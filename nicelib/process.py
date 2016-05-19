@@ -73,7 +73,8 @@ class Token(object):
         return self.type is other_type and self.string == other_string
 
     def __str__(self):
-        return '{}({})'.format(self.type.name, self.string)
+        string = '' if self.string == '\n' else self.string
+        return '[{}:{}] {}({})'.format(self.line, self.col, self.type.name, string)
 
     def __repr__(self):
         return str(self)
