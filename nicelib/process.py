@@ -99,15 +99,15 @@ class Lexer(object):
         lines = f.read().splitlines()
         joined_lines = []
         continued_line = ''
-        c_lineno = 1
+        source_lineno = 1
         for line in lines:
             if line.endswith("\\"):
                 continued_line = continued_line + line[:-1]
-                self.esc_newlines[c_lineno] += 1
+                self.esc_newlines[source_lineno] += 1
             else:
                 joined_lines.append(continued_line + line)
                 continued_line = ''
-                c_lineno += 1
+                source_lineno += 1 + self.esc_newlines.get(source_lineno, 0)
         text = '\n'.join(joined_lines)
         return lexer._lex_text(text)
 
@@ -122,8 +122,10 @@ class Lexer(object):
                 tokens.append(token)
             pos = pos + len(token.string)
 
-            self.line += token.string.count('\n') + self.esc_newlines.get(self.line, 0)
-            self.col = len(token.string.rsplit('\n', 1)[-1]) + 1
+            for i in range(token.string.count('\n')):
+                self.line += 1 + self.esc_newlines.get(self.line, 0)
+                self.col = 1
+            self.col += len(token.string.rsplit('\n', 1)[-1])
 
         return tokens
 
