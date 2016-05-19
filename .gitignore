@@ -1,0 +1,14 @@
+*~
+*.pyc
+*.pyo
+*.swp
+
+/bin/
+/build/
+/dist/
+/*.egg-info/
+
+/docs/_build
+/docs/_themes
+
+Release/
