@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015-2016 Nate Bogdanowicz
+from builtins import str, zip, object
+from past.builtins import basestring
+from future.utils import with_metaclass
+
 import sys
 import warnings
 from inspect import isfunction
@@ -151,7 +155,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buf
             else:
                 raise Exception("Unrecognized arg info '{}'".format(info))
 
-            if isinstance(arg, unicode):
+            if isinstance(arg, str):
                 arg = arg.encode('ascii')
             args.append(arg)
 
@@ -192,15 +196,15 @@ class NiceObject(object):
                             "compatible with the context manager syntax")
         outer_vars = sys._getframe(1).f_locals
         self.doc = outer_vars.pop('__doc__', None)
-        self._enter_names = outer_vars.keys()  # Not including __doc__
+        self._enter_names = set(outer_vars.keys())  # Not including __doc__
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         outer_vars = sys._getframe(1).f_locals
         new_doc = outer_vars.pop('__doc__', None)
 
-        exit_names = outer_vars.keys()
-        self.names = set(exit_names).difference(set(self._enter_names))
+        exit_names = set(outer_vars.keys())
+        self.names = exit_names.difference(self._enter_names)
 
         if new_doc:
             outer_vars['__doc__'] = self.doc  # Put old var back
@@ -376,7 +380,7 @@ class LibFunction(object):
         return self._repr
 
 
-class NiceLib(object):
+class NiceLib(with_metaclass(LibMeta, object)):
     """Base class for mid-level library wrappers
 
     Provides a nice interface for quickly defining mid-level library wrappers. You define your own
@@ -402,7 +406,6 @@ class NiceLib(object):
         The default length for buffers. This can be overridden on a per-argument basis in the
         argument's spec string, e.g `'buf64'` will make a 64-byte buffer.
     """
-    __metaclass__ = LibMeta
     _ffi = None  # MUST be filled in by subclass
     _lib = None  # MUST be filled in by subclass
     _defs = None

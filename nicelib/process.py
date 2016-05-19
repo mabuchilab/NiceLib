@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Nate Bogdanowicz
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str, range, object
+
 import re
 import warnings
 import platform
@@ -7,7 +11,7 @@ import logging as log
 from enum import Enum
 from collections import OrderedDict, namedtuple, defaultdict
 import ast
-from cStringIO import StringIO
+from io import StringIO
 from pycparser import c_parser, c_ast
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
@@ -34,7 +38,10 @@ BINARY_OP_STR = {
 }
 CMP_OP_STR = {'==': '==', '!=': '!=', '<': '<', '<=': '<=', '>': '>', '<=': '<='}
 BOOL_OP_STR = {'&&': ' and ', '||': ' or '}
-ALL_BINOP_STRS = dict(BINARY_OP_STR.items() + CMP_OP_STR.items() + BOOL_OP_STR.items())
+ALL_BINOP_STRS = {}
+ALL_BINOP_STRS.update(BINARY_OP_STR)
+ALL_BINOP_STRS.update(CMP_OP_STR)
+ALL_BINOP_STRS.update(BOOL_OP_STR)
 
 
 class EndOfStreamError(Exception):

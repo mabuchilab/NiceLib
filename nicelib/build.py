@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Nate Bogdanowicz
+from __future__ import print_function
+from past.builtins import basestring
+
 import sys
 import os
 import os.path
