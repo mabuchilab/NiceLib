@@ -846,9 +846,12 @@ def to_py_src(node):
         py_src = [node.name.name, '(', args, ')']
 
     elif isinstance(node, c_ast.Cast):
-        py_type_map = {'int': 'int', 'long': 'int', 'float': 'float', 'double': 'float'}
-        py_type = py_type_map[''.join(node.to_type.type.type.names)]
-        py_src = [py_type, '('] + to_py_src(node.expr) + [')']
+        if not isinstance(node.to_type.type, c_ast.TypeDecl):
+            raise ConvertError("Unsupported cast type {}".format(node.to_type.type))
+        type_str = ' '.join(node.to_type.type.type.names)
+        py_type = 'float' if ('float' in type_str or 'double' in type_str) else 'int'
+        cast_str = 'ffi.cast("{}", '.format(type_str)
+        py_src = [py_type, '(', cast_str, '('] + to_py_src(node.expr) + ['))']
 
     else:
         raise ConvertError("Unsupported c_ast type {}".format(type(node)))
@@ -871,6 +874,7 @@ def process_file(in_fname, out_fname, minify):
 
     with open('macros.py', 'w') as f:
         #f.writelines("{} = {}\n".format(name, val) for name, val in parser.macro_vals.items())
+        f.write("from builtins import int\n")
         for name, macro in parser.macros.items():
             if not macro.dependencies_satisfied:
                 f.write("# ")
