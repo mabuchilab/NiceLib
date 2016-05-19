@@ -383,9 +383,8 @@ class LibFunction(object):
 class NiceLib(with_metaclass(LibMeta, object)):
     """Base class for mid-level library wrappers
 
-    Provides a nice interface for quickly defining mid-level library wrappers. You define your own
-    subclass for each specific library (DLL), then create an instance for each instance of your
-    Instrument subclass. See the examples in the developer docs for more info.
+    Provides a nice interface for quickly defining mid-level library wrappers. You define a
+    subclass for each specific library (DLL).
 
     Attributes
     ----------
@@ -393,18 +392,23 @@ class NiceLib(with_metaclass(LibMeta, object)):
         FFI instance variable. Required.
     _lib
         FFI library opened with `dlopen()`. Required.
-    _prefix : str, optional
-        Prefix to strip from the library function names. E.g. If the library has functions named
-        like ``SDK_Func()``, you can set `_prefix` to ``'SDK_'``, and access them as `Func()`.
+    _ defs
+        Object whose attributes are the Python-equivalent macros defined in the header file(s).
+        Optional.
+    _prefix : str or sequence of strs, optional
+        Prefix(es) to strip from the library function names. E.g. If the library has functions
+        named like ``SDK_Func()``, you can set `_prefix` to ``'SDK_'``, and access them as
+        `Func()`. If more than one prefix is given, they are tried in order for each signature
+        until the appropraite function is found.
     _err_wrap : function, optional
         Wrapper function to handle error codes returned by each library function.
     _struct_maker : function, optional
         Function that is called to create an FFI struct of the given type. Mainly useful for
         odd libraries that require you to always fill out some field of the struct, like its size
-        in bytes (I'm looking at you PCO...)
+        in bytes
     _buflen : int, optional
         The default length for buffers. This can be overridden on a per-argument basis in the
-        argument's spec string, e.g `'buf64'` will make a 64-byte buffer.
+        argument's spec string, e.g `'len=64'` will make a 64-byte buffer.
     """
     _ffi = None  # MUST be filled in by subclass
     _lib = None  # MUST be filled in by subclass
