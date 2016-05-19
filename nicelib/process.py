@@ -257,7 +257,7 @@ class Parser(object):
             except EndOfStreamError:
                 break
 
-            if update_cb:
+            if update_cb and self.out:
                 update_cb(self.out[-1].line, self.last_line)
 
         for macro in self.all_macros.values():
