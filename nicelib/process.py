@@ -56,10 +56,20 @@ class ConvertError(Exception):
     pass
 
 
-class ParseError(Exception):
+class PreprocessorError(Exception):
     def __init__(self, token, msg):
-        msg = "({}:{}) {}".format(token.line, token.col, msg)
-        super(ParseError, self).__init__(msg)
+        msg = "[{}:{}:{}] {}".format(token.fname, token.line, token.col, msg)
+        super(PreprocessorError, self).__init__(msg)
+
+
+class PreprocessorWarning(Warning):
+    def __init__(self, token, msg):
+        msg = "[{}:{}:{}] {}".format(token.fname, token.line, token.col, msg)
+        super(PreprocessorWarning, self).__init__(msg)
+
+
+class ParseError(PreprocessorError):
+    pass
 
 
 class Token(object):
