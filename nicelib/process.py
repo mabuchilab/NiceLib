@@ -242,6 +242,8 @@ class Parser(object):
             'undef': self.parse_undef,
             'pragma': self.parse_pragma,
             'include': self.parse_include,
+            'error': self.parse_error,
+            'warning': self.parse_warning,
         }
 
     def pop(self, test_type=None, test_string=None, dont_ignore=(), silent=False):
@@ -752,6 +754,21 @@ class Parser(object):
 
     def parse_pragma(self):
         self.pop_until_newline()  # Ignore pragmas
+        return False
+
+    def parse_error(self):
+        tokens = self.pop_until_newline()
+        if not self.skipping:
+            log.info("macros = {}".format(self.macros))
+            message = ''.join(token.string for token in tokens)
+            raise PreprocessorError(tokens[0], message)
+        return False
+
+    def parse_warning(self):
+        tokens = self.pop_until_newline()
+        if not self.skipping:
+            message = ''.join(token.string for token in tokens)
+            warnings.warn(PreprocessorWarning(tokens[0], message))
         return False
 
     def parse_include(self):
