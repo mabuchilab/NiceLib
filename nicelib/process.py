@@ -551,8 +551,7 @@ class Parser(object):
                     done = True
         return expanded
 
-    @classmethod
-    def macro_expand_funclike_body(cls, macro, exp_arg_lists, blacklist=[], func_blacklist=[]):
+    def macro_expand_funclike_body(self, macro, exp_arg_lists, blacklist=[], func_blacklist=[]):
         body = []
         last_real_token = None
         last_real_token_idx = -1
@@ -590,7 +589,7 @@ class Parser(object):
                     last_real_token_idx = len(body) - 1
 
         # Expand body and return
-        return cls.macro_expand_2(body, blacklist, func_blacklist + [macro.name])
+        return self.macro_expand_2(body, blacklist, func_blacklist + [macro.name])
 
     def macro_expand_tokens(self, tokens, blacklist=[]):
         expanded = []
