@@ -468,10 +468,14 @@ class Parser(object):
 
         while not done:
             if token.type is Token.IDENTIFIER:
-                if tokens:
+                done = True
+                while tokens:
                     next_token = tokens.pop(0)
-                else:
-                    done = True
+                    if next_token.type is Token.WHITESPACE:
+                        expanded.append(token)
+                    else:
+                        done = False
+                        break
 
                 if (not done and next_token.string == '(' and token.string in self.func_macros and
                         token.string not in func_blacklist):
