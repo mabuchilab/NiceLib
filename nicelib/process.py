@@ -498,8 +498,12 @@ class Parser(object):
         return tokens
 
     def parse_if(self):
-        value = self.parse_expression(self.pop_until_newline())
-        self.start_if_clause(bool(value))
+        if self.skipping:
+            self.pop_until_newline
+            self.start_if_clause(False)
+        else:
+            value = self.parse_expression(self.pop_until_newline())
+            self.start_if_clause(bool(value))
         return False
 
     def macro_expand_2(self, tokens, blacklist=[], func_blacklist=[]):
@@ -665,25 +669,41 @@ class Parser(object):
         return eval(py_src, {})
 
     def parse_ifdef(self):
-        macro = self.parse_macro()
-        self.start_if_clause(macro is not None)
-        self.assert_line_empty()
+        if self.skipping:
+            self.pop_until_newline()
+            self.start_if_clause(False)
+        else:
+            macro = self.parse_macro()
+            self.start_if_clause(macro is not None)
+            self.assert_line_empty()
         return False
 
     def parse_ifndef(self):
-        macro = self.parse_macro()
-        self.start_if_clause(macro is None)
-        self.assert_line_empty()
+        if self.skipping:
+            self.pop_until_newline()
+            self.start_if_clause(False)
+        else:
+            macro = self.parse_macro()
+            self.start_if_clause(macro is None)
+            self.assert_line_empty()
         return False
 
     def parse_else(self):
-        self.start_else_clause()
-        self.assert_line_empty()
+        if not all(self.cond_stack[:-1]):  # if outer scope is skipping
+            self.pop_until_newline()
+            self.start_else_clause()
+        else:
+            self.start_else_clause()
+            self.assert_line_empty()
         return False
 
     def parse_elif(self):
-        value = self.parse_expression(self.pop_until_newline())
-        self.start_elif_clause(bool(value))
+        if not all(self.cond_stack[:-1]):  # if outer scope is skipping
+            self.pop_until_newline()
+            self.start_elif_clause(False)
+        else:
+            value = self.parse_expression(self.pop_until_newline())
+            self.start_elif_clause(bool(value))
         return False
 
     def parse_endif(self):
