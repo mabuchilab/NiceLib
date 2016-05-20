@@ -563,7 +563,6 @@ class Parser(object):
         last_real_token = None
         last_real_token_idx = -1
         concatting = False
-        log.debug("Macro body = {}".format(macro.body))
         for token in macro.body:
             if concatting:
                 if token.type not in (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT,
@@ -707,6 +706,7 @@ class Parser(object):
                 macro = FuncMacro(name_token, body, args, un_pythonable)
                 self.func_macros[name_token.string] = macro
                 self.all_macros[name_token.string] = macro
+                log.info("Saving func-macro {} = {}".format(macro, body))
         else:
             # Object-like macro
             dont_ignore = (Token.WHITESPACE, Token.BLOCK_COMMENT, Token.LINE_COMMENT)
@@ -717,6 +717,7 @@ class Parser(object):
                 macro = Macro(name_token, body)
                 self.macros[name_token.string] = macro
                 self.all_macros[name_token.string] = macro
+                log.info("Saving obj-macro {} = {}".format(macro, body))
 
         # Output all the tokens we suppressed
         self.out_line.extend(tokens)
