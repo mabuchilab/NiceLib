@@ -236,7 +236,7 @@ class LibMeta(type):
             prefixes = tuple(prefixes) + ('',)
 
         niceobjects = {}  # name: NiceObject
-        for name, value in classdict.items():
+        for name, value in list(classdict.items()):
             if isinstance(value, NiceObject):
                 if value.attrs is None:
                     value.names.remove(name)  # Remove self
