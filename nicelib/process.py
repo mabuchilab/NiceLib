@@ -5,6 +5,7 @@ standard_library.install_aliases()
 from builtins import str, range, object
 
 import re
+import os.path
 import warnings
 import platform
 import logging as log
@@ -222,9 +223,13 @@ class Parser(object):
         self.out = []
         self.cond_stack = []
         self.cond_done_stack = []
-        self.macros = OrderedDict()
-        self.func_macros = OrderedDict()
+
+        self.macros = OrderedDict(obj_macros)
+        self.func_macros = OrderedDict(func_macros)
         self.all_macros = OrderedDict()
+        self.all_macros.update(self.macros)
+        self.all_macros.update(self.func_macros)
+
         self.expand_macros = True
         self.skipping = False
         self.output_defines = False
@@ -773,6 +778,28 @@ class Parser(object):
         return False
 
 
+def get_preprocessor_macros():
+    PREDEF_MACRO_STR = """
+        #define __unix__ 1
+        #define __x86_64 1
+        #define __linux 1
+        #define __unix 1
+        #define __linux__ 1
+        #define __SIZEOF_INT__ 4
+        #define __SIZEOF_POINTER__ 8
+        #define __GNUC__ 6
+        #define __gnu_linux__ 1
+        #define __amd64 1
+        #define unix 1
+        #define __x86_64__ 1
+        #define linux 1
+        #define __amd64__ 1
+        #define __STDC__ 1
+    """
+    parser = Parser(PREDEF_MACRO_STR, '<predef>')
+    parser.parse()
+    return parser.macros, parser.func_macros
+
 # Ordered by precedence - should usually be longest match first
 replacement_maps = {
     'Windows': [
@@ -976,7 +1003,9 @@ def process_header(in_fname, minify, update_cb=None):
     with open(in_fname, 'rU') as f:
         source = f.read()
 
-    parser = Parser(source, in_fname, replacement_maps.get(platform.system()))
+    OBJ_MACROS, FUNC_MACROS = get_preprocessor_macros()
+    parser = Parser(source, in_fname, replacement_maps.get(platform.system()), OBJ_MACROS,
+                    FUNC_MACROS)
     parser.parse(update_cb=update_cb)
 
     header_io = StringIO()
