@@ -13,7 +13,7 @@ from enum import Enum
 from collections import OrderedDict, namedtuple, defaultdict
 import ast
 from io import StringIO
-from pycparser import c_parser, c_ast
+from pycparser import c_parser, c_ast, plyparser
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
 
@@ -944,7 +944,12 @@ def src_to_c_ast(source):
     if ';' in source:
         raise ConvertError("C-to-Py supports only expressions, not statements")
     parser = c_parser.CParser()
-    tree = parser.parse('int main(void){' + source + ';}')
+
+    try:
+        tree = parser.parse('int main(void){' + source + ';}')
+    except plyparser.ParseError as e:
+        raise ConvertError(e)
+
     expr_node = tree.ext[0].body.block_items[0]
     return expr_node
 
