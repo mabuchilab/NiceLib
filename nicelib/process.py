@@ -355,7 +355,7 @@ class Parser(object):
                     try:
                         macro.py_src = c_to_py_src(c_src)
                     except ConvertError as e:
-                        raise ParseError(macro, e.message)
+                        raise ParseError(macro, str(e))
                     log.debug("body = {}".format(macro.py_src))
             else:
                 log.debug("Generating body of object-like macro {} "
@@ -377,7 +377,7 @@ class Parser(object):
                     try:
                         macro.py_src = c_to_py_src(c_src)
                     except ConvertError as e:
-                        raise ParseError(macro, e.message)
+                        raise ParseError(macro, str(e))
                     log.debug("body = {}".format(macro.py_src))
 
     def parse_next(self):
@@ -941,7 +941,7 @@ def c_to_py_src(c_src):
 def src_to_c_ast(source):
     """Convert C expression source str to a c_ast expression node"""
     if ';' in source:
-        raise Exception("C-to-Py supports only expressions, not statements")
+        raise ConvertError("C-to-Py supports only expressions, not statements")
     parser = c_parser.CParser()
     tree = parser.parse('int main(void){' + source + ';}')
     expr_node = tree.ext[0].body.block_items[0]
