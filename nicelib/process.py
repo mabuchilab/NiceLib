@@ -231,6 +231,7 @@ class Parser(object):
         while True:
             try:
                 token = tokens.pop(0)
+                log.debug("Popped token {}".format(token))
             except IndexError:
                 raise EndOfStreamError
 
@@ -239,8 +240,6 @@ class Parser(object):
 
             if (token.type in dont_ignore) or (token.type not in self._ignored_tokens):
                 break
-
-        log.debug("Popped token {}".format(token))
 
         if test_type is not None and token.type != test_type:
             raise ParseError(token, "Expected token type {}, got {}".format(test_type, token.type))
@@ -263,13 +262,19 @@ class Parser(object):
 
         for macro in self.all_macros.values():
             if isinstance(macro, FuncMacro):
+                log.debug("Generating body of function-like macro {} "
+                          "[{}:{}]".format(macro.name, macro.line, macro.col))
+
                 if macro.body and not macro.un_pythonable:
                     c_src = ''.join(token.string for token in macro.body)
                     try:
                         macro.py_src = c_to_py_src(c_src)
                     except ConvertError as e:
                         raise ParseError(macro, e.message)
+                    log.debug("body = {}".format(macro.py_src))
             else:
+                log.debug("Generating body of object-like macro {} "
+                          "[{}:{}]".format(macro.name, macro.line, macro.body))
                 if self.expand_macros:
                     macro.body = self.macro_expand_2(macro.body)
 
@@ -288,6 +293,7 @@ class Parser(object):
                         macro.py_src = c_to_py_src(c_src)
                     except ConvertError as e:
                         raise ParseError(macro, e.message)
+                    log.debug("body = {}".format(macro.py_src))
 
     def parse_next(self):
         self.out_line = []
@@ -297,6 +303,7 @@ class Parser(object):
             if not self.skipping:
                 self.out.extend(self.out_line)
         elif token.matches(Token.PUNCTUATOR, '#'):
+            log.debug("Parsing directive")
             dir_token = self.pop()
             parse_directive = self.directive_parse_func[dir_token.string]
             keep_line = parse_directive()
