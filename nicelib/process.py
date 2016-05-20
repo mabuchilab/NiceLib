@@ -182,9 +182,10 @@ class Macro(object):
 
 
 class FuncMacro(Macro):
-    def __init__(self, name_token, body, args):
+    def __init__(self, name_token, body, args, un_pythonable):
         super(FuncMacro, self).__init__(name_token, body)
         self.args = args
+        self.un_pythonable = un_pythonable
 
 
 class Parser(object):
@@ -262,7 +263,7 @@ class Parser(object):
 
         for macro in self.all_macros.values():
             if isinstance(macro, FuncMacro):
-                if macro.body:
+                if macro.body and not macro.un_pythonable:
                     c_src = ''.join(token.string for token in macro.body)
                     try:
                         macro.py_src = c_to_py_src(c_src)
@@ -620,9 +621,14 @@ class Parser(object):
             dont_ignore = (Token.WHITESPACE, Token.BLOCK_COMMENT, Token.LINE_COMMENT)
             tokens = self.pop_until_newline(silent=True, dont_ignore=dont_ignore)
 
+            un_pythonable = False
+            for token in tokens:
+                if token.string == '##':
+                    un_pythonable = True
+
             if not self.skipping:
                 preamble, body, postamble = self._split_body(tokens)
-                macro = FuncMacro(name_token, body, args)
+                macro = FuncMacro(name_token, body, args, un_pythonable)
                 self.func_macros[name_token.string] = macro
                 self.all_macros[name_token.string] = macro
         else:
