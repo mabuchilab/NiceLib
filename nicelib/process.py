@@ -480,20 +480,11 @@ class Parser(object):
 
                     # Expand args
                     exp_arg_lists = [self.macro_expand_2(a, blacklist, func_blacklist +
-                                                         [token.string]) for a in arg_lists]
+                                                         [name]) for a in arg_lists]
 
-                    # Substitute args into body
-                    body = []
-                    for token in macro.body:
-                        if token.type is Token.IDENTIFIER and token.string in macro.args:
-                            arg_idx = macro.args.index(token.string)
-                            body.extend(exp_arg_lists[arg_idx])
-                        else:
-                            body.append(token)
-
-                    # Expand body
-                    expanded.extend(self.macro_expand_2(body, blacklist, func_blacklist +
-                                                        [token.string]))
+                    # Substitute args into body, then expand it
+                    body = self.macro_expand_funclike_body(macro, exp_arg_lists)
+                    expanded.extend(body)
 
                     if tokens:
                         token = tokens.pop(0)
@@ -519,6 +510,47 @@ class Parser(object):
                 else:
                     done = True
         return expanded
+
+    @classmethod
+    def macro_expand_funclike_body(cls, macro, exp_arg_lists, blacklist=[], func_blacklist=[]):
+        body = []
+        last_real_token = None
+        last_real_token_idx = -1
+        concatting = False
+        log.debug("Macro body = {}".format(macro.body))
+        for token in macro.body:
+            if concatting:
+                if token.type not in (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT,
+                                      Token.BLOCK_COMMENT):
+                    concat_str = last_real_token.string + token.string
+                    log.debug("Macro concat produced '{}'".format(concat_str))
+                    new_token = lexer.read_token(concat_str, pos=0)
+                    body.append(new_token)
+                    concatting = False
+                continue
+
+            if token.type is Token.IDENTIFIER and token.string in macro.args:
+                arg_idx = macro.args.index(token.string)
+                for arg_token in exp_arg_lists[arg_idx]:
+                    body.append(arg_token)
+                    if arg_token.type not in (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT,
+                                              Token.BLOCK_COMMENT):
+                        last_real_token = arg_token
+                        last_real_token_idx = len(body) - 1
+            elif token.string == '##':
+                log.debug("Saw ##")
+                body = body[:last_real_token_idx]
+                concatting = True
+                last_real_token_idx = -1
+            else:
+                body.append(token)
+                if token.type not in (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT,
+                                      Token.BLOCK_COMMENT):
+                    last_real_token = token
+                    last_real_token_idx = len(body) - 1
+
+        # Expand body and return
+        return cls.macro_expand_2(body, blacklist, func_blacklist + [macro.name])
 
     def macro_expand_tokens(self, tokens, blacklist=[]):
         expanded = []
