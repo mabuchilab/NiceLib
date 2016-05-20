@@ -462,7 +462,7 @@ class Parser(object):
                 match = False
 
             if match:
-                for _ in range(i-1):
+                for _ in range(i - 1):
                     self.out.pop(-1)
                 self.out.extend(repl_tokens)
                 break  # Only allow a single replacement
@@ -514,7 +514,7 @@ class Parser(object):
         tokens = []
         while True:
             try:
-                token = self.pop(dont_ignore=(Token.NEWLINE,)+dont_ignore, silent=silent)
+                token = self.pop(dont_ignore=(Token.NEWLINE,) + dont_ignore, silent=silent)
             except EndOfStreamError:  # End of token stream
                 break
 
@@ -1078,7 +1078,6 @@ def process_file(in_fname, out_fname, minify):
 
 
 def process_header(in_fname, minify, update_cb=None):
-    base_dir = os.path.dirname(in_fname)
     with open(in_fname, 'rU') as f:
         source = f.read()
 
@@ -1113,7 +1112,6 @@ def process_header(in_fname, minify, update_cb=None):
 if __name__ == '__main__':
     process_file('./NIDAQmx.h', './NIDAQmx_clean.h', minify=True)
     #process_file('uc480.h', 'uc480_clean.h', minify=True)
-
 
 
 # NOTES
