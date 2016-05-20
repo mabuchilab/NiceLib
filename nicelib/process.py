@@ -387,10 +387,17 @@ class Parser(object):
             if not self.skipping:
                 self.out.extend(self.out_line)
         elif token.matches(Token.PUNCTUATOR, '#'):
-            log.debug("Parsing directive")
             dir_token = self.pop()
-            parse_directive = self.directive_parse_func[dir_token.string]
-            keep_line = parse_directive()
+            log.debug("Parsing directive")
+            parse_directive = self.directive_parse_func.get(dir_token.string)
+
+            if parse_directive is not None:
+                keep_line = parse_directive()
+            elif self.skipping:
+                self.pop_until_newline()  # Unrecog
+                keep_line = False
+            else:
+                raise ParseError(dir_token, "Unrecognized directive #{}".format(dir_token.string))
 
             if keep_line:
                 self.out.extend(self.out_line)
