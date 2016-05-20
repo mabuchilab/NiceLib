@@ -98,17 +98,19 @@ class Lexer(object):
     def __init__(self):
         self.regexes = OrderedDict()
         self.ignored = []
-        self.line = 1
-        self.col = 1
-        self.esc_newlines = defaultdict(int)
 
     def add(self, name, regex_str, ignore=False):
         self.regexes[name] = re.compile(regex_str)
         if ignore:
             self.ignored.append(name)
 
-    def lex(self, f):
-        lines = f.read().splitlines()
+    def lex(self, text, fname='<string>'):
+        self.line = 1
+        self.col = 1
+        self.fname = fname
+        self.esc_newlines = defaultdict(int)
+
+        lines = text.splitlines()
         joined_lines = []
         continued_line = ''
         source_lineno = 1
@@ -141,7 +143,7 @@ class Lexer(object):
 
         return tokens
 
-    def read_token(self, text, pos):
+    def read_token(self, text, pos=0):
         """Read the next token from text, starting at pos"""
         best_token = None
         best_size = 0
@@ -150,7 +152,7 @@ class Lexer(object):
             if match:
                 size = match.end() - match.start()
                 if size > best_size:
-                    best_token = Token(token_type, match.group(0), self.line, self.col)
+                    best_token = Token(token_type, match.group(0), self.line, self.col, self.fname)
                     best_size = size
         return best_token
 
@@ -212,9 +214,10 @@ class FuncMacro(Macro):
 
 
 class Parser(object):
-    def __init__(self, tokens, replacement_map=[]):
-        self.tokens = tokens
-        self.last_line = tokens[-1].line
+    def __init__(self, source, fpath='', replacement_map=[], obj_macros={}, func_macros={}):
+        self.base_dir, self.fname = os.path.split(fpath)
+        self.tokens = lexer.lex(source, self.fname)
+        self.last_line = self.tokens[-1].line
         self.replacement_map = replacement_map
         self.out = []
         self.cond_stack = []
@@ -934,7 +937,7 @@ def to_py_src(node):
 
 def process_file(in_fname, out_fname, minify):
     with open(in_fname, 'rU') as f:
-        tokens = lexer.lex(f)
+        tokens = lexer.lex(f.read())
 
     parser = Parser(tokens, replacement_maps.get(platform.system()))
     parser.parse()
@@ -955,10 +958,11 @@ def process_file(in_fname, out_fname, minify):
 
 
 def process_header(in_fname, minify, update_cb=None):
+    base_dir = os.path.dirname(in_fname)
     with open(in_fname, 'rU') as f:
-        tokens = lexer.lex(f)
+        source = f.read()
 
-    parser = Parser(tokens, replacement_maps.get(platform.system()))
+    parser = Parser(source, in_fname, replacement_maps.get(platform.system()))
     parser.parse(update_cb=update_cb)
 
     header_io = StringIO()
