@@ -395,43 +395,17 @@ class Parser(object):
             if keep_line:
                 self.out.extend(self.out_line)
         else:
-            chunk = [token]
-            dont_ignore = (Token.NEWLINE, Token.WHITESPACE, Token.LINE_COMMENT,
-                           Token.BLOCK_COMMENT)
-            while True:
-                if token.type is Token.IDENTIFIER:
-                    next_token = self.pop(silent=True, dont_ignore=dont_ignore)
-                    chunk.append(next_token)
-                    if (next_token.matches(Token.PUNCTUATOR, '(') and
-                            self.func_macro_defined(token.string)):
-                        # Pop tokens until the closing paren
-                        arg_lists = [[]]
-                        n_parens = 1
-                        while n_parens > 0:
-                            token = self.pop(silent=True, dont_ignore=dont_ignore)
-                            chunk.append(token)
-                            if token.string == '(':
-                                n_parens += 1
-                            elif token.string == ')':
-                                n_parens -= 1
-
-                            if token.string == ',' and n_parens == 1:
-                                arg_lists.append([])
-                            elif n_parens > 0:
-                                arg_lists[-1].append(token)
-                        token = self.pop(silent=True, dont_ignore=dont_ignore)
-                        chunk.append(token)
-                    else:
-                        token = next_token
-                elif token.type is Token.NEWLINE:
-                    break  # Done with this line
-                else:
-                    # Ordinary token
-                    token = self.pop(silent=True, dont_ignore=dont_ignore)
-                    chunk.append(token)
+            # Grab tokens until we get to a line with a '#'
+            last_newline_idx = 0
+            for i, token in enumerate(self.tokens):
+                if token.type is Token.NEWLINE:
+                    last_newline_idx = i
+                elif token.string == '#':
+                    break
+            expanded = self.macro_expand_2(self.tokens[:last_newline_idx])
+            self.tokens = self.tokens[last_newline_idx:]
 
             # Add to output
-            expanded = self.macro_expand_2(chunk)
             if not self.skipping:
                 for token in expanded:
                     self.out.append(token)
