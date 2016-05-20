@@ -224,8 +224,8 @@ class LibMeta(type):
         ffi = classdict['_ffi']
         lib = classdict['_lib']
         defs = mro_lookup('_defs')
-        prefixes = classdict['_prefix']
-        err_wrap = classdict['_err_wrap']
+        prefixes = mro_lookup('_prefix')
+        err_wrap = mro_lookup('_err_wrap')
         struct_maker = mro_lookup('_struct_maker') or (ffi.new if ffi else None)
         buflen = mro_lookup('_buflen')
 
@@ -414,9 +414,11 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _lib = None  # MUST be filled in by subclass
     _defs = None
     _prefix = ''
-    _err_wrap = None
     _struct_maker = None  # ffi.new
     _buflen = 512
+
+    def _err_wrap(ret_code):
+        pass
 
     def __new__(cls):
         raise Exception("Not allowed to instantiate {}".format(cls))
