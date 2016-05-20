@@ -73,18 +73,19 @@ class ParseError(PreprocessorError):
 
 
 class Token(object):
-    def __init__(self, type, string, line=0, col=0):
+    def __init__(self, type, string, line=0, col=0, fname='<string>'):
         self.type = type
         self.string = string
         self.line = line
         self.col = col
+        self.fname = fname
 
     def matches(self, other_type, other_string):
         return self.type is other_type and self.string == other_string
 
     def __str__(self):
         string = '' if self.string == '\n' else self.string
-        return '[{}:{}] {}({})'.format(self.line, self.col, self.type.name, string)
+        return '{}[{}:{}:{}]({})'.format(self.type.name, self.fname, self.line, self.col, string)
 
     def __repr__(self):
         return str(self)
