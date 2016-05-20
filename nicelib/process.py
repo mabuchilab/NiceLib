@@ -215,7 +215,7 @@ class FuncMacro(Macro):
 
 
 class Parser(object):
-    def __init__(self, source, fpath='', replacement_map=[], obj_macros={}, func_macros={},
+    def __init__(self, source, fpath='', replacement_map=[], obj_macros=[], func_macros=[],
                  include_dirs=[]):
         self.base_dir, self.fname = os.path.split(fpath)
         self.tokens = lexer.lex(source, self.fname)
@@ -226,11 +226,10 @@ class Parser(object):
         self.cond_done_stack = []
         self.include_dirs = include_dirs
 
-        self.macros = OrderedDict(obj_macros)
-        self.func_macros = OrderedDict(func_macros)
-        self.all_macros = OrderedDict()
-        self.all_macros.update(self.macros)
-        self.all_macros.update(self.func_macros)
+        self.predef_obj_macros = {m.name: m for m in obj_macros}
+        self.predef_func_macros = {m.name: m for m in func_macros}
+        self.obj_macros = OrderedDict()
+        self.func_macros = OrderedDict()
 
         self.expand_macros = True
         self.skipping = False
@@ -252,6 +251,55 @@ class Parser(object):
             'error': self.parse_error,
             'warning': self.parse_warning,
         }
+
+    def obj_macro_defined(self, name):
+        return (name in self.obj_macros) or (name in self.predef_obj_macros)
+
+    def func_macro_defined(self, name):
+        return (name in self.func_macros) or (name in self.predef_func_macros)
+
+    def any_macro_defined(self, name):
+        return any(name in d.keys() for d in (self.obj_macros, self.func_macros,
+                                              self.predef_obj_macros, self.predef_func_macros))
+
+    def get_obj_macro(self, name, default=None):
+        if name in self.obj_macros:
+            return self.obj_macros[name]
+        elif name in self.predef_obj_macros:
+            return self.predef_obj_macros[name]
+        return default
+
+    def get_func_macro(self, name, default=None):
+        if name in self.func_macros:
+            return self.func_macros[name]
+        elif name in self.predef_func_macros:
+            return self.predef_func_macros[name]
+        return default
+
+    def get_any_macro(self, name, default=None):
+        for macros in (self.obj_macros, self.func_macros, self.predef_obj_macros,
+                       self.predef_func_macros):
+            if name in macros:
+                return macros[name]
+        return default
+
+    def add_obj_macro(self, macro):
+        self.obj_macros[macro.name] = macro
+
+    def add_func_macro(self, macro):
+        self.func_macros[macro.name] = macro
+
+    def undef_macro(self, name):
+        if name in self.obj_macros:
+            del self.obj_macros[name]
+        elif name in self.func_macros:
+            del self.func_macros[name]
+        else:
+            warnings.warn("#undef of nonexistent macro")
+
+    def ordered_macro_items(self):
+        all_items = list(self.obj_macros.items()) + list(self.func_macros.items())
+        return sorted(all_items, key=(lambda tup: (tup[1].line, tup[1].col)))
 
     def pop(self, test_type=None, test_string=None, dont_ignore=(), silent=False):
         return self._pop_base(self.tokens, test_type, test_string, dont_ignore, silent,
@@ -295,7 +343,8 @@ class Parser(object):
             if update_cb and self.out:
                 update_cb(self.out[-1].line, self.last_line)
 
-        for macro in self.all_macros.values():
+        self.macros = [macro for (name, macro) in self.ordered_macro_items()]
+        for macro in self.macros:
             if isinstance(macro, FuncMacro):
                 log.debug("Generating body of function-like macro {} "
                           "[{}:{}]".format(macro.name, macro.line, macro.col))
@@ -315,7 +364,7 @@ class Parser(object):
 
                 macro.dependencies_satisfied = True
                 for macro_name in macro.depends_on:
-                    if macro_name not in self.macros:
+                    if not self.obj_macro_defined(macro_name):
                         macro.dependencies_satisfied = False
 
                 #c_src = ''.join(token.string for token in tokens)
@@ -354,7 +403,7 @@ class Parser(object):
                     next_token = self.pop(silent=True, dont_ignore=dont_ignore)
                     chunk.append(next_token)
                     if (next_token.matches(Token.PUNCTUATOR, '(') and
-                            token.string in self.func_macros):
+                            self.func_macro_defined(token.string)):
                         # Pop tokens until the closing paren
                         arg_lists = [[]]
                         n_parens = 1
@@ -420,7 +469,7 @@ class Parser(object):
 
     def parse_macro(self):
         token = self.pop()
-        return self.macros.get(token.string, None)
+        return self.get_obj_macro(token.string, None)
 
     def start_if_clause(self, condition):
         self.cond_stack.append(condition)
@@ -500,13 +549,14 @@ class Parser(object):
                         done = False
                         break
 
-                if (not done and next_token.string == '(' and token.string in self.func_macros and
+                if (not done and next_token.string == '(' and
+                        self.func_macro_defined(token.string) and
                         token.string not in func_blacklist):
                     # Func-like macro
                     # Pop tokens until the closing paren
                     name_token = token
                     name = token.string
-                    macro = self.func_macros[name]
+                    macro = self.get_func_macro(name)
                     arg_lists = [[]]
                     n_parens = 1
                     while n_parens > 0:
@@ -538,9 +588,9 @@ class Parser(object):
                     else:
                         done = True
                 else:
-                    if token.string in self.macros and token.string not in blacklist:
+                    if self.obj_macro_defined(token.string) and token.string not in blacklist:
                         # Object-like macro expand
-                        body = self.macros[token.string].body
+                        body = self.get_obj_macro(token.string).body
                         expanded.extend(self.macro_expand_2(body, blacklist + [token.string],
                                                             func_blacklist))
                     else:
@@ -600,9 +650,9 @@ class Parser(object):
     def macro_expand_tokens(self, tokens, blacklist=[]):
         expanded = []
         for token in tokens:
-            if (token.type is Token.IDENTIFIER and token.string in self.macros and
+            if (token.type is Token.IDENTIFIER and self.obj_macro_defined(token.string) and
                     token.string not in blacklist):
-                vals = self.macros[token.string].body
+                vals = self.get_obj_macro(token.string).body
                 vals = self.macro_expand_tokens(vals, blacklist + [token.string])
                 expanded.extend(vals)
             else:
@@ -621,7 +671,7 @@ class Parser(object):
                     self.pop_from(tokens, Token.PUNCTUATOR, ')')
                 elif token.type != Token.IDENTIFIER:
                     raise ParseError(token, "Need either '(' or identifier after `defined`")
-                val = '1' if token.string in self.all_macros else '0'
+                val = '1' if self.any_macro_defined(token.string) else '0'
                 expanded.append(Token(Token.NUMBER, val))
             else:
                 expanded.append(token)
@@ -704,8 +754,7 @@ class Parser(object):
             if not self.skipping:
                 preamble, body, postamble = self._split_body(tokens)
                 macro = FuncMacro(name_token, body, args, un_pythonable)
-                self.func_macros[name_token.string] = macro
-                self.all_macros[name_token.string] = macro
+                self.add_func_macro(macro)
                 log.info("Saving func-macro {} = {}".format(macro, body))
         else:
             # Object-like macro
@@ -715,8 +764,7 @@ class Parser(object):
             if not self.skipping:
                 preamble, body, postamble = self._split_body(tokens)
                 macro = Macro(name_token, body)
-                self.macros[name_token.string] = macro
-                self.all_macros[name_token.string] = macro
+                self.add_obj_macro(macro)
                 log.info("Saving obj-macro {} = {}".format(macro, body))
 
         # Output all the tokens we suppressed
@@ -752,7 +800,7 @@ class Parser(object):
 
         if not self.skipping:
             try:
-                del self.macros[name_token.string]
+                self.undef_macro(name_token.string)
             except KeyError:
                 pass
         return True
@@ -1023,10 +1071,10 @@ def process_file(in_fname, out_fname, minify):
     with open('macros.py', 'w') as f:
         #f.writelines("{} = {}\n".format(name, val) for name, val in parser.macro_vals.items())
         f.write("from builtins import int\n")
-        for name, macro in parser.macros.items():
+        for macro in parser.macros:
             if not macro.dependencies_satisfied:
                 f.write("# ")
-            f.write("{} = {}\n".format(name, macro.py_src))
+            f.write("{} = {}\n".format(macro.name, macro.py_src))
 
 
 def process_header(in_fname, minify, update_cb=None):
@@ -1047,17 +1095,17 @@ def process_header(in_fname, minify, update_cb=None):
 
     macro_io = StringIO()
     macro_io.write("# Generated macro definitions\n")
-    for name, macro in parser.all_macros.items():
+    for macro in parser.macros:
         if isinstance(macro, FuncMacro):
             arg_list = ', '.join(macro.args)
             #macro_io.write("def {}({}):\n".format(name, arg_list))
             #macro_io.write("    return {}\n".format(macro.py_src))
             #macro_io.write("defs.{} = {}\n".format(name, name))
-            macro_io.write("defs.{} = lambda {}: {}\n".format(name, arg_list, macro.py_src))
+            macro_io.write("defs.{} = lambda {}: {}\n".format(macro.name, arg_list, macro.py_src))
         else:
             if not macro.dependencies_satisfied:
                 macro_io.write("# ")
-            macro_io.write("defs.{} = {}\n".format(name, macro.py_src))
+            macro_io.write("defs.{} = {}\n".format(macro.name, macro.py_src))
 
     return header_io.getvalue(), macro_io.getvalue()
 
