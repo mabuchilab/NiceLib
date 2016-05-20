@@ -183,6 +183,15 @@ class Macro(object):
         self._body = tokens
         self.depends_on = tuple(t.string for t in tokens if t.type is Token.IDENTIFIER)
 
+    def __repr__(self):
+        return str(self)
+
+    def __str__(self):
+        return '<{}>'.format(self.name)
+
+    def body_str(self):
+        return ' '.join(token.string for token in self.body)
+
 
 class FuncMacro(Macro):
     def __init__(self, name_token, body, args, un_pythonable):
