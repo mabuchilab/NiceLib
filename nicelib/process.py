@@ -215,7 +215,8 @@ class FuncMacro(Macro):
 
 
 class Parser(object):
-    def __init__(self, source, fpath='', replacement_map=[], obj_macros={}, func_macros={}):
+    def __init__(self, source, fpath='', replacement_map=[], obj_macros={}, func_macros={},
+                 include_dirs=[]):
         self.base_dir, self.fname = os.path.split(fpath)
         self.tokens = lexer.lex(source, self.fname)
         self.last_line = self.tokens[-1].line
@@ -223,6 +224,7 @@ class Parser(object):
         self.out = []
         self.cond_stack = []
         self.cond_done_stack = []
+        self.include_dirs = include_dirs
 
         self.macros = OrderedDict(obj_macros)
         self.func_macros = OrderedDict(func_macros)
@@ -774,7 +776,35 @@ class Parser(object):
         return False
 
     def parse_include(self):
-        self.pop_until_newline()  # Ignore includes
+        tokens = self.pop_until_newline()  # Ignore includes
+        if self.skipping:
+            return False
+
+        if len(tokens) != 1 or tokens[0].type not in (Token.HEADER_NAME, Token.STRING_CONST):
+            raise ParseError(self.out_line[-1], "Invalid #include line")
+        token = tokens[0]
+        hpath = token.string[1:-1]
+
+        if token.type is Token.HEADER_NAME:
+            log.info("System header {}".format(hpath))
+            for include_dir in self.include_dirs:
+                try_path = os.path.join(include_dir, hpath)
+                if os.path.exists(try_path):
+                    hpath = try_path
+                    break
+        else:
+            hpath = os.path.join(self.base_dir, hpath)
+            log.info("Local header {}".format(hpath))
+
+        if os.path.exists(hpath):
+            log.info("Including header {}".format(hpath))
+            with open(hpath, 'rU') as f:
+                tokens = lexer.lex(f.read(), hpath)
+                tokens.append(Token(Token.NEWLINE, '\n'))
+
+            # Prepend these header's tokens
+            self.tokens = tokens + self.tokens
+
         return False
 
 
@@ -1005,7 +1035,7 @@ def process_header(in_fname, minify, update_cb=None):
 
     OBJ_MACROS, FUNC_MACROS = get_preprocessor_macros()
     parser = Parser(source, in_fname, replacement_maps.get(platform.system()), OBJ_MACROS,
-                    FUNC_MACROS)
+                    FUNC_MACROS, ['/usr/include', '/usr/local/include'])
     parser.parse(update_cb=update_cb)
 
     header_io = StringIO()
