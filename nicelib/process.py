@@ -608,33 +608,31 @@ class Parser(object):
         expanded = []
         while tokens:
             token = self.pop_from(tokens)
-            if token.type is Token.IDENTIFIER:
-                if token.string not in self.macros:
-                    warnings.warn("Undefined identifier {} in expression, treating as "
-                                  "0...".format(token.string))
-                    val = [Token(Token.NUMBER, '0')]
-                else:
-                    val = self.macros[token.string].body
-                tokens = val + tokens
-            elif token.type is Token.DEFINED:
+            if token.type is Token.DEFINED:
                 token = self.pop_from(tokens)
-                if token.matches(Token.PUNCTUATOR, '('):
+                if token.string == '(':
                     token = self.pop_from(tokens, Token.IDENTIFIER)
                     self.pop_from(tokens, Token.PUNCTUATOR, ')')
                 elif token.type != Token.IDENTIFIER:
                     raise ParseError(token, "Need either '(' or identifier after `defined`")
-                expanded.append('1' if token.string in self.macros else '0')
+                val = '1' if token.string in self.all_macros else '0'
+                expanded.append(Token(Token.NUMBER, val))
             else:
-                replacements = {
-                    '||': 'or',
-                    '&&': 'and',
-                    '!': 'not',
-                }
-                expanded.append(replacements.get(token.string, token.string))
+                expanded.append(token)
 
-        out = ' '.join(expanded)
-        log.debug("Parsed expression is '{}'".format(out))
-        return eval(out, {})
+        exp = self.macro_expand_2(expanded)
+        tokens = []
+        for token in exp:
+            if token.type is Token.IDENTIFIER:
+                warnings.warn(PreprocessorWarning(token, "Unidentified identifier {} in expression"
+                                                  ", treating as 0...".format(token.string)))
+                tokens.append(Token(Token.NUMBER, '0'))
+            else:
+                tokens.append(token)
+
+        py_src = c_to_py_src(' '.join(token.string for token in tokens))
+        log.info("py_src = '{}'".format(py_src))
+        return eval(py_src, {})
 
     def parse_ifdef(self):
         macro = self.parse_macro()
