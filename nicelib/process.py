@@ -183,6 +183,7 @@ class Macro(object):
     def __init__(self, name_token, body):
         self.name = name_token.string
         self.line = name_token.line
+        self.fname = name_token.fname
         self.col = name_token.col
         self.body = body
         self.py_src = None
@@ -347,7 +348,7 @@ class Parser(object):
         for macro in self.macros:
             if isinstance(macro, FuncMacro):
                 log.debug("Generating body of function-like macro {} "
-                          "[{}:{}]".format(macro.name, macro.line, macro.col))
+                          "[{}:{}:{}]".format(macro.name, macro.fname, macro.line, macro.col))
 
                 if macro.body and not macro.un_pythonable:
                     c_src = ''.join(token.string for token in macro.body)
@@ -358,7 +359,7 @@ class Parser(object):
                     log.debug("body = {}".format(macro.py_src))
             else:
                 log.debug("Generating body of object-like macro {} "
-                          "[{}:{}]".format(macro.name, macro.line, macro.body))
+                          "[{}:{}:{}]".format(macro.name, macro.fname, macro.line, macro.col))
                 if self.expand_macros:
                     macro.body = self.macro_expand_2(macro.body)
 
