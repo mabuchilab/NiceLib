@@ -805,7 +805,7 @@ class Parser(object):
                 self.undef_macro(name_token.string)
             except KeyError:
                 pass
-        return True
+        return False
 
     def parse_pragma(self):
         self.pop_until_newline()  # Ignore pragmas
