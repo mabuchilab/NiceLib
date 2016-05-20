@@ -934,6 +934,7 @@ def c_to_py_ast(c_src):
 
 def c_to_py_src(c_src):
     """Convert C expression source str to a Python source str"""
+    log.info("Converting c-source '{}'".format(c_src))
     expr_node = src_to_c_ast(c_src)
     return ''.join(to_py_src(expr_node))
 
