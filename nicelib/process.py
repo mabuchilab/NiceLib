@@ -418,6 +418,7 @@ class Parser(object):
 
     def end_if_clause(self):
         self.cond_stack.pop(-1)
+        self.cond_done_stack.pop(-1)
         self.skipping = not all(self.cond_stack)
 
     def assert_line_empty(self):
