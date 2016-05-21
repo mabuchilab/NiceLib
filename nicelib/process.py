@@ -913,7 +913,7 @@ def write_tokens(file, parser, add_newlines=True):
         if token.type is Token.NEWLINE:
             if accept_newline:
                 file.write('\n')
-            needs_space = False
+                needs_space = False
             accept_newline = False
         elif token.type not in (Token.WHITESPACE, Token.LINE_COMMENT, Token.BLOCK_COMMENT):
             this_needs_space = not (token.string in '+-#,;{}[]')
