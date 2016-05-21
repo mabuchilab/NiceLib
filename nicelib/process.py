@@ -528,10 +528,11 @@ class Parser(object):
         while not done:
             if token.type is Token.IDENTIFIER:
                 done = True
+                spaces = []
                 while tokens:
                     next_token = tokens.pop(0)
                     if next_token.type is Token.WHITESPACE:
-                        expanded.append(token)
+                        spaces.append(next_token)
                     else:
                         done = False
                         break
@@ -583,6 +584,7 @@ class Parser(object):
                     else:
                         # Ordinary identifier
                         expanded.append(token)
+                    expanded.extend(spaces)
 
                     if not done:
                         token = next_token
