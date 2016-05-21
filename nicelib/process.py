@@ -405,12 +405,13 @@ class Parser(object):
         else:
             # Grab tokens until we get to a line with a '#'
             last_newline_idx = 0
-            for i, token in enumerate(self.tokens):
-                if token.type is Token.NEWLINE:
+            for i, t in enumerate(self.tokens):
+                if t.type is Token.NEWLINE:
                     last_newline_idx = i
-                elif token.string == '#':
+                elif t.string == '#':
                     break
-            expanded = self.macro_expand_2(self.tokens[:last_newline_idx])
+
+            expanded = self.macro_expand_2([token] + self.tokens[:last_newline_idx])
             self.tokens = self.tokens[last_newline_idx:]
 
             # Add to output
