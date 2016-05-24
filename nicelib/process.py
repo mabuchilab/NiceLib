@@ -296,7 +296,7 @@ class Parser(object):
         elif name in self.func_macros:
             del self.func_macros[name]
         else:
-            warnings.warn("#undef of nonexistent macro")
+            warnings.warn("#undef of nonexistent macro '{}'".format(name))
 
     def ordered_macro_items(self):
         all_items = list(self.obj_macros.items()) + list(self.func_macros.items())
