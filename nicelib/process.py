@@ -13,7 +13,7 @@ from enum import Enum
 from collections import OrderedDict, namedtuple, defaultdict
 import ast
 from io import StringIO
-from pycparser import c_parser, c_ast, plyparser
+from pycparser import c_parser, c_generator, c_ast, plyparser
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
 
@@ -93,6 +93,8 @@ class Token(object):
 
 for ttype in TokenType:
     setattr(Token, ttype.name, ttype)
+
+NON_TOKENS = (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT, Token.BLOCK_COMMENT)
 
 
 class Lexer(object):
@@ -345,40 +347,6 @@ class Parser(object):
                 update_cb(self.out[-1].line, self.last_line)
 
         self.macros = [macro for (name, macro) in self.ordered_macro_items()]
-        for macro in self.macros:
-            if isinstance(macro, FuncMacro):
-                log.debug("Generating body of function-like macro {} "
-                          "[{}:{}:{}]".format(macro.name, macro.fname, macro.line, macro.col))
-
-                if macro.body and not macro.un_pythonable:
-                    c_src = ''.join(token.string for token in macro.body)
-                    try:
-                        macro.py_src = c_to_py_src(c_src)
-                    except ConvertError as e:
-                        raise ParseError(macro, str(e))
-                    log.debug("body = {}".format(macro.py_src))
-            else:
-                log.debug("Generating body of object-like macro {} "
-                          "[{}:{}:{}]".format(macro.name, macro.fname, macro.line, macro.col))
-                if self.expand_macros:
-                    macro.body = self.macro_expand_2(macro.body)
-
-                macro.dependencies_satisfied = True
-                for macro_name in macro.depends_on:
-                    if not self.obj_macro_defined(macro_name):
-                        macro.dependencies_satisfied = False
-
-                #c_src = ''.join(token.string for token in tokens)
-                #val, token = evaluate_c_src(c_src)
-                #self.macro_vals[name_token.string] = val
-
-                if macro.body:
-                    c_src = ''.join(token.string for token in macro.body)
-                    try:
-                        macro.py_src = c_to_py_src(c_src)
-                    except ConvertError as e:
-                        raise ParseError(macro, str(e))
-                    log.debug("body = {}".format(macro.py_src))
 
     def parse_next(self):
         self.out_line = []
@@ -862,6 +830,87 @@ class Parser(object):
         return False
 
 
+class Generator(object):
+    def __init__(self, tokens, macros):
+        self.tokens = tokens
+        self.macros = macros
+
+    def generate(self):
+        out = StringIO()
+        out.write(' '.join(t.string for t in self.tokens if t.type not in NON_TOKENS))
+
+        self.parser = c_parser.CParser()
+        tree = self.parse(out.getvalue())
+
+        # Remove function defs
+        children = []
+        for child in tree.ext:
+            if not isinstance(child, c_ast.FuncDef):
+                children.append(child)
+        tree.ext = children
+
+        # Generate cleaned C source
+        generator = c_generator.CGenerator()
+        header_src = generator.visit(tree)
+
+        with open('log.txt', 'w') as f:
+            f.write(header_src)
+
+        # Convert macros
+        macro_src = StringIO()
+        macro_src.write("# Generated macro definitions\n")
+        for macro in self.macros:
+            py_src = self.gen_py_src(macro)
+            if py_src:
+                dependencies_satisfied = True
+                for macro_name in macro.depends_on:
+                    if not self.obj_macro_defined(macro_name):
+                        dependencies_satisfied = False
+
+                if not dependencies_satisfied:
+                    macro_src.write("# ")
+
+                if isinstance(macro, FuncMacro):
+                    arg_list = ', '.join(macro.args)
+                    macro_src.write("defs.{} = lambda {}: {}\n".format(macro.name, arg_list,
+                                                                       py_src))
+                else:
+                    macro_src.write("defs.{} = {}\n".format(macro.name, py_src))
+
+        return header_src, macro_src
+
+    def gen_py_src(self, macro):
+        prefix = '__FMACRO_' if isinstance(macro, FuncMacro) else '__OMACRO_'
+        log.debug("Generating body of macro {} "
+                  "[{}:{}:{}]".format(macro.name, macro.fname, macro.line, macro.col))
+
+        py_src = None
+        if macro.body:
+            c_src = ''.join(token.string for token in macro.body)
+            func_src = "\nint " + prefix + macro.name + "(void){" + c_src + ";}"
+
+            try:
+                tree = self.parse(func_src)
+                expr_node = tree.ext[0].body.block_items[0]
+                try:
+                    py_src = ''.join(to_py_src(expr_node))
+                except ConvertError as e:
+                    warnings.warn(e)
+
+            except (plyparser.ParseError, AttributeError):
+                warnings.warn("Un-pythonable macro {}".format(macro.name))
+
+        return py_src
+
+    def parse(self, text):
+        """Reimplement CParser.parse to retain scope"""
+        self.parser.clex.filename = '<generator>'
+        self.parser.clex.reset_lineno()
+        #self.parser._scope_stack = [dict()]
+        self.parser._last_yielded_token = None
+        return self.parser.cparser.parse(input=text, lexer=self.parser.clex, debug=0)
+
+
 def get_preprocessor_macros():
     PREDEF_MACRO_STR = """
         #define __unix__ 1
@@ -1097,27 +1146,9 @@ def process_header(in_fname, minify, update_cb=None):
                     FUNC_MACROS, ['/usr/include', '/usr/local/include'])
     parser.parse(update_cb=update_cb)
 
-    header_io = StringIO()
-    if minify:
-        write_tokens(header_io, parser)
-    else:
-        write_tokens_simple(header_io, parser)
-
-    macro_io = StringIO()
-    macro_io.write("# Generated macro definitions\n")
-    for macro in parser.macros:
-        if isinstance(macro, FuncMacro):
-            arg_list = ', '.join(macro.args)
-            #macro_io.write("def {}({}):\n".format(name, arg_list))
-            #macro_io.write("    return {}\n".format(macro.py_src))
-            #macro_io.write("defs.{} = {}\n".format(name, name))
-            macro_io.write("defs.{} = lambda {}: {}\n".format(macro.name, arg_list, macro.py_src))
-        else:
-            if not macro.dependencies_satisfied:
-                macro_io.write("# ")
-            macro_io.write("defs.{} = {}\n".format(macro.name, macro.py_src))
-
-    return header_io.getvalue(), macro_io.getvalue()
+    gen = Generator(parser.out, parser.macros)
+    header_src, macro_src = gen.generate()
+    return header_src, macro_src
 
 
 if __name__ == '__main__':
