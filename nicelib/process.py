@@ -232,7 +232,7 @@ class Macro(object):
         return str(self)
 
     def __str__(self):
-        return '<{}>'.format(self.name)
+        return '<{}:{}:{}:{}>'.format(self.name, self.fname, self.line, self.col)
 
     def body_str(self):
         return ' '.join(token.string for token in self.body)
