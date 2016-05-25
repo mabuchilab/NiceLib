@@ -14,6 +14,7 @@ from collections import OrderedDict, namedtuple, defaultdict
 import ast
 from io import StringIO
 from pycparser import c_parser, c_generator, c_ast, plyparser
+import cffi
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
 
@@ -43,6 +44,33 @@ ALL_BINOP_STRS = {}
 ALL_BINOP_STRS.update(BINARY_OP_STR)
 ALL_BINOP_STRS.update(CMP_OP_STR)
 ALL_BINOP_STRS.update(BOOL_OP_STR)
+
+
+UNOPS = {
+    '+': lambda x: +x,
+    '-': lambda x: -x,
+    '!': lambda x: not x,
+    '~': lambda x: ~x,
+}
+BINOPS = {
+    '+': lambda x, y: x + y,
+    '-': lambda x, y: x - y,
+    '*': lambda x, y: x * y,
+    '/': lambda x, y: x / y,
+    '<<': lambda x, y: x << y,
+    '>>': lambda x, y: x >> y,
+    '|': lambda x, y: x | y,
+    '&': lambda x, y: x & y,
+    '^': lambda x, y: x ^ y,
+    '==': lambda x, y: x == y,
+    '!=': lambda x, y: x != y,
+    '<': lambda x, y: x < y,
+    '>': lambda x, y: x > y,
+    '<=': lambda x, y: x <= y,
+    '>=': lambda x, y: x >= y,
+    '&&': lambda x, y: x and y,
+    '||': lambda x, y: x or y,
+}
 
 
 class EndOfStreamError(Exception):
@@ -830,6 +858,156 @@ class Parser(object):
         return False
 
 
+class FFICleaner(c_ast.NodeVisitor):
+    def __init__(self, ffi):
+        self.ffi = ffi
+        self.generator = c_generator.CGenerator()
+
+    def visit(self, node, calc=False):
+        node.show()
+        method = 'visit_' + node.__class__.__name__ + ('_calc' if calc else '')
+        if hasattr(self, method):
+            return getattr(self, method)(node)
+        else:
+            return self.generic_visit(node, calc)
+
+    def generic_visit(self, node, calc):
+        lists = defaultdict(list)
+        for child_name, child in node.children():
+            result = self.visit(child, calc)
+            if '[' in child_name:
+                attr_name, rest = child_name.split('[')
+                idx = int(rest[:-1])
+                lists[attr_name].insert(idx, result)
+            else:
+                setattr(node, child_name, result)
+
+        for attr_name, node_list in lists.items():
+            node_list = [n for n in node_list if n is not None]
+            setattr(node, attr_name, node_list)
+
+        return node
+
+    def visit_Typedef(self, node):
+        # Visit children first
+        self.generic_visit(node, False)
+        #self._generate_type(node)
+
+        # Now add type to FFI
+        src = self.generator.visit(node) + ';'
+        print(src)
+        self.ffi.cdef(src)
+        return node
+
+    def visit_FuncDef(self, node):
+        return None
+
+    def visit_ArrayDecl(self, node):
+        node.type = self.visit(node.type, False)
+        dim_str = str(int(self.visit(node.dim, True))) if node.dim is not None else None
+        node.dim = c_ast.Constant('int', dim_str)
+        return node
+
+    def visit_UnaryOp_calc(self, node):
+        if node.op == 'sizeof':
+            type_str = self.visit(node.expr, True)
+            print("SIZEOF({})".format(type_str))
+            val = self.ffi.sizeof(type_str)
+        elif node.op in UNOPS:
+            return UNOPS[node.op](self.visit(node.expr, True))
+        else:
+            raise ConvertError("Unknown unary op '{}'".format(node.op))
+        return val
+
+    def visit_TernaryOp_calc(self, node):
+        return self.visit(node.iftrue if node.cond else node.iffalse, True)
+
+    def visit_BinaryOp_calc(self, node):
+        left = self.visit(node.left, True)
+        right = self.visit(node.right, True)
+        if node.op in BINOPS:
+            return BINOPS[node.op](left, right)
+        else:
+            raise ConvertError("Unknown binary op '{}'".format(node.op))
+
+    def visit_Constant_calc(self, node):
+        if node.type == 'int':
+            return int(node.value.rstrip('UuLl'))
+        elif node.type == 'float':
+            return float(node.value.rstrip('FfLl'))
+        elif node.type == 'string':
+            return node.value
+
+    # Based on pycparser.c_generator.CGenerator
+    def _generate_type(self, n, modifiers=[]):
+        """ Recursive generation from a type node. n is the type node.
+            modifiers collects the PtrDecl, ArrayDecl and FuncDecl modifiers
+            encountered on the way down to a TypeDecl, to allow proper
+            generation from it.
+        """
+        ntype = type(n)
+
+        if ntype == c_ast.TypeDecl:
+            s = ''
+            if n.quals:
+                s += ' '.join(n.quals) + ' '
+            s += self.visit(n.type, True)
+
+            nstr = n.declname if n.declname else ''
+            # Resolve modifiers.
+            # Wrap in parens to distinguish pointer to array and pointer to
+            # function syntax.
+            #
+            for i, modifier in enumerate(modifiers):
+                if isinstance(modifier, c_ast.ArrayDecl):
+                    if (i != 0 and isinstance(modifiers[i - 1], c_ast.PtrDecl)):
+                        nstr = '(' + nstr + ')'
+                    nstr += '[' + self.visit(modifier.dim, False) + ']'
+                elif isinstance(modifier, c_ast.FuncDecl):
+                    if (i != 0 and isinstance(modifiers[i - 1], c_ast.PtrDecl)):
+                        nstr = '(' + nstr + ')'
+                    nstr += '(' + self.visit(modifier.args) + ')'
+                elif isinstance(modifier, c_ast.PtrDecl):
+                    if modifier.quals:
+                        nstr = '* %s %s' % (' '.join(modifier.quals), nstr)
+                    else:
+                        nstr = '*' + nstr
+            if nstr:
+                s += ' ' + nstr
+            return s
+        #elif ntype == c_ast.Decl:
+        #    return self._generate_decl(n.type)
+        elif ntype == c_ast.Typename:
+            return self._generate_type(n.type)
+        elif ntype == c_ast.IdentifierType:
+            return ' '.join(n.names) + ' '
+        elif ntype in (c_ast.ArrayDecl, c_ast.PtrDecl, c_ast.FuncDecl):
+            return self._generate_type(n.type, modifiers + [n])
+        else:
+            return self.visit(n, True)
+
+    def visit_PtrDecl_calc(self, node):
+        pass
+
+    def visit_Typename_calc(self, node):
+        #return self.visit(node.type, True)
+        return self._generate_type(node)
+
+    def visit_TypeDecl_calc(self, node):
+        return self.visit(node.type, True)
+
+    def visit_IdentifierType_calc(self, node):
+        return ' '.join(node.names)
+
+    def visit_Cast_calc(self, node):
+        # TODO: Use FFI to cast?
+        if not isinstance(node.to_type.type, c_ast.TypeDecl):
+            raise ConvertError("Unsupported cast type {}".format(node.to_type.type))
+        type_str = ' '.join(node.to_type.type.type.names)
+        py_type = float if ('float' in type_str or 'double' in type_str) else int
+        return py_type(self.visit(node.expr, True))
+
+
 class Generator(object):
     def __init__(self, tokens, macros):
         self.tokens = tokens
@@ -843,11 +1021,9 @@ class Generator(object):
         tree = self.parse(out.getvalue())
 
         # Remove function defs
-        children = []
-        for child in tree.ext:
-            if not isinstance(child, c_ast.FuncDef):
-                children.append(child)
-        tree.ext = children
+        ffi = cffi.FFI()
+        cleaner = FFICleaner(ffi)
+        tree = cleaner.visit(tree)
 
         # Generate cleaned C source
         generator = c_generator.CGenerator()
@@ -999,7 +1175,7 @@ def src_to_c_ast(source):
 
     try:
         tree = parser.parse('int main(void){' + source + ';}')
-    except plyparser.ParseError as e:
+    except (plyparser.ParseError, AttributeError) as e:
         raise ConvertError(e)
 
     expr_node = tree.ext[0].body.block_items[0]
