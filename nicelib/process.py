@@ -911,6 +911,11 @@ class FFICleaner(c_ast.NodeVisitor):
         node.dim = c_ast.Constant('int', dim_str)
         return node
 
+    def visit_Enumerator(self, node):
+        val_str = str(int(self.visit(node.value, True))) if node.value is not None else None
+        node.value = c_ast.Constant('int', val_str)
+        return node
+
     def visit_UnaryOp_calc(self, node):
         if node.op == 'sizeof':
             type_str = self.visit(node.expr, True)
