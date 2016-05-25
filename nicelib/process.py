@@ -1314,8 +1314,17 @@ def process_file(in_fname, out_fname, minify):
 
 
 def process_header(in_fname, minify, update_cb=None):
-    with open(in_fname, 'rU') as f:
-        source = f.read()
+    try:
+        with open(in_fname, 'rU') as f:
+            source = f.read()
+    except IOError:
+        source = in_fname
+
+    preamble = """
+    typedef int size_t;
+    """
+
+    source = preamble + source
 
     OBJ_MACROS, FUNC_MACROS = get_preprocessor_macros()
     parser = Parser(source, in_fname, replacement_maps.get(platform.system()), OBJ_MACROS,
