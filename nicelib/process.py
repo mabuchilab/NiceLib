@@ -345,7 +345,9 @@ class Parser(object):
         while True:
             try:
                 token = tokens.pop(0)
-                log.debug("Popped token {}".format(token))
+                if track_lines:
+                    log.debug("{}Popped token {}".format('[skipping]' if self.skipping else '',
+                                                         token))
             except IndexError:
                 raise EndOfStreamError
 
