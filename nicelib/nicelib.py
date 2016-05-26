@@ -8,6 +8,8 @@ import sys
 import warnings
 from inspect import isfunction
 
+__all__ = ['NiceLib', 'NiceObject']
+
 
 def _wrap_ndarrays(ffi, argtype, arg):
     import numpy as np
