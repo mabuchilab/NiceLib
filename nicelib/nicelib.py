@@ -392,7 +392,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
         FFI instance variable. Required.
     _lib
         FFI library opened with `dlopen()`. Required.
-    _ defs
+    _defs
         Object whose attributes are the Python-equivalent macros defined in the header file(s).
         Optional.
     _prefix : str or sequence of strs, optional
@@ -417,6 +417,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _struct_maker = None  # ffi.new
     _buflen = 512
 
+    @staticmethod
     def _err_wrap(ret_code):
         pass
 
