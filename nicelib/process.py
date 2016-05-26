@@ -601,10 +601,20 @@ class Parser(object):
         last_real_token = None
         last_real_token_idx = -1
         concatting = False
+
+        # Sub in args in first pass
+        substituted = []
         for token in macro.body:
+            if token.type is Token.IDENTIFIER and token.string in macro.args:
+                arg_idx = macro.args.index(token.string)
+                substituted.extend(exp_arg_lists[arg_idx])
+            else:
+                substituted.append(token)
+
+        # Do concatting pass
+        for token in substituted:
             if concatting:
-                if token.type not in (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT,
-                                      Token.BLOCK_COMMENT):
+                if token.type not in NON_TOKENS:
                     concat_str = last_real_token.string + token.string
                     log.debug("Macro concat produced '{}'".format(concat_str))
                     new_token = lexer.read_token(concat_str, pos=0)
@@ -612,23 +622,14 @@ class Parser(object):
                     concatting = False
                 continue
 
-            if token.type is Token.IDENTIFIER and token.string in macro.args:
-                arg_idx = macro.args.index(token.string)
-                for arg_token in exp_arg_lists[arg_idx]:
-                    body.append(arg_token)
-                    if arg_token.type not in (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT,
-                                              Token.BLOCK_COMMENT):
-                        last_real_token = arg_token
-                        last_real_token_idx = len(body) - 1
-            elif token.string == '##':
+            if token.string == '##':
                 log.debug("Saw ##")
                 body = body[:last_real_token_idx]
                 concatting = True
                 last_real_token_idx = -1
             else:
                 body.append(token)
-                if token.type not in (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT,
-                                      Token.BLOCK_COMMENT):
+                if token.type not in NON_TOKENS:
                     last_real_token = token
                     last_real_token_idx = len(body) - 1
 
