@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015-2016 Nate Bogdanowicz
-from builtins import str, zip, object
+from builtins import str, zip
 from past.builtins import basestring
 from future.utils import with_metaclass
 
