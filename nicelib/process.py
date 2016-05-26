@@ -940,11 +940,22 @@ class FFICleaner(c_ast.NodeVisitor):
 
     def visit_Constant_calc(self, node):
         if node.type == 'int':
-            return int(node.value.rstrip('UuLl'))
+            int_str = node.value.rstrip('UuLl')
+            if int_str.startswith('0x'):
+                base = 16
+            elif int_str.startswith('0b'):
+                base = 2
+            elif int_str.startswith('0'):
+                base = 8
+            else:
+                base = 10
+            return int(int_str, base)
         elif node.type == 'float':
             return float(node.value.rstrip('FfLl'))
         elif node.type == 'string':
             return node.value
+        else:
+            raise ConvertError("Unknown constant type '{}'".format(node.type))
 
     # Based on pycparser.c_generator.CGenerator
     def _generate_type(self, n, modifiers=[]):
