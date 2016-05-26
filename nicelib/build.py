@@ -45,6 +45,26 @@ def handle_lib_name(lib_name):
 
 
 def build_lib(header_path, lib_name, module_name):
+    """Build a low-level Python wrapper of a C lib
+
+    Parameters
+    ----------
+    header_path : str or dict
+        Path to header file. Paths can use ``os.environ``, as described below
+    lib_name : str or dict
+        Name of compiled library file, e.g. 'mylib.dll'
+    module_name : str
+        Name of module to create. Must be in the format '_*lib', e.g. '_mylib'
+
+    Notes
+    -----
+    ``header_path`` and ``lib_name`` can each be a dict that maps from a platform to the
+    corresponding path or name, allowing cross-platform support. The keys are matched against
+    ``sys.platform`` and can use globbing, i.e. 'linux*' will match anything starting with 'linux'.
+
+    The path or paths provided by ``header_path`` may use items in ``os.environ``. For example,
+    "{PROGRAMFILES}\\\\header.h" will be formatted with ``os.environ['PROGRAMFILES']``.
+    """
     print("Module {} does not yet exist, building it now. "
           "This may take a minute...".format(module_name))
 
