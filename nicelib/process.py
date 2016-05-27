@@ -867,18 +867,14 @@ class FFICleaner(c_ast.NodeVisitor):
         self.ffi = ffi
         self.generator = c_generator.CGenerator()
 
-    def visit(self, node, calc=False):
-        node.show()
-        method = 'visit_' + node.__class__.__name__ + ('_calc' if calc else '')
-        if hasattr(self, method):
-            return getattr(self, method)(node)
-        else:
-            return self.generic_visit(node, calc)
+    def visit(self, node):
+        method = 'visit_' + node.__class__.__name__
+        return getattr(self, method, self.generic_visit)(node)
 
-    def generic_visit(self, node, calc):
+    def generic_visit(self, node):
         lists = defaultdict(list)
         for child_name, child in node.children():
-            result = self.visit(child, calc)
+            result = self.visit(child)
             if '[' in child_name:
                 attr_name, rest = child_name.split('[')
                 idx = int(rest[:-1])
@@ -894,8 +890,7 @@ class FFICleaner(c_ast.NodeVisitor):
 
     def visit_Typedef(self, node):
         # Visit children first
-        self.generic_visit(node, False)
-        #self._generate_type(node)
+        self.generic_visit(node)
 
         # Now add type to FFI
         src = self.generator.visit(node) + ';'
@@ -907,42 +902,21 @@ class FFICleaner(c_ast.NodeVisitor):
         return None
 
     def visit_ArrayDecl(self, node):
-        node.type = self.visit(node.type, False)
-        dim_str = str(int(self.visit(node.dim, True))) if node.dim is not None else None
-        node.dim = c_ast.Constant('int', dim_str)
+        node.type = self.visit(node.type)
+        if node.dim is not None:
+            node.dim = self.visit(node.dim)
         return node
 
     def visit_Enumerator(self, node):
         if node.value is not None:
-            val_str = str(int(self.visit(node.value, True)))
-            node.value = c_ast.Constant('int', val_str)
+            node.value = self.visit(node.value)
         return node
 
-    def visit_UnaryOp_calc(self, node):
-        if node.op == 'sizeof':
-            type_str = self.visit(node.expr, True)
-            print("SIZEOF({})".format(type_str))
-            val = self.ffi.sizeof(type_str)
-        elif node.op in UNOPS:
-            return UNOPS[node.op](self.visit(node.expr, True))
-        else:
-            raise ConvertError("Unknown unary op '{}'".format(node.op))
-        return val
-
-    def visit_TernaryOp_calc(self, node):
-        return self.visit(node.iftrue if node.cond else node.iffalse, True)
-
-    def visit_BinaryOp_calc(self, node):
-        left = self.visit(node.left, True)
-        right = self.visit(node.right, True)
-        if node.op in BINOPS:
-            return BINOPS[node.op](left, right)
-        else:
-            raise ConvertError("Unknown binary op '{}'".format(node.op))
-
-    def visit_Constant_calc(self, node):
-        if node.type == 'int':
-            int_str = node.value.rstrip('UuLl')
+    @staticmethod
+    def _val_from_const(const):
+        assert isinstance(const, c_ast.Constant)
+        if const.type == 'int':
+            int_str = const.value.rstrip('UuLl')
             if int_str.startswith('0x'):
                 base = 16
             elif int_str.startswith('0b'):
@@ -952,81 +926,61 @@ class FFICleaner(c_ast.NodeVisitor):
             else:
                 base = 10
             return int(int_str, base)
-        elif node.type == 'float':
-            return float(node.value.rstrip('FfLl'))
-        elif node.type == 'string':
-            return node.value
+        elif const.type == 'float':
+            return float(const.value.rstrip('FfLl'))
+        elif const.type == 'string':
+            return const.value
         else:
-            raise ConvertError("Unknown constant type '{}'".format(node.type))
+            raise ConvertError("Unknown constant type '{}'".format(const.type))
 
-    # Based on pycparser.c_generator.CGenerator
-    def _generate_type(self, n, modifiers=[]):
-        """ Recursive generation from a type node. n is the type node.
-            modifiers collects the PtrDecl, ArrayDecl and FuncDecl modifiers
-            encountered on the way down to a TypeDecl, to allow proper
-            generation from it.
-        """
-        ntype = type(n)
-
-        if ntype == c_ast.TypeDecl:
-            s = ''
-            if n.quals:
-                s += ' '.join(n.quals) + ' '
-            s += self.visit(n.type, True)
-
-            nstr = n.declname if n.declname else ''
-            # Resolve modifiers.
-            # Wrap in parens to distinguish pointer to array and pointer to
-            # function syntax.
-            #
-            for i, modifier in enumerate(modifiers):
-                if isinstance(modifier, c_ast.ArrayDecl):
-                    if (i != 0 and isinstance(modifiers[i - 1], c_ast.PtrDecl)):
-                        nstr = '(' + nstr + ')'
-                    nstr += '[' + self.visit(modifier.dim, False) + ']'
-                elif isinstance(modifier, c_ast.FuncDecl):
-                    if (i != 0 and isinstance(modifiers[i - 1], c_ast.PtrDecl)):
-                        nstr = '(' + nstr + ')'
-                    nstr += '(' + self.visit(modifier.args) + ')'
-                elif isinstance(modifier, c_ast.PtrDecl):
-                    if modifier.quals:
-                        nstr = '* %s %s' % (' '.join(modifier.quals), nstr)
-                    else:
-                        nstr = '*' + nstr
-            if nstr:
-                s += ' ' + nstr
-            return s
-        #elif ntype == c_ast.Decl:
-        #    return self._generate_decl(n.type)
-        elif ntype == c_ast.Typename:
-            return self._generate_type(n.type)
-        elif ntype == c_ast.IdentifierType:
-            return ' '.join(n.names) + ' '
-        elif ntype in (c_ast.ArrayDecl, c_ast.PtrDecl, c_ast.FuncDecl):
-            return self._generate_type(n.type, modifiers + [n])
+    @staticmethod
+    def _const_from_val(val):
+        if isinstance(val, int):
+            return c_ast.Constant('int', str(int(val)))
+        elif isinstance(val, float):
+            return c_ast.Constant('float', str(val))
+        elif isinstance(val, str):
+            return c_ast.Constant('string', val)
         else:
-            return self.visit(n, True)
+            raise ConvertError("Unknown value type '{}'".format(val))
 
-    def visit_PtrDecl_calc(self, node):
-        pass
+    def visit_UnaryOp(self, node):
+        if node.op == 'sizeof':
+            type_str = self.generator.visit(node.expr)
+            print("SIZEOF({})".format(type_str))
+            val = self.ffi.sizeof(type_str)
+        elif node.op in UNOPS:
+            expr_val = self._val_from_const(self.visit(node.expr))
+            val = UNOPS[node.op](expr_val)
+        else:
+            raise ConvertError("Unknown unary op '{}'".format(node.op))
+        return self._const_from_val(val)
 
-    def visit_Typename_calc(self, node):
-        #return self.visit(node.type, True)
-        return self._generate_type(node)
+    def visit_TernaryOp(self, node):
+        return self.visit(node.iftrue if node.cond else node.iffalse)
 
-    def visit_TypeDecl_calc(self, node):
-        return self.visit(node.type, True)
+    def visit_BinaryOp(self, node):
+        left_val = self._val_from_const(self.visit(node.left))
+        right_val = self._val_from_const(self.visit(node.right))
+        if node.op == '/':
+            if isinstance(left_val, int) and isinstance(right_val, int):
+                val = left_val // right_val
+            else:
+                val = left_val / right_val
+        elif node.op in BINOPS:
+            val = BINOPS[node.op](left_val, right_val)
+        else:
+            raise ConvertError("Unknown binary op '{}'".format(node.op))
 
-    def visit_IdentifierType_calc(self, node):
-        return ' '.join(node.names)
+        return self._const_from_val(val)
 
-    def visit_Cast_calc(self, node):
+    def visit_Cast(self, node):
         # TODO: Use FFI to cast?
         if not isinstance(node.to_type.type, c_ast.TypeDecl):
             raise ConvertError("Unsupported cast type {}".format(node.to_type.type))
         type_str = ' '.join(node.to_type.type.type.names)
         py_type = float if ('float' in type_str or 'double' in type_str) else int
-        return py_type(self.visit(node.expr, True))
+        return self._const_from_val(py_type(self._val_from_const(self.visit(node.expr))))
 
 
 class Generator(object):
