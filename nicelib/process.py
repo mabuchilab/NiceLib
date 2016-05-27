@@ -984,9 +984,10 @@ class FFICleaner(c_ast.NodeVisitor):
 
 
 class Generator(object):
-    def __init__(self, tokens, macros):
-        self.tokens = tokens
-        self.macros = macros
+    def __init__(self, parser):
+        self.tokens = parser.out
+        self.macros = parser.macros
+        self.expander = parser.macro_expand_2
 
     def generate(self):
         out = StringIO()
@@ -1037,7 +1038,11 @@ class Generator(object):
 
         py_src = None
         if macro.body:
-            c_src = ''.join(token.string for token in macro.body)
+            expanded = self.expander(macro.body)
+            for token in expanded:
+                if token.type is Token.IDENTIFIER:
+                    return None
+            c_src = ''.join(token.string for token in expanded)
             func_src = "\nint " + prefix + macro.name + "(void){" + c_src + ";}"
 
             try:
@@ -1306,7 +1311,7 @@ def process_header(in_fname, minify, update_cb=None):
                     FUNC_MACROS, ['/usr/include', '/usr/local/include'])
     parser.parse(update_cb=update_cb)
 
-    gen = Generator(parser.out, parser.macros)
+    gen = Generator(parser)
     header_src, macro_src = gen.generate()
     return header_src, macro_src
 
