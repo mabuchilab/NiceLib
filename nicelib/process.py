@@ -1272,7 +1272,7 @@ def to_py_src(node):
         type_str = ' '.join(node.to_type.type.type.names)
         py_type = 'float' if ('float' in type_str or 'double' in type_str) else 'int'
         cast_str = 'ffi.cast("{}", '.format(type_str)
-        py_src = [py_type, '(', cast_str, '('] + to_py_src(node.expr) + ['))']
+        py_src = [py_type, '(', cast_str, '('] + to_py_src(node.expr) + [')))']
 
     else:
         raise ConvertError("Unsupported c_ast type {}".format(type(node)))
