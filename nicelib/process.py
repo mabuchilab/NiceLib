@@ -1028,7 +1028,7 @@ class Generator(object):
                 else:
                     macro_src.write("defs.{} = {}\n".format(macro.name, py_src))
 
-        return header_src, macro_src
+        return header_src, macro_src.getvalue()
 
     def gen_py_src(self, macro):
         prefix = '__FMACRO_' if isinstance(macro, FuncMacro) else '__OMACRO_'
