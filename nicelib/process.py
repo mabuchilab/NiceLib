@@ -1238,7 +1238,16 @@ def to_py_src(node):
 
     elif isinstance(node, c_ast.Constant):
         if node.type == 'int':
-            py_src = [node.value.rstrip('UuLl')]
+            int_str = node.value.rstrip('UuLl')
+            if int_str.startswith('0x'):
+                base = 16
+            elif int_str.startswith('0b'):
+                base = 2
+            elif int_str.startswith('0'):
+                base = 8
+            else:
+                base = 10
+            py_src = [str(int(int_str, base))]
         elif node.type == 'float':
             py_src = [node.value.rstrip('FfLl')]
         elif node.type == 'string':
