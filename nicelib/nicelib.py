@@ -184,13 +184,27 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buf
 
 # WARNING uses some stack frame hackery; should probably make use of this syntax optional
 class NiceObject(object):
-    def __init__(self, attrs=None, n_handles=1):
+    def __init__(self, attrs=None, n_handles=1, init=None, prefix=None, err_wrap=None, doc=None):
+        self.doc = doc
         self.attrs = attrs
         self.n_handles = n_handles
-        self.doc = None
+        self.init = init
+        self.prefix = prefix
+        self.err_wrap = err_wrap
+
+        self.flags = {}
+        if prefix is not None:
+            self.flags['prefix'] = prefix
+        if err_wrap is not None:
+            self.flags['err_wrap'] = err_wrap
 
         if attrs is not None:
             self.names = set(attrs.keys())
+
+    def set_signatures(self, sigs={}, **kwds):
+        self.attrs = sigs
+        self.attrs.update(kwds)
+        self.names = set(self.attrs.keys())
 
     def __enter__(self):
         if self.attrs is not None:
@@ -238,6 +252,7 @@ class LibMeta(type):
             prefixes = tuple(prefixes) + ('',)
 
         niceobjects = {}  # name: NiceObject
+        func_to_niceobj = {}
         for name, value in list(classdict.items()):
             if isinstance(value, NiceObject):
                 if value.attrs is None:
@@ -245,18 +260,23 @@ class LibMeta(type):
                 else:
                     for attr_name, attr_val in value.attrs.items():
                         classdict[attr_name] = attr_val
+                        func_to_niceobj[attr_name] = value
                 niceobjects[name] = value
 
         funcs = {}
+        func_flags = {}
 
         for name, value in classdict.items():
             if (not name.startswith('_') and not isinstance(value, NiceObject)):
                 if isfunction(value):
                     func = value
+                    flags = {}
                     repr_str = func.__doc__ or "{}(??) -> ??".format(name)
                 else:
                     sig_tup = value
-                    flags = {}
+                    flags = {'prefix': prefixes, 'err_wrap': err_wrap}
+                    if name in func_to_niceobj:
+                        flags.update(func_to_niceobj[name].flags)
 
                     if not isinstance(sig_tup, tuple):
                         sig_tup = (sig_tup,)
@@ -266,22 +286,30 @@ class LibMeta(type):
                         flags.update(sig_tup[-1])
                         sig_tup = sig_tup[:-1]
 
+                    if isinstance(flags['prefix'], basestring):
+                        flags['prefix'] = (flags['prefix'], '')
+                    else:
+                        flags['prefix'] = tuple(flags['prefix']) + ('',)
+
                     # Try prefixes until we find the lib function
-                    for prefix in prefixes:
-                        ffi_func = getattr(lib, prefix + name, None)
+                    for prefix in flags['prefix']:
+                        func_name = prefix + name
+                        ffi_func = getattr(lib, func_name, None)
                         if ffi_func is not None:
                             break
 
                     if ffi_func is None:
                         raise AttributeError("No lib function found with a name ending in '{}', wi"
-                                             "th any of these prefixes: {}".format(name, prefixes))
+                                             "th any of these prefixes: {}".format(name,
+                                                                                   flags['prefix']))
 
-                    func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, err_wrap, struct_maker,
-                                         buflen)
+                    func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, flags['err_wrap'],
+                                         struct_maker, buflen)
                     repr_str = metacls._func_repr_str(ffi, func)
 
                 # Save for use by niceobjs
                 funcs[name] = func
+                func_flags[name] = flags
 
                 # HACK to get nice repr
                 classdict[name] = LibFunction(func, repr_str)
@@ -315,7 +343,11 @@ class LibMeta(type):
                 repr_str = func.__doc__ or '{}(??) -> ??'.format(func_name)
             repr_strs[func_name] = repr_str
 
-        def __init__(self, *handles):
+        def __init__(self, *args):
+            handles = niceobj.init(*args) if niceobj.init else args
+            if not isinstance(handles, tuple):
+                handles = (handles,)
+
             if len(handles) != niceobj.n_handles:
                 raise TypeError("__init__() takes exactly {} arguments "
                                 "({} given)".format(niceobj.n_handles, len(handles)))
