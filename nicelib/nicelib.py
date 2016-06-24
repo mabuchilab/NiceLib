@@ -446,7 +446,9 @@ class NiceLib(with_metaclass(LibMeta, object)):
         `Func()`. If more than one prefix is given, they are tried in order for each signature
         until the appropraite function is found.
     _err_wrap : function, optional
-        Wrapper function to handle error codes returned by each library function.
+        Wrapper function to handle error codes returned by each library function. If None, the C
+        return value will be appended to the end of the Python return values. The wrapper function
+        takes the C function's return value (usually an error/success code) as its only argument.
     _struct_maker : function, optional
         Function that is called to create an FFI struct of the given type. Mainly useful for
         odd libraries that require you to always fill out some field of the struct, like its size
