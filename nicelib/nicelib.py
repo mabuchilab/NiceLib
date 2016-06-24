@@ -245,6 +245,8 @@ class LibMeta(type):
         struct_maker = mro_lookup('_struct_maker') or (ffi.new if ffi else None)
         buflen = mro_lookup('_buflen')
 
+        dir_lib = dir(lib)
+
         # Add default empty prefix
         if isinstance(prefixes, basestring):
             prefixes = (prefixes, '')
@@ -304,6 +306,7 @@ class LibMeta(type):
                                              "th any of these prefixes: {}".format(name,
                                                                                    flags['prefix']))
 
+                    dir_lib.remove(func_name)
                     func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, flags['err_wrap'],
                                          struct_maker, buflen)
                     repr_str = metacls._func_repr_str(ffi, func)
@@ -331,7 +334,14 @@ class LibMeta(type):
                             classdict[shortname] = staticmethod(attr) if callable(attr) else attr
                         break
 
+        classdict['_dir_lib'] = dir_lib
         return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
+
+    def __getattr__(self, name):
+        return getattr(self._lib, name)
+
+    def __dir__(self):
+        return super(LibMeta, self).__dir__() + self._dir_lib
 
     @classmethod
     def _create_object_class(metacls, cls_name, niceobj, ffi, funcs):
