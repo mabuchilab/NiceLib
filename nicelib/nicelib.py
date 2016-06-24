@@ -278,9 +278,6 @@ class LibMeta(type):
                     if name in func_to_niceobj:
                         flags.update(func_to_niceobj[name].flags)
 
-                    if not isinstance(sig_tup, tuple):
-                        sig_tup = (sig_tup,)
-
                     # Pop off the flags dict
                     if sig_tup and isinstance(sig_tup[-1], dict):
                         flags.update(sig_tup[-1])
@@ -290,6 +287,10 @@ class LibMeta(type):
                         flags['prefix'] = (flags['prefix'], '')
                     else:
                         flags['prefix'] = tuple(flags['prefix']) + ('',)
+
+                    # Allow non-tuple, e.g. ('in')
+                    if not isinstance(sig_tup, tuple):
+                        sig_tup = (sig_tup,)
 
                     # Try prefixes until we find the lib function
                     for prefix in flags['prefix']:
