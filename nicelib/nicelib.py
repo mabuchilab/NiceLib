@@ -11,9 +11,14 @@ from inspect import isfunction
 __all__ = ['NiceLib', 'NiceObject']
 
 
-def _wrap_ndarrays(ffi, argtype, arg):
-    import numpy as np
-    if isinstance(arg, np.ndarray):
+def _wrap_inarg(ffi, argtype, arg):
+    try:
+        import numpy as np
+        HAS_NUMPY = True
+    except ImportError:
+        HAS_NUMPY = False
+
+    if HAS_NUMPY and isinstance(arg, np.ndarray):
         if argtype.kind != 'pointer':
             raise TypeError
         elif argtype.item.kind != 'primitive':
@@ -35,6 +40,8 @@ def _wrap_ndarrays(ffi, argtype, arg):
             raise TypeError
 
         return ffi.cast(argtype, arg.ctypes.data)
+    elif isinstance(argtype, ffi.CType):
+        return ffi.cast(argtype, arg)
     else:
         return arg
 
@@ -141,7 +148,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buf
                 outargs.append((arg, lambda o: o[0]))
             elif info == 'in':
                 arg = inargs.pop(0)
-                arg = _wrap_ndarrays(ffi, argtype, arg)
+                arg = _wrap_inarg(ffi, argtype, arg)
             elif info == 'out':
                 if argtype.kind == 'pointer' and argtype.item.kind == 'struct':
                     arg = struct_maker(argtype)
