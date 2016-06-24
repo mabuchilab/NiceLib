@@ -419,7 +419,6 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _struct_maker = None  # ffi.new
     _buflen = 512
 
-    @staticmethod
     def _err_wrap(ret_code):
         pass
 
