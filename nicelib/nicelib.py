@@ -40,8 +40,12 @@ def _wrap_ndarrays(ffi, argtype, arg):
 
 
 def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buflen):
-    argtypes = ffi.typeof(func).args
-    n_expected_inargs = sum('in' in a for a in sig_tup)
+    functype = ffi.typeof(func)
+    argtypes = functype.args
+    n_expected_inargs = sum('in' in a for a in sig_tup if isinstance(a, str))
+
+    if functype.ellipsis:
+        argtypes = argtypes + ('...',)
 
     if len(sig_tup) != len(argtypes):
         raise TypeError("{}() takes {} args, but your signature specifies "
@@ -50,7 +54,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buf
     def wrapped(*inargs):
         inargs = list(inargs)
 
-        if len(inargs) != n_expected_inargs:
+        if not functype.ellipsis and len(inargs) != n_expected_inargs:
             message = '{}() takes '.format(fname)
             if n_expected_inargs == 0:
                 message += 'no arguments'
@@ -68,7 +72,10 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buf
         n_paired_bufs = 0
         inarg_idx = 0
         for sig, argtype in zip(sig_tup, argtypes):
-            if sig.startswith(('buf', 'arr')):
+            if argtype == '...':
+                continue
+
+            elif sig.startswith(('buf', 'arr')):
                 if len(sig) > 3:
                     try:
                         assert sig[3] == '[' and sig[-1] == ']'
@@ -115,6 +122,9 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buf
         # - retlen??(returned length)
         # - ignore  (reserved arg, pass in 0/NULL)
         for info, argtype in zip(sig_tup, argtypes):
+            if argtype == '...':
+                info, argtype = info(*args)
+
             if info == 'inout':
                 inarg = inargs.pop(0)
                 try:
