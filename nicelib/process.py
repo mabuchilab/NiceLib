@@ -859,8 +859,10 @@ class Parser(object):
                 tokens = lexer.lex(f.read(), hpath)
                 tokens.append(Token(Token.NEWLINE, '\n'))
 
-            # Prepend these header's tokens
+            # Prepend this header's tokens
             self.tokens = tokens + self.tokens
+        else:
+            raise PreprocessorError(token, 'Header "{}" not found'.format(hpath))
 
         return False
 
