@@ -1290,22 +1290,16 @@ def process_file(in_fname, out_fname, minify):
             f.write("{} = {}\n".format(macro.name, macro.py_src))
 
 
-def process_header(in_fname, minify, update_cb=None):
-    try:
-        with open(in_fname, 'rU') as f:
-            source = f.read()
-    except IOError:
-        source = in_fname
-
+def process_headers(header_paths, predef_path, update_cb=None):
     preamble = """
     typedef int size_t;
     """
 
-    source = preamble + source
+    source = preamble + '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
     OBJ_MACROS, FUNC_MACROS = get_predef_macros()
-    parser = Parser(source, in_fname, replacement_maps.get(platform.system()), OBJ_MACROS,
-                    FUNC_MACROS, ['/usr/include', '/usr/local/include'])
+    parser = Parser(source, '<root>', replacement_maps.get(platform.system()), OBJ_MACROS,
+                    FUNC_MACROS, INCLUDE_DIRS)
     parser.parse(update_cb=update_cb)
 
     gen = Generator(parser)

@@ -8,7 +8,7 @@ import os
 import os.path
 from fnmatch import fnmatch
 import cffi
-from .process import process_header
+from .process import process_headers
 
 
 def handle_header_path(path):
@@ -19,17 +19,53 @@ def handle_header_path(path):
             raise Exception("Cannot find library header")
 
     header_path_lookup = path
-    for platform_pattern, paths in header_path_lookup.items():
+    for platform_pattern, header_dict in header_path_lookup.items():
         if fnmatch(sys.platform, platform_pattern):
-            for path in paths:
-                try:
-                    path = path.format(**os.environ)
-                    if os.path.exists(path):
-                        return path
-                except KeyError:
-                    pass
+            if 'header' not in header_dict:
+                raise KeyError("Header dict must contain key 'header'")
+
+            header_names = header_dict['header']
+            header_names = (header_names,) if isinstance(header_names, basestring) else header_names
+
+            include_dirs = header_dict.get('path', ())
+            include_dirs = (include_dirs,) if isinstance(include_dirs, basestring) else include_dirs
+
+            headers = [find_header(h, include_dirs) for h in header_names]
+
+            if 'predef' in header_dict:
+                predef_header = find_header(header_dict['predef'], include_dirs)
+            else:
+                predef_header = None
+
+            return headers, predef_header
 
     raise Exception("Cannot find library header")
+
+
+def find_header(header_name, include_dirs):
+    try:
+        header_name = header_name.format(**os.environ)
+    except KeyError:
+        pass
+
+    if os.path.isabs(header_name):
+        if os.path.exists(header_name):
+            return header_name
+    else:
+        for include_dir in include_dirs:
+            try:
+                include_dir = include_dir.format(**os.environ)
+            except KeyError:
+                pass
+
+            if not os.path.isabs(include_dir):
+                raise Exception("Header include paths must be absolute")
+
+            path = os.path.join(include_dir, header_name)
+            if os.path.exists(path):
+                return path
+
+    raise Exception("Cannot find header '{}'".format(header_name))
 
 
 def handle_lib_name(lib_name):
@@ -44,13 +80,26 @@ def handle_lib_name(lib_name):
     raise Exception("No library name given for your platform")
 
 
-def build_lib(header_path, lib_name, module_name):
+def build_lib(header_info, lib_name, module_name):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
     ----------
-    header_path : str or dict
-        Path to header file. Paths can use ``os.environ``, as described below
+    header_info : str or dict
+        Path to header file. Paths can use ``os.environ``, as described below. Info is provided in
+        the form of a dict which must contain a 'header' key whose value is either a str containing
+        a single header name, or a tuple of such strings.
+
+        There are also some other optional entries:
+
+        The 'path' value must be a str or tuple of strs that are directories which will be searched
+        for the given header(s). Any headers that are specified with a leading slash are
+        considered absolute and are not affected by this path'.
+
+        The 'predef' value is a str which is the name or path of a header file which will be used
+        to populate the predefined preprocessor macros that are ordinarily provided by the compiler
+        on a per-system basis. If provided, this overrides the default header that NiceLib uses for
+        your system.
     lib_name : str or dict
         Name of compiled library file, e.g. 'mylib.dll'
     module_name : str
@@ -58,19 +107,19 @@ def build_lib(header_path, lib_name, module_name):
 
     Notes
     -----
-    ``header_path`` and ``lib_name`` can each be a dict that maps from a platform to the
+    ``header_info`` and ``lib_name`` can each be a dict that maps from a platform to the
     corresponding path or name, allowing cross-platform support. The keys are matched against
     ``sys.platform`` and can use globbing, i.e. 'linux*' will match anything starting with 'linux'.
 
-    The path or paths provided by ``header_path`` may use items in ``os.environ``. For example,
+    The path or paths provided by ``header_info`` may use items in ``os.environ``. For example,
     "{PROGRAMFILES}\\\\header.h" will be formatted with ``os.environ['PROGRAMFILES']``.
     """
     print("Module {} does not yet exist, building it now. "
           "This may take a minute...".format(module_name))
 
     print("Searching for headers...")
-    header_path = handle_header_path(header_path)
-    print("Found {}".format(header_path))
+    header_paths, predef_path = handle_header_path(header_info)
+    print("Found {}".format(header_paths))
 
     lib_name = handle_lib_name(lib_name)
 
@@ -81,9 +130,9 @@ def build_lib(header_path, lib_name, module_name):
         sys.stdout.write("Parsing line {}/{}\r".format(cur_line, tot_lines))
         sys.stdout.flush()
 
-    header_name = os.path.basename(header_path)
-    print("Parsing and cleaning header {}".format(header_name))
-    clean_header_str, macro_code = process_header(header_path, minify=True, update_cb=update_cb)
+    #header_name = os.path.basename(header_path)
+    #print("Parsing and cleaning header {}".format(header_name))
+    clean_header_str, macro_code = process_headers(header_paths, predef_path, update_cb=update_cb)
 
     print("Compiling cffi module...")
     ffi = cffi.FFI()
