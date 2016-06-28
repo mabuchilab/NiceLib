@@ -1292,11 +1292,7 @@ def process_file(in_fname, out_fname, minify):
 
 
 def process_headers(header_paths, predef_path, update_cb=None):
-    preamble = """
-    typedef int size_t;
-    """
-
-    source = preamble + '\n'.join('#include "{}"'.format(path) for path in header_paths)
+    source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
     OBJ_MACROS, FUNC_MACROS = get_predef_macros()
     parser = Parser(source, '<root>', replacement_maps.get(platform.system()), OBJ_MACROS,
