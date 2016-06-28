@@ -11,6 +11,13 @@ import cffi
 from .process import process_headers
 
 
+def select_platform_value(platform_dict):
+    for platform_pattern, value in platform_dict.items():
+        if fnmatch(sys.platform, platform_pattern):
+            return value
+    raise ValueError("No matching platform pattern found")
+
+
 def handle_header_path(path):
     if isinstance(path, basestring):
         if os.path.exists(path):
@@ -18,28 +25,24 @@ def handle_header_path(path):
         else:
             raise Exception("Cannot find library header")
 
-    header_path_lookup = path
-    for platform_pattern, header_dict in header_path_lookup.items():
-        if fnmatch(sys.platform, platform_pattern):
-            if 'header' not in header_dict:
-                raise KeyError("Header dict must contain key 'header'")
+    header_dict = select_platform_value(path)
+    if 'header' not in header_dict:
+        raise KeyError("Header dict must contain key 'header'")
 
-            header_names = header_dict['header']
-            header_names = (header_names,) if isinstance(header_names, basestring) else header_names
+    header_names = header_dict['header']
+    header_names = (header_names,) if isinstance(header_names, basestring) else header_names
 
-            include_dirs = header_dict.get('path', ())
-            include_dirs = (include_dirs,) if isinstance(include_dirs, basestring) else include_dirs
+    include_dirs = header_dict.get('path', ())
+    include_dirs = (include_dirs,) if isinstance(include_dirs, basestring) else include_dirs
 
-            headers = [find_header(h, include_dirs) for h in header_names]
+    headers = [find_header(h, include_dirs) for h in header_names]
 
-            if 'predef' in header_dict:
-                predef_header = find_header(header_dict['predef'], include_dirs)
-            else:
-                predef_header = None
+    if 'predef' in header_dict:
+        predef_header = find_header(header_dict['predef'], include_dirs)
+    else:
+        predef_header = None
 
-            return headers, predef_header
-
-    raise Exception("Cannot find library header")
+    return headers, predef_header
 
 
 def find_header(header_name, include_dirs):
@@ -71,13 +74,7 @@ def find_header(header_name, include_dirs):
 def handle_lib_name(lib_name):
     if isinstance(lib_name, basestring):
         return lib_name
-
-    lib_name_lookup = lib_name
-    for platform_pattern, name in lib_name_lookup.items():
-        if fnmatch(sys.platform, platform_pattern):
-            return name
-
-    raise Exception("No library name given for your platform")
+    return select_platform_value(lib_name)
 
 
 def build_lib(header_info, lib_name, module_name):
