@@ -89,13 +89,13 @@ class ConvertError(Exception):
 
 class PreprocessorError(Exception):
     def __init__(self, token, msg):
-        msg = "[{}:{}:{}] {}".format(token.fname, token.line, token.col, msg)
+        msg = "[{}:{}:{}] {}".format(token.fpath, token.line, token.col, msg)
         super(PreprocessorError, self).__init__(msg)
 
 
 class PreprocessorWarning(Warning):
     def __init__(self, token, msg):
-        msg = "[{}:{}:{}] {}".format(token.fname, token.line, token.col, msg)
+        msg = "[{}:{}:{}] {}".format(token.fpath, token.line, token.col, msg)
         super(PreprocessorWarning, self).__init__(msg)
 
 
@@ -104,19 +104,19 @@ class ParseError(PreprocessorError):
 
 
 class Token(object):
-    def __init__(self, type, string, line=0, col=0, fname='<string>'):
+    def __init__(self, type, string, line=0, col=0, fpath='<string>'):
         self.type = type
         self.string = string
         self.line = line
         self.col = col
-        self.fname = fname
+        self.fpath = fpath
 
     def matches(self, other_type, other_string):
         return self.type is other_type and self.string == other_string
 
     def __str__(self):
         string = '' if self.string == '\n' else self.string
-        return '{}[{}:{}:{}]({})'.format(self.type.name, self.fname, self.line, self.col, string)
+        return '{}[{}:{}:{}]({})'.format(self.type.name, self.fpath, self.line, self.col, string)
 
     def __repr__(self):
         return str(self)
@@ -137,10 +137,10 @@ class Lexer(object):
         if ignore:
             self.ignored.append(name)
 
-    def lex(self, text, fname='<string>'):
+    def lex(self, text, fpath='<string>'):
         self.line = 1
         self.col = 1
-        self.fname = fname
+        self.fpath = fpath
         self.esc_newlines = defaultdict(int)
 
         lines = text.splitlines()
@@ -185,7 +185,7 @@ class Lexer(object):
             if match:
                 size = match.end() - match.start()
                 if size > best_size:
-                    best_token = Token(token_type, match.group(0), self.line, self.col, self.fname)
+                    best_token = Token(token_type, match.group(0), self.line, self.col, self.fpath)
                     best_size = size
         return best_token
 
@@ -215,7 +215,7 @@ class Macro(object):
     def __init__(self, name_token, body):
         self.name = name_token.string
         self.line = name_token.line
-        self.fname = name_token.fname
+        self.fpath = name_token.fpath
         self.col = name_token.col
         self.body = body
         self.py_src = None
@@ -234,7 +234,7 @@ class Macro(object):
         return str(self)
 
     def __str__(self):
-        return '<{}:{}:{}:{}>'.format(self.name, self.fname, self.line, self.col)
+        return '<{}:{}:{}:{}>'.format(self.name, self.fpath, self.line, self.col)
 
     def body_str(self):
         return ' '.join(token.string for token in self.body)
@@ -251,7 +251,7 @@ class Parser(object):
     def __init__(self, source, fpath='', replacement_map=[], obj_macros=[], func_macros=[],
                  include_dirs=[]):
         self.base_dir, self.fname = os.path.split(fpath)
-        self.tokens = lexer.lex(source, self.fname)
+        self.tokens = lexer.lex(source, fpath)
         self.last_line = self.tokens[-1].line
         self.replacement_map = replacement_map
         self.out = []
@@ -848,7 +848,9 @@ class Parser(object):
                     hpath = try_path
                     break
         else:
-            hpath = os.path.join(self.base_dir, hpath)
+            # TODO: Don't use base_dir if hpath is absolute
+            base_dir = os.path.split(token.fpath)[0]
+            hpath = os.path.join(base_dir, hpath)
             log.info("Local header {}".format(hpath))
 
         if os.path.exists(hpath):
@@ -1035,7 +1037,7 @@ class Generator(object):
     def gen_py_src(self, macro):
         prefix = '__FMACRO_' if isinstance(macro, FuncMacro) else '__OMACRO_'
         log.debug("Generating body of macro {} "
-                  "[{}:{}:{}]".format(macro.name, macro.fname, macro.line, macro.col))
+                  "[{}:{}:{}]".format(macro.name, macro.fpath, macro.line, macro.col))
 
         py_src = None
         if macro.body:
