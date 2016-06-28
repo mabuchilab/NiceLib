@@ -818,7 +818,8 @@ class Parser(object):
     def parse_error(self):
         tokens = self.pop_until_newline()
         if not self.skipping:
-            log.info("macros = {}".format(self.macros))
+            log.info("obj_macros = {}".format(self.obj_macros))
+            log.info("func_macros = {}".format(self.func_macros))
             message = ''.join(token.string for token in tokens)
             raise PreprocessorError(tokens[0], message)
         return False
