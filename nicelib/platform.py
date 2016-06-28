@@ -50,6 +50,7 @@ else:
 
 
 if COMPILER == 'GCC':
+    PREDEF_MACRO_STR += "\n#define __builtin_va_list void*"
     if is_64bit:
         PREDEF_MACRO_STR += """
             #define __amd64 1
