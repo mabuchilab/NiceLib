@@ -16,6 +16,7 @@ import ast
 from io import StringIO
 from pycparser import c_parser, c_generator, c_ast, plyparser
 import cffi
+from .platform import PREDEF_MACRO_STR, INCLUDE_DIRS
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
 
@@ -1067,24 +1068,7 @@ class Generator(object):
         return self.parser.cparser.parse(input=text, lexer=self.parser.clex, debug=0)
 
 
-def get_preprocessor_macros():
-    PREDEF_MACRO_STR = """
-        #define __unix__ 1
-        #define __x86_64 1
-        #define __linux 1
-        #define __unix 1
-        #define __linux__ 1
-        #define __SIZEOF_INT__ 4
-        #define __SIZEOF_POINTER__ 8
-        #define __GNUC__ 6
-        #define __gnu_linux__ 1
-        #define __amd64 1
-        #define unix 1
-        #define __x86_64__ 1
-        #define linux 1
-        #define __amd64__ 1
-        #define __STDC__ 1
-    """
+def get_predef_macros():
     parser = Parser(PREDEF_MACRO_STR, '<predef>')
     parser.parse()
     return parser.macros, parser.func_macros
@@ -1315,7 +1299,7 @@ def process_header(in_fname, minify, update_cb=None):
 
     source = preamble + source
 
-    OBJ_MACROS, FUNC_MACROS = get_preprocessor_macros()
+    OBJ_MACROS, FUNC_MACROS = get_predef_macros()
     parser = Parser(source, in_fname, replacement_maps.get(platform.system()), OBJ_MACROS,
                     FUNC_MACROS, ['/usr/include', '/usr/local/include'])
     parser.parse(update_cb=update_cb)
