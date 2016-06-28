@@ -8,7 +8,6 @@ from builtins import str, range
 import re
 import os.path
 import warnings
-import platform
 import logging as log
 from enum import Enum
 from collections import OrderedDict, namedtuple, defaultdict
@@ -16,7 +15,7 @@ import ast
 from io import StringIO
 from pycparser import c_parser, c_generator, c_ast, plyparser
 import cffi
-from .platform import PREDEF_MACRO_STR, INCLUDE_DIRS
+from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
 
@@ -426,7 +425,7 @@ class Parser(object):
             self.perform_replacement()
 
     def perform_replacement(self):
-        for test_strings, repl_tokens in self.replacement_map:
+        for test_strings, repl_string in self.replacement_map:
             try:
                 match = True
                 i = 1
@@ -445,8 +444,10 @@ class Parser(object):
                 match = False
 
             if match:
+                fpath = self.out[-1].fpath
                 for _ in range(i - 1):
                     self.out.pop(-1)
+                repl_tokens = lexer.lex(repl_string, fpath)
                 self.out.extend(repl_tokens)
                 break  # Only allow a single replacement
 
@@ -1078,22 +1079,6 @@ def get_predef_macros():
     parser.parse()
     return parser.macros, parser.func_macros
 
-# Ordered by precedence - should usually be longest match first
-replacement_maps = {
-    'Windows': [
-        (['unsigned', '__int8'], [Token(Token.IDENTIFIER, 'uint8_t')]),
-        (['__int8'], [Token(Token.IDENTIFIER, 'int8_t')]),
-        (['unsigned', '__int16'], [Token(Token.IDENTIFIER, 'uint16_t')]),
-        (['__int16'], [Token(Token.IDENTIFIER, 'int16_t')]),
-        (['unsigned', '__int32'], [Token(Token.IDENTIFIER, 'uint32_t')]),
-        (['__int32'], [Token(Token.IDENTIFIER, 'int32_t')]),
-        (['unsigned', '__int64'], [Token(Token.IDENTIFIER, 'uint64_t')]),
-        (['__int64'], [Token(Token.IDENTIFIER, 'int64_t')]),
-    ],
-    'Linux': [],
-    'Darwin': [],
-}
-
 
 def write_tokens_simple(file, parser):
     for token in parser.out:
@@ -1273,7 +1258,7 @@ def process_file(in_fname, out_fname, minify):
     with open(in_fname, 'rU') as f:
         tokens = lexer.lex(f.read())
 
-    parser = Parser(tokens, replacement_maps.get(platform.system()))
+    parser = Parser(tokens, REPLACEMENT_MAP)
     parser.parse()
 
     with open(out_fname, 'w') as f:
@@ -1295,7 +1280,7 @@ def process_headers(header_paths, predef_path, update_cb=None):
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
     OBJ_MACROS, FUNC_MACROS = get_predef_macros()
-    parser = Parser(source, '<root>', replacement_maps.get(platform.system()), OBJ_MACROS,
+    parser = Parser(source, '<root>', REPLACEMENT_MAP, OBJ_MACROS,
                     FUNC_MACROS, INCLUDE_DIRS)
     parser.parse(update_cb=update_cb)
 

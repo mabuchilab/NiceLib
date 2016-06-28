@@ -50,6 +50,7 @@ else:
 
 
 if COMPILER == 'GCC':
+    REPLACEMENT_MAP = []
     PREDEF_MACRO_STR += "\n#define __builtin_va_list void*"
     if is_64bit:
         PREDEF_MACRO_STR += """
@@ -65,6 +66,18 @@ if COMPILER == 'GCC':
             #define __i386__ 1
         """
 elif COMPILER == 'MSVC':
+    # Ordered by precedence - should usually be longest match first
+    REPLACEMENT_MAP = [
+        (['unsigned', '__int8'], 'uint8_t'),
+        (['__int8'], 'int8_t'),
+        (['unsigned', '__int16'], 'uint16_t'),
+        (['__int16'], 'int16_t'),
+        (['unsigned', '__int32'], 'uint32_t'),
+        (['__int32'], 'int32_t'),
+        (['unsigned', '__int64'], 'uint64_t'),
+        (['__int64'], 'int64_t'),
+    ]
+
     if is_64bit:
         PREDEF_MACRO_STR += """
             #define _M_IX86
@@ -74,7 +87,6 @@ elif COMPILER == 'MSVC':
             #define _M_X64
             #define _M_AMD64
         """
-
 
 # Glob the include dirs into a flattened list
 INCLUDE_DIRS = list(itertools.chain(*(glob.glob(d) for d in INCLUDE_DIRS)))
