@@ -1,3 +1,8 @@
+.. image:: https://travis-ci.org/mabuchilab/NiceLib.svg?branch=master
+    :target: https://travis-ci.org/mabuchilab/NiceLib
+    :alt: Travis CI
+
+
 NiceLib
 =======
 
