@@ -4,6 +4,7 @@
 # Info about macros defined here can be found at this great reference:
 # https://sourceforge.net/p/predef/wiki/Home/
 
+import os
 import sys
 import glob
 import itertools
@@ -38,6 +39,8 @@ elif fnmatch(sys.platform, 'win*'):
     PREDEF_MACRO_STR = """
         #define _WIN32 1
     """
+    INCLUDE_DIRS = [r'{PROGRAMFILES}\Windows Kits\*\Include\*',
+                    r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*']
 
     if is_64bit:
         PREDEF_MACRO_STR += """
@@ -89,4 +92,4 @@ elif COMPILER == 'MSVC':
         """
 
 # Glob the include dirs into a flattened list
-INCLUDE_DIRS = list(itertools.chain(*(glob.glob(d) for d in INCLUDE_DIRS)))
+INCLUDE_DIRS = list(itertools.chain(*(glob.glob(d.format(**os.environ)) for d in INCLUDE_DIRS)))
