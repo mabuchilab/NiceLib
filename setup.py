@@ -30,5 +30,5 @@ if __name__ == '__main__':
         url = about['__url__'],
         license = about['__license__'],
         classifiers = classifiers,
-        install_requires = ['cffi>=1.5', 'future']
+        install_requires = ['cffi>=1.5', 'pycparser', 'future']
     )
