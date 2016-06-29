@@ -2,6 +2,7 @@
 # Copyright 2016 Nate Bogdanowicz
 import os
 import os.path
+import sys
 from setuptools import setup, find_packages
 
 description = "Library with high-level drivers for lab equipment"
@@ -18,6 +19,11 @@ about = {}
 with open(os.path.join(base_dir, 'nicelib', '__about__.py')) as f:
     exec(f.read(), about)
 
+install_requires = ['cffi>=1.5', 'pycparser', 'future']
+
+if sys.version_info < (3, 4):
+    install_requires.append('enum34>=1.0.4')
+
 if __name__ == '__main__':
     setup(
         name = about['__distname__'],
@@ -30,5 +36,5 @@ if __name__ == '__main__':
         url = about['__url__'],
         license = about['__license__'],
         classifiers = classifiers,
-        install_requires = ['cffi>=1.5', 'pycparser', 'future']
+        install_requires = install_requires
     )
