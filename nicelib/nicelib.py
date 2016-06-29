@@ -40,6 +40,10 @@ def _wrap_inarg(ffi, argtype, arg):
             raise TypeError
 
         return ffi.cast(argtype, arg.ctypes.data)
+
+    elif isinstance(arg, (str, bytes)):
+        return bytes(arg)
+
     elif isinstance(argtype, ffi.CType):
         try:
             ffi.cast(argtype, arg)
