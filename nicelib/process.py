@@ -989,6 +989,18 @@ class FFICleaner(c_ast.NodeVisitor):
         py_type = float if ('float' in type_str or 'double' in type_str) else int
         return self._const_from_val(py_type(self._val_from_const(self.visit(node.expr))))
 
+    def visit_Decl(self, node):
+        # Undo stdcall hack
+        if node.quals[-3:] == ['volatile', 'volatile', 'const']:
+            node.quals = node.quals[:-3] + ['__stdcall']
+        return self.generic_visit(node)
+
+    def visit_FuncDecl(self, node):
+        # Undo stdcall hack
+        if node.type.quals[-3:] == ['volatile', 'volatile', 'const']:
+            node.type.quals = node.type.quals[:-3] + ['__stdcall']
+        return self.generic_visit(node)
+
 
 class Generator(object):
     def __init__(self, parser):
@@ -998,12 +1010,29 @@ class Generator(object):
 
     def generate(self):
         out = StringIO()
-        out.write(' '.join(t.string for t in self.tokens if t.type not in NON_TOKENS))
+
+        # pycparser doesn't know about these types by default, but cffi does. We just need to make
+        # sure that pycparser knows these are types, the particular type is unimportant
+        common_types = 'int8_t int16_t int32_t int64_t uint8_t uint16_t uint32_t uint64_t'.split()
+        for type_name in common_types:
+            out.write("typedef int {};\n".format(type_name))
+        out.write('\n'.join(t.string for t in self.tokens if t.type not in NON_TOKENS))
+
+        # Do stdcall/WINAPI replacement hack like cffi does (see cffi.cparser for more info)
+        r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
+        r_stdcall2 = re.compile(r"[(]\s*(__stdcall|WINAPI)\b")
+        r_cdecl = re.compile(r"\b__cdecl\b")
+        csource = out.getvalue()
+        csource = r_stdcall2.sub(' volatile volatile const(', csource)
+        csource = r_stdcall1.sub(' volatile volatile const ', csource)
+        csource = r_cdecl.sub(' ', csource)
 
         self.parser = c_parser.CParser()
-        tree = self.parse(out.getvalue())
+        tree = self.parse(csource)
+        # Remove phony typedefs
+        tree.ext = tree.ext[len(common_types):]
 
-        # Remove function defs
+        # Remove function defs and replace 'volatile volatile const'
         ffi = cffi.FFI()
         cleaner = FFICleaner(ffi)
         tree = cleaner.visit(tree)
