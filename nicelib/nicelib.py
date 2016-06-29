@@ -56,6 +56,8 @@ def _wrap_inarg(ffi, argtype, arg):
 def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buflen):
     functype = ffi.typeof(func)
     argtypes = functype.args
+    # Cast bytes to str
+    sig_tup = tuple(str(sig) if isinstance(sig, bytes) else sig for sig in sig_tup)
     n_expected_inargs = sum('in' in a for a in sig_tup if isinstance(a, str))
 
     if functype.ellipsis:
