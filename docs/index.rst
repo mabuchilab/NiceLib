@@ -104,9 +104,8 @@ becomes the Python code::
     def LTZ(val):
         return (val) < 0
 
-The preprocessor also supports conditionals (``#ifdef`` and friends) and ``#include`` s, and the
-ultimate goal is to support platform-specific predefined macros (like ``__linux__``, ``__WIN64``,
-and ``__x86_64``).
+The preprocessor also supports conditionals (``#ifdef`` and friends), ``#include`` s, and
+platform-specific predefined macros (like ``__linux__``, ``__WIN64``, and ``__x86_64``).
 
 Currently, ``#pragma`` directives are ignored.
 
