@@ -46,7 +46,7 @@ def _wrap_inarg(ffi, argtype, arg):
 
     elif isinstance(argtype, ffi.CType):
         try:
-            ffi.cast(argtype, arg)
+            return ffi.cast(argtype, arg)
         except TypeError:
             raise TypeError("A value cast-able to '{}' is required, got '{}'".format(argtype, arg))
     else:
