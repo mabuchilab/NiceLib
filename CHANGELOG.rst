@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+Unreleased
+----------
+Nothing yet.
+
+
 (0.1) - 2016-6-29
 -----------------
 
@@ -20,4 +25,4 @@ Added
 
 Changed
 """""""
-- Spun off `NiceLib` from `Instrumental`
+- Spun off ``NiceLib`` from ``Instrumental``
