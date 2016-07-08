@@ -69,8 +69,8 @@ NIDAQmx::
         CreateTask = ('in', 'out')
 
         Task = NiceObject({
-            'StartTask' = ('in'),
-            'ReadAnalogScalarF64' = ('in', 'in', 'out', 'ignore'),
+            'StartTask': ('in'),
+            'ReadAnalogScalarF64': ('in', 'in', 'out', 'ignore'),
         })
 
 For both of these function signatures, the first *in* argument is the Task handle. We can then use
