@@ -603,14 +603,23 @@ def _func_repr_str(ffi, func, n_handles=0):
 
 
 class LibFunction(object):
-    def __init__(self, func, repr_str, handles=()):
-        self.__name__ = func.__name__
+    def __init__(self, func, repr_str, handles=(), niceobj_name=None):
+        self.__name__ = niceobj_name + '.' + func.__name__ if niceobj_name else func.__name__
         self._func = func
         self._repr = repr_str
         self._handles = handles
 
     def __call__(self, *args):
-        return self._func(*(self._handles + args))
+        result = self._func(*(self._handles + args))
+
+        if test_mode_is('record', 'replay'):
+            Record.ensure_created()
+            if test_mode_is('record'):
+                Record.record.add_func_call(self.__name__, self._handles, args, result)
+            else:  # replay
+                raise NotImplementedError
+
+        return result
 
     def __str__(self):
         return self._repr
