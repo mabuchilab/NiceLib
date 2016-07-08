@@ -412,32 +412,9 @@ class LibMeta(type):
         return super(LibMeta, self).__dir__() + self._dir_lib
 
     @classmethod
-    def _create_object_class(metacls, cls_name, niceobj, ffi, funcs):
-        repr_strs = {}
-        for func_name in niceobj.names:
-            func = funcs[func_name]
-            if hasattr(func, '_ffi_func'):
-                repr_str = metacls._func_repr_str(ffi, funcs[func_name], niceobj.n_handles)
-            else:
-                repr_str = func.__doc__ or '{}(??) -> ??'.format(func_name)
-            repr_strs[func_name] = repr_str
 
-        def __init__(self, *args):
-            handles = niceobj.init(*args) if niceobj.init else args
-            if not isinstance(handles, tuple):
-                handles = (handles,)
 
-            if len(handles) != niceobj.n_handles:
-                raise TypeError("__init__() takes exactly {} arguments "
-                                "({} given)".format(niceobj.n_handles, len(handles)))
 
-            # Generate "bound methods"
-            for func_name in niceobj.names:
-                lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles)
-                setattr(self, func_name, lib_func)
-
-        niceobj_dict = {'__init__': __init__, '__doc__': niceobj.doc}
-        return type(cls_name, (object,), niceobj_dict)
 
     @staticmethod
     def _create_mro_lookup(classdict, bases):
