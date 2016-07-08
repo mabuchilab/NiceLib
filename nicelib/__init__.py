@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Nate Bogdanowicz
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
+from importlib import import_module
 
 
 class TestMode(object):
@@ -38,6 +39,70 @@ def get_test_mode():
 
 def arg_mode_is(*modes):
     return _test_mode.arg_mode in modes
+
+
+class LibInfo(object):
+    def __init__(self, lib_module=None):
+        if lib_module:
+            self.ffi = lib_module.ffi
+            self.lib = lib_module.lib
+            self.defs = lib_module.defs
+        else:
+            print("Stuff is None!!")
+            self.ffi = None
+            self.lib = None
+            self.defs = None
+
+    def unpack(self):
+        return self.ffi, self.lib, self.defs
+
+
+def _load_or_build_lib(name):
+    try:
+        lib_module = import_module('_{}lib'.format(name))
+    except ImportError:
+        build_module = import_module('_build_{}'.format(name))
+        build_module.build()
+        lib_module = import_module('_{}lib'.format(name))
+
+    if not lib_module:
+        print("No lib_module!!")
+    return LibInfo(lib_module)
+
+
+def load_lib(name):
+    lib_module = None
+    if arg_mode_is(None):
+        lib_module = _load_or_build_lib(name)
+
+    elif arg_mode_is('run', 'record', 'record-if-missing'):
+        lib_module = _load_or_build_lib(name)
+        if arg_mode_is('run'):
+            _test_mode.set_mode('run')
+        else:
+            _test_mode.set_mode('record')
+
+    elif arg_mode_is('replay'):
+        lib_module = LibInfo()
+        _test_mode.set_mode('replay')
+
+    elif arg_mode_is('run-or-replay'):
+        if test_mode_is('none', 'run'):  # All lib imports so far have been successful
+            try:
+                lib_module = _load_or_build_lib(name)
+                _test_mode.set_mode('run')
+            except ImportError:
+                _test_mode.set_mode('replay')
+
+        if test_mode_is('replay'):  # At least one lib import has failed
+            lib_module = LibInfo()
+
+    if not lib_module:
+        raise ValueError("Invalid mode '{}'".format(get_test_mode()))
+
+    return lib_module
+
+
 from .nicelib import NiceLib, NiceObject
 from .build import build_lib
 
