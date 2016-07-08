@@ -6,10 +6,127 @@ from future.utils import with_metaclass
 
 import sys
 import warnings
+import pickle as pkl
 from inspect import isfunction
 from . import test_mode_is, LibInfo, _test_mode
 
 __all__ = ['NiceLib', 'NiceObject']
+
+
+class StateNode(object):
+    def __init__(self, result=None):
+        self.result = result
+        self.children = {}
+        self.attrs = {}
+
+    def add_attr_access(self, name, value):
+        self.attrs[name] = value
+
+    def show(self, buf=sys.stdout, indent=0):
+        prefix = ' ' * indent
+        print(prefix + repr(self.attrs))
+
+        for args, node in self.children.items():
+            print(prefix + str(args[0]) + str(args[1:]))
+            node.show(buf, indent + 2)
+
+    def has_func(self, name):
+        for args in self.children:
+            if args[0] == name:
+                return True
+        return False
+
+
+class Record(object):
+    record = None
+    rec_fpath = None
+
+    def __init__(self):
+        if self.record:
+            raise Exception("record already exists")
+
+        self.__class__.record = self
+        self.root = StateNode()
+        self.cur_state = self.root
+        self.niceobjs = {}
+
+    def add_niceobject(self, cls_name, handles):
+        handles = tuple(self.encode_arg(h) for h in handles)
+        obj = MockNiceObject(cls_name, handles)
+
+    def get_attr(self, name):
+        if name in self.cur_state.attrs:
+            return self.cur_state.attrs[name]
+        elif self.cur_state.has_func(name):
+            return LibFunction(None, '', )
+        elif name in self.niceobjs:
+            return self.niceobjs[name]
+
+        self.cur_state.show()
+        raise AttributeError(name)
+
+    def get_niceobj_attr(self, name):
+        pass
+
+    def reset(self):
+        self.cur_state = self.root
+
+    def add_func_call(self, func_name, handles, args, result):
+        new_state = StateNode(result)
+
+        handles = self.encode_args(handles)
+        args = self.encode_args(args)
+        key = ('func', func_name, handles, args)
+
+        self.cur_state.children[key] = new_state
+        self.cur_state = new_state
+
+        if '.' in func_name:
+            obj_name = func_name.split('.')[0]
+            #classdict = {}
+            #obj_class = type(obj_name, (object,), classdict)
+            self.niceobjs[obj_name] = MockNiceObjectClass(obj_name)
+
+    def add_attr_access(self, name, value):
+        self.cur_state.add_attr_access(name, value)
+
+    @staticmethod
+    def encode_args(args):
+        return tuple(Record.encode_arg(arg) for arg in args)
+
+    @staticmethod
+    def encode_arg(arg):
+        if 'CData' in str(type(arg)):
+            return MockCData(arg)
+        else:
+            return arg
+
+    def show(self):
+        print('Record:')
+        self.root.show(indent=2)
+
+    @classmethod
+    def load(cls):
+        if cls.rec_fpath is None:
+            raise ValueError("Record.rec_fpath not set, can't load record file!")
+
+        with open(cls.rec_fpath, 'rb') as f:
+            cls.record = pkl.load(f)
+
+    def save(self, fname):
+        with open(fname, 'wb') as f:
+            pkl.dump(self, f)
+
+    @classmethod
+    def ensure_created(cls):
+        if cls.record is None:
+            if test_mode_is('replay'):
+                Record.load()
+            elif test_mode_is('record', 'run'):
+                print("Creating new record")
+                cls.record = cls()
+            else:
+                raise Exception("Unknown mode '{}'".format(_test_mode.mode))
 
 
 class _NiceObject(object):
