@@ -47,6 +47,38 @@ class NiceClassMeta(type):
 
         niceobj_dict = {'__init__': __init__, '__doc__': niceobj.doc}
         return type(cls_name, (_NiceObject,), niceobj_dict)
+
+
+class MockNiceObjectClass(object):
+    def __init__(self, name):
+        self.name = name
+
+    def __call__(self, *args, **kwds):
+        return MockNiceObject(self.name)
+
+
+class MockNiceObject(object):
+    def __init__(self, clsname, handles):
+        self.clsname = clsname
+        self.handles = handles
+
+    def __getattr__(self, name):
+        if test_mode_is('replay'):
+            if not name.startswith('__'):
+                print("Getting '{}'".format(name))
+                Record.ensure_created()
+                return Record.record.get_niceobj_attr('{}.{}'.format(self.clsname, name))
+        raise AttributeError(name)
+
+
+class MockCData(object):
+    def __init__(self, cdata):
+        self.str = str(cdata)
+
+    def __repr__(self):
+        return self.str
+
+
 def _wrap_inarg(ffi, argtype, arg):
     # For variadic args, we can't rely on cffi auto-converting our arg to the right cdata type, so
     # we do it ourselves instead
