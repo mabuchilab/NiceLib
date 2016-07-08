@@ -48,6 +48,8 @@ class NiceClassMeta(type):
         niceobj_dict = {'__init__': __init__, '__doc__': niceobj.doc}
         return type(cls_name, (_NiceObject,), niceobj_dict)
 def _wrap_inarg(ffi, argtype, arg):
+    # For variadic args, we can't rely on cffi auto-converting our arg to the right cdata type, so
+    # we do it ourselves instead
     try:
         import numpy as np
         HAS_NUMPY = True
@@ -77,14 +79,18 @@ def _wrap_inarg(ffi, argtype, arg):
 
         return ffi.cast(argtype, arg.ctypes.data)
 
-    elif isinstance(arg, (str, bytes)):
-        return bytes(arg)
-
     elif isinstance(argtype, ffi.CType):
-        try:
-            return ffi.cast(argtype, arg)
-        except TypeError:
-            raise TypeError("A value cast-able to '{}' is required, got '{}'".format(argtype, arg))
+        if argtype.cname in ('char *', 'char[]') and isinstance(arg, (str, bytes)):
+            if isinstance(arg, str):
+                arg = arg.encode()
+            return ffi.new('char[]', arg)
+
+        else:
+            try:
+                return ffi.cast(argtype, arg)
+            except TypeError:
+                raise TypeError("A value castable to '{}' is required, got '{}'".format(argtype,
+                                                                                        arg))
     else:
         return arg
 
