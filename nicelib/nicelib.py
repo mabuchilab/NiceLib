@@ -526,7 +526,7 @@ class LibMeta(type):
                     dir_lib.remove(func_name)
                     func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, flags['err_wrap'],
                                          struct_maker, buflen)
-                    repr_str = metacls._func_repr_str(ffi, func)
+                    repr_str = _func_repr_str(ffi, func)
 
                 # Save for use by niceobjs
                 funcs[name] = func
