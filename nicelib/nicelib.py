@@ -452,6 +452,8 @@ class NiceObject(object):
 
 class LibMeta(type):
     def __new__(metacls, clsname, bases, classdict):
+        if test_mode_is('replay'):
+            return metacls.__new_replay__(clsname, bases, classdict)
         mro_lookup = metacls._create_mro_lookup(classdict, bases)
 
         ffi = classdict['_ffi']
@@ -552,18 +554,33 @@ class LibMeta(type):
                         break
 
         classdict['_dir_lib'] = dir_lib
+        cls = super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
+
+        if test_mode_is('run'):
+            _contingent_libs.append(cls)
+
+        return cls
+
+    @classmethod
+    def __new_replay__(metacls, clsname, bases, orig_classdict):
+        print("In __new_replay__()")
+        classdict = {}
         return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
     def __getattr__(self, name):
-        return getattr(self._lib, name)
+        if test_mode_is('replay'):
+            Record.ensure_created()
+            value = Record.record.get_attr(name)
+        else:
+            value = getattr(self._lib, name)
+            if test_mode_is('record'):
+                Record.ensure_created()
+                Record.record.add_attr_access(name, value)
+
+        return value
 
     def __dir__(self):
         return super(LibMeta, self).__dir__() + self._dir_lib
-
-    @classmethod
-
-
-
 
     @staticmethod
     def _create_mro_lookup(classdict, bases):
