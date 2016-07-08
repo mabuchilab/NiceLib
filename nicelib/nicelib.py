@@ -450,6 +450,9 @@ class NiceObject(object):
         return repr(self.names)
 
 
+_contingent_libs = []
+
+
 class LibMeta(type):
     def __new__(metacls, clsname, bases, classdict):
         if test_mode_is('replay'):
