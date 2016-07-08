@@ -7,10 +7,46 @@ from future.utils import with_metaclass
 import sys
 import warnings
 from inspect import isfunction
+from . import test_mode_is, LibInfo, _test_mode
 
 __all__ = ['NiceLib', 'NiceObject']
 
 
+class _NiceObject(object):
+    pass
+
+
+class NiceClassMeta(type):
+    def __new__(metacls, cls_name, niceobj, ffi, funcs):
+        repr_strs = {}
+        for func_name in niceobj.names:
+            func = funcs[func_name]
+            if hasattr(func, '_ffi_func'):
+                repr_str = _func_repr_str(ffi, funcs[func_name], niceobj.n_handles)
+            else:
+                repr_str = func.__doc__ or '{}(??) -> ??'.format(func_name)
+            repr_strs[func_name] = repr_str
+
+        def __init__(self, *args):
+            handles = niceobj.init(*args) if niceobj.init else args
+            if not isinstance(handles, tuple):
+                handles = (handles,)
+
+            if len(handles) != niceobj.n_handles:
+                raise TypeError("__init__() takes exactly {} arguments "
+                                "({} given)".format(niceobj.n_handles, len(handles)))
+
+            # Generate "bound methods"
+            for func_name in niceobj.names:
+                lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles, cls_name)
+                setattr(self, func_name, lib_func)
+
+            if test_mode_is('record'):
+                Record.ensure_created()
+                Record.record.add_niceobject(cls_name, handles)
+
+        niceobj_dict = {'__init__': __init__, '__doc__': niceobj.doc}
+        return type(cls_name, (_NiceObject,), niceobj_dict)
 def _wrap_inarg(ffi, argtype, arg):
     try:
         import numpy as np
@@ -346,7 +382,7 @@ class LibMeta(type):
 
         for cls_name, niceobj in niceobjects.items():
             # Need to use a separate function so we have a per-class closure
-            classdict[cls_name] = metacls._create_object_class(cls_name, niceobj, ffi, funcs)
+            classdict[cls_name] = NiceClassMeta(cls_name, niceobj, ffi, funcs)
 
         # Add macro defs
         if defs:
@@ -415,23 +451,23 @@ class LibMeta(type):
             raise KeyError(name)
         return lookup
 
-    @staticmethod
-    def _func_repr_str(ffi, func, n_handles=0):
-        argtypes = ffi.typeof(func._ffi_func).args
 
-        if n_handles > len(func._sig_tup):
-            raise ValueError("Signature for function '{}' is missing its required "
-                             "handle args".format(func.__name__))
+def _func_repr_str(ffi, func, n_handles=0):
+    argtypes = ffi.typeof(func._ffi_func).args
 
-        in_args = [a.cname for a, d in zip(argtypes, func._sig_tup) if 'in' in d][n_handles:]
-        out_args = [a.item.cname for a, d in zip(argtypes, func._sig_tup)
-                    if d.startswith(('out', 'buf', 'arr'))]
+    if n_handles > len(func._sig_tup):
+        raise ValueError("Signature for function '{}' is missing its required "
+                         "handle args".format(func.__name__))
 
-        if not out_args:
-            out_args = ['None']
+    in_args = [a.cname for a, d in zip(argtypes, func._sig_tup) if 'in' in d][n_handles:]
+    out_args = [a.item.cname for a, d in zip(argtypes, func._sig_tup)
+                if d.startswith(('out', 'buf', 'arr'))]
 
-        repr_str = "{}({}) -> {}".format(func.__name__, ', '.join(in_args), ', '.join(out_args))
-        return repr_str
+    if not out_args:
+        out_args = ['None']
+
+    repr_str = "{}({}) -> {}".format(func.__name__, ', '.join(in_args), ', '.join(out_args))
+    return repr_str
 
 
 class LibFunction(object):
