@@ -367,7 +367,7 @@ class LibMeta(type):
         return getattr(self._lib, name)
 
     def __dir__(self):
-        return list(__dict__.keys()) + self._dir_lib
+        return list(self.__dict__.keys()) + self._dir_lib
 
     @classmethod
     def _create_object_class(metacls, cls_name, niceobj, ffi, funcs):
