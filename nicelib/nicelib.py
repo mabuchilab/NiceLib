@@ -475,17 +475,19 @@ class LibMeta(type):
         else:
             prefixes = tuple(prefixes) + ('',)
 
+        # Unpack NiceObject sigs into the classdict
         niceobjects = {}  # name: NiceObject
         func_to_niceobj = {}
         for name, value in list(classdict.items()):
             if isinstance(value, NiceObject):
-                if value.attrs is None:
-                    value.names.remove(name)  # Remove self
+                niceobj = value
+                if niceobj.attrs is None:
+                    niceobj.names.remove(name)  # Remove self
                 else:
-                    for attr_name, attr_val in value.attrs.items():
+                    for attr_name, attr_val in niceobj.attrs.items():
                         classdict[attr_name] = attr_val
-                        func_to_niceobj[attr_name] = value
-                niceobjects[name] = value
+                        func_to_niceobj[attr_name] = niceobj
+                niceobjects[name] = niceobj
 
         funcs = {}
         func_flags = {}
