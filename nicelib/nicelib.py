@@ -585,7 +585,7 @@ class LibMeta(type):
         return value
 
     def __dir__(self):
-        return super(LibMeta, self).__dir__() + self._dir_lib
+        return list(self.__dict__.keys()) + self._dir_lib
 
     @staticmethod
     def _create_mro_lookup(classdict, bases):
