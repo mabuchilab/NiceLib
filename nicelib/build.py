@@ -77,7 +77,7 @@ def handle_lib_name(lib_name):
     return select_platform_value(lib_name)
 
 
-def build_lib(header_info, lib_name, module_name):
+def build_lib(header_info, lib_name, module_name, ignore_headers=()):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -129,7 +129,8 @@ def build_lib(header_info, lib_name, module_name):
 
     #header_name = os.path.basename(header_path)
     #print("Parsing and cleaning header {}".format(header_name))
-    clean_header_str, macro_code = process_headers(header_paths, predef_path, update_cb=update_cb)
+    clean_header_str, macro_code = process_headers(header_paths, predef_path, update_cb=update_cb,
+                                                   ignore_headers=ignore_headers)
 
     print("Compiling cffi module...")
     ffi = cffi.FFI()
