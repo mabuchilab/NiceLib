@@ -1008,12 +1008,38 @@ class FFICleaner(c_ast.NodeVisitor):
 
 
 class Generator(object):
-    def __init__(self, parser):
+    def __init__(self, parser, token_list_hooks=(), str_list_hooks=()):
         self.tokens = parser.out
         self.macros = parser.macros
         self.expander = parser.macro_expand_2
 
+        self.token_list_hooks = token_list_hooks
+        self.str_list_hooks = str_list_hooks
+
     def generate(self):
+        strings = []
+        cur_fpath = '<root>'
+
+        # HOOK: list of tokens
+        tokens = self.tokens
+        for hook in self.token_list_hooks:
+            tokens = hook(tokens)
+
+        for t in tokens:
+            if t.type not in NON_TOKENS:
+                if t.fpath != cur_fpath:
+                    strings.append('#line {} "{}"'.format(t.line, t.fpath))
+                    cur_fpath = t.fpath
+
+                if isinstance(t, (bytes, str)):
+                    strings.append(t)
+                else:
+                    strings.append(t.string)
+
+        # HOOK: list of strings
+        for hook in self.str_list_hooks:
+            strings = hook(strings)
+
         out = StringIO()
 
         # pycparser doesn't know about these types by default, but cffi does. We just need to make
@@ -1021,7 +1047,7 @@ class Generator(object):
         common_types = 'int8_t int16_t int32_t int64_t uint8_t uint16_t uint32_t uint64_t'.split()
         for type_name in common_types:
             out.write("typedef int {};\n".format(type_name))
-        out.write('\n'.join(t.string for t in self.tokens if t.type not in NON_TOKENS))
+        out.write('\n'.join(strings))
 
         # Do stdcall/WINAPI replacement hack like cffi does (see cffi.cparser for more info)
         r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
@@ -1318,7 +1344,31 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
                     FUNC_MACROS, INCLUDE_DIRS, ignore_headers=ignore_headers)
     parser.parse(update_cb=update_cb)
 
-    gen = Generator(parser)
+    def extern_c_hook(strings):
+        out = []
+        depth = 10000
+        i = 0
+        while i < len(strings):
+            s = strings[i]
+            if s == 'extern' and i + 1 < len(strings) and strings[i+1] == '"C"':
+                depth = 0
+                i += 1
+            else:
+                skip = False
+                if s == '{':
+                    skip = (depth == 0)
+                    depth += 1
+                elif s == '}':
+                    depth -= 1
+                    skip = (depth == 0)
+                    i += 1  # Skip semicolon
+
+                if not skip:
+                    out.append(s)
+            i += 1
+        return out
+
+    gen = Generator(parser, str_list_hooks=(extern_c_hook,))
     header_src, macro_src = gen.generate()
     return header_src, macro_src
 
