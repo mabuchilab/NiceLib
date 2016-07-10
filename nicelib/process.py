@@ -248,7 +248,7 @@ class FuncMacro(Macro):
 
 class Parser(object):
     def __init__(self, source, fpath='', replacement_map=[], obj_macros=[], func_macros=[],
-                 include_dirs=[]):
+                 include_dirs=[], ignore_headers=()):
         self.base_dir, self.fname = os.path.split(fpath)
         self.tokens = lexer.lex(source, fpath)
         self.last_line = self.tokens[-1].line
@@ -257,6 +257,7 @@ class Parser(object):
         self.cond_stack = []
         self.cond_done_stack = []
         self.include_dirs = include_dirs
+        self.ignored_headers = tuple(os.path.normcase(p) for p in ignore_headers)
 
         self.predef_obj_macros = {m.name: m for m in obj_macros}
         self.predef_func_macros = {m.name: m for m in func_macros}
@@ -842,6 +843,10 @@ class Parser(object):
         token = tokens[0]
         hpath = token.string[1:-1]
 
+        if os.path.normcase(hpath) in self.ignored_headers:
+            log.info("Explicitly ignored header '{}'".format(hpath))
+            return False
+
         if token.type is Token.HEADER_NAME:
             log.info("System header {}".format(hpath))
             for include_dir in self.include_dirs:
@@ -1305,12 +1310,12 @@ def process_file(in_fname, out_fname, minify):
             f.write("{} = {}\n".format(macro.name, macro.py_src))
 
 
-def process_headers(header_paths, predef_path, update_cb=None):
+def process_headers(header_paths, predef_path=None, update_cb=None, ignore_headers=()):
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
     OBJ_MACROS, FUNC_MACROS = get_predef_macros()
     parser = Parser(source, '<root>', REPLACEMENT_MAP, OBJ_MACROS,
-                    FUNC_MACROS, INCLUDE_DIRS)
+                    FUNC_MACROS, INCLUDE_DIRS, ignore_headers=ignore_headers)
     parser.parse(update_cb=update_cb)
 
     gen = Generator(parser)
