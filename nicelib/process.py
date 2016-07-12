@@ -882,6 +882,19 @@ class Parser(object):
 
 
 class FFICleaner(c_ast.NodeVisitor):
+    """A visitor class for cleaning up `c_ast`s
+
+    One major feature is that this will evaluate numeric expressions and replace them with
+    constants. This allows arrays with calculated lengths to be used by cffi. In general we want to
+    support use of `sizeof` as well, so we need to have ffi parse each typedef as we see it so we
+    know the available sizes.
+
+    This also cleans up a tricky issue where pycparser will split a multi-element typedef into
+    multiple typedefs, possible duplicating a struct/union/enum definition. Here we are careful to
+    erase all but the first definition.
+
+    All function definitions are also removed.
+    """
     def __init__(self, ffi):
         self.ffi = ffi
         self.generator = c_generator.CGenerator()
