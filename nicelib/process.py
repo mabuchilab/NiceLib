@@ -1073,21 +1073,21 @@ class Generator(object):
         chunk = []
         expected_line = -1
         cur_fpath = '<root>'
-        chunk_not_empty = False
         chunk_start_line = -1
+        chunk_water_mark = 0
         for t in tokens:
             if (t.fpath, t.line) != (cur_fpath, expected_line):
-                if chunk_not_empty:
+                if chunk_water_mark > 0:
                     strings.append('#line {} "{}"\n'.format(chunk_start_line, cur_fpath))
-                    strings.extend(chunk)
+                    strings.extend(chunk[:chunk_water_mark])
                 cur_fpath = t.fpath
                 expected_line = t.line
                 chunk = []
-                chunk_not_empty = False
+                chunk_water_mark = 0
                 chunk_start_line = t.line
 
             if t.type not in NON_TOKENS:
-                chunk_not_empty = True
+                chunk_water_mark = len(chunk) + 1
             elif t.type is Token.NEWLINE:
                 expected_line += 1
             elif t.type is Token.BLOCK_COMMENT:
