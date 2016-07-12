@@ -1025,24 +1025,40 @@ class Generator(object):
         self.debug_file = debug_file
 
     def generate(self):
-        strings = []
-        cur_fpath = '<root>'
 
         # HOOK: list of tokens
         tokens = self.tokens
         for hook in self.token_list_hooks:
             tokens = hook(tokens)
 
+        strings = []
+        chunk = []
+        expected_line = -1
+        cur_fpath = '<root>'
+        chunk_not_empty = False
+        chunk_start_line = -1
         for t in tokens:
-            if t.type not in NON_TOKENS:
-                if t.fpath != cur_fpath:
-                    strings.append('#line {} "{}"'.format(t.line, t.fpath))
-                    cur_fpath = t.fpath
+            if (t.fpath, t.line) != (cur_fpath, expected_line):
+                if chunk_not_empty:
+                    strings.append('#line {} "{}"\n'.format(chunk_start_line, cur_fpath))
+                    strings.extend(chunk)
+                cur_fpath = t.fpath
+                expected_line = t.line
+                chunk = []
+                chunk_not_empty = False
+                chunk_start_line = t.line
 
-                if isinstance(t, (bytes, str)):
-                    strings.append(t)
-                else:
-                    strings.append(t.string)
+            if t.type not in NON_TOKENS:
+                chunk_not_empty = True
+            elif t.type is Token.NEWLINE:
+                expected_line += 1
+            elif t.type is Token.BLOCK_COMMENT:
+                expected_line += t.string.count('\n')
+                continue  # Don't output
+            elif t.type is Token.LINE_COMMENT:
+                continue  # Don't output
+
+            chunk.append(t.string)
 
         # HOOK: list of strings
         for hook in self.str_list_hooks:
@@ -1054,7 +1070,7 @@ class Generator(object):
         # sure that pycparser knows these are types, the particular type is unimportant
         for type_name in cffi.commontypes.COMMON_TYPES:
             out.write("typedef int {};\n".format(type_name))
-        out.write('\n'.join(strings))
+        out.write(''.join(strings))
 
         # Do stdcall/WINAPI replacement hack like cffi does (see cffi.cparser for more info)
         r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
