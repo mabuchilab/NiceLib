@@ -918,14 +918,29 @@ class FFICleaner(c_ast.NodeVisitor):
         self.ffi.cdef(src)
         return node
 
-    def visit_Struct(self, node):
-        if node.decls:  # Is a struct definition
+    def visit_Enum(self, node):
+        if node.values:  # Is a definition
             if node.name in self.defined_tags:
-                node = c_ast.Struct(node.name, ())
+                node = c_ast.Enum(node.name, ())
             else:
                 self.defined_tags.add(node.name)
                 self.generic_visit(node)
         return node
+
+    def visit_StructOrUnion(self, node, node_class):
+        if node.decls:  # Is a definition
+            if node.name in self.defined_tags:
+                node = node_class(node.name, ())
+            else:
+                self.defined_tags.add(node.name)
+                self.generic_visit(node)
+        return node
+
+    def visit_Struct(self, node):
+        return self.visit_StructOrUnion(node, c_ast.Struct)
+
+    def visit_Union(self, node):
+        return self.visit_StructOrUnion(node, c_ast.Union)
 
     def visit_FuncDef(self, node):
         return None
