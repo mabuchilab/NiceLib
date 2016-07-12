@@ -1360,13 +1360,18 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
 
     def extern_c_hook(strings):
         out = []
-        depth = 10000
+        looking_for_brace = False
+        depth = 0
         i = 0
         while i < len(strings):
             s = strings[i]
-            if s == 'extern' and i + 1 < len(strings) and strings[i+1] == '"C"':
-                depth = 0
-                i += 1
+            if not looking_for_brace:
+                if s == 'extern' and i + 1 < len(strings) and strings[i+1] == '"C"':
+                    depth = 0
+                    looking_for_brace = True
+                    i += 1
+                else:
+                    out.append(s)
             else:
                 skip = False
                 if s == '{':
@@ -1375,6 +1380,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
                 elif s == '}':
                     depth -= 1
                     skip = (depth == 0)
+                    looking_for_brace = not skip
                     i += 1  # Skip semicolon
 
                 if not skip:
