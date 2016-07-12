@@ -885,6 +885,7 @@ class FFICleaner(c_ast.NodeVisitor):
     def __init__(self, ffi):
         self.ffi = ffi
         self.generator = c_generator.CGenerator()
+        self.defined_tags = set()
 
     def visit(self, node):
         method = 'visit_' + node.__class__.__name__
@@ -908,13 +909,22 @@ class FFICleaner(c_ast.NodeVisitor):
         return node
 
     def visit_Typedef(self, node):
-        # Visit children first
-        self.generic_visit(node)
+        # Visit typedecl hierarchy first
+        self.visit(node.type)
 
         # Now add type to FFI
         src = self.generator.visit(node) + ';'
         print(src)
         self.ffi.cdef(src)
+        return node
+
+    def visit_Struct(self, node):
+        if node.decls:  # Is a struct definition
+            if node.name in self.defined_tags:
+                node = c_ast.Struct(node.name, ())
+            else:
+                self.defined_tags.add(node.name)
+                self.generic_visit(node)
         return node
 
     def visit_FuncDef(self, node):
