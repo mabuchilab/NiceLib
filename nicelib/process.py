@@ -4,6 +4,7 @@ from __future__ import unicode_literals, division, print_function
 from future import standard_library
 standard_library.install_aliases()
 from builtins import str, range
+from past.builtins import basestring
 
 import re
 import os.path
@@ -1344,6 +1345,7 @@ def process_file(in_fname, out_fname, minify):
 
 def process_headers(header_paths, predef_path=None, update_cb=None, ignore_headers=(),
                     debug_file=None):
+    header_paths = (header_paths,) if isinstance(header_paths, basestring) else header_paths
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
     OBJ_MACROS, FUNC_MACROS = get_predef_macros()
