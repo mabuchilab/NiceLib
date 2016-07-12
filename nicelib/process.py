@@ -16,6 +16,7 @@ import ast
 from io import StringIO
 from pycparser import c_parser, c_generator, c_ast, plyparser
 import cffi
+import cffi.commontypes
 from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
@@ -1046,8 +1047,7 @@ class Generator(object):
 
         # pycparser doesn't know about these types by default, but cffi does. We just need to make
         # sure that pycparser knows these are types, the particular type is unimportant
-        common_types = 'int8_t int16_t int32_t int64_t uint8_t uint16_t uint32_t uint64_t'.split()
-        for type_name in common_types:
+        for type_name in cffi.commontypes.COMMON_TYPES:
             out.write("typedef int {};\n".format(type_name))
         out.write('\n'.join(strings))
 
