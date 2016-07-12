@@ -899,6 +899,7 @@ class FFICleaner(c_ast.NodeVisitor):
         self.ffi = ffi
         self.generator = c_generator.CGenerator()
         self.defined_tags = set()
+        self.cur_typedef_name = None
 
     def visit(self, node):
         method = 'visit_' + node.__class__.__name__
@@ -923,7 +924,10 @@ class FFICleaner(c_ast.NodeVisitor):
 
     def visit_Typedef(self, node):
         # Visit typedecl hierarchy first
+        tmp_name = self.cur_typedef_name
+        self.cur_typedef_name = node.name
         self.visit(node.type)
+        self.cur_typedef_name = tmp_name
 
         # Now add type to FFI
         src = self.generator.visit(node) + ';'
@@ -932,6 +936,8 @@ class FFICleaner(c_ast.NodeVisitor):
         return node
 
     def visit_Enum(self, node):
+        node.name = node.name or '__autotag_' + self.cur_typedef_name
+
         if node.values:  # Is a definition
             if node.name in self.defined_tags:
                 node = c_ast.Enum(node.name, ())
@@ -941,6 +947,8 @@ class FFICleaner(c_ast.NodeVisitor):
         return node
 
     def visit_StructOrUnion(self, node, node_class):
+        node.name = node.name or '__autotag_' + self.cur_typedef_name
+
         if node.decls:  # Is a definition
             if node.name in self.defined_tags:
                 node = node_class(node.name, ())
