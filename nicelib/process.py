@@ -1008,13 +1008,14 @@ class FFICleaner(c_ast.NodeVisitor):
 
 
 class Generator(object):
-    def __init__(self, parser, token_list_hooks=(), str_list_hooks=()):
+    def __init__(self, parser, token_list_hooks=(), str_list_hooks=(), debug_file=None):
         self.tokens = parser.out
         self.macros = parser.macros
         self.expander = parser.macro_expand_2
 
         self.token_list_hooks = token_list_hooks
         self.str_list_hooks = str_list_hooks
+        self.debug_file = debug_file
 
     def generate(self):
         strings = []
@@ -1057,6 +1058,11 @@ class Generator(object):
         csource = r_stdcall2.sub(' volatile volatile const(', csource)
         csource = r_stdcall1.sub(' volatile volatile const ', csource)
         csource = r_cdecl.sub(' ', csource)
+
+        # Log intermediate c-source
+        if self.debug_file:
+            with open(self.debug_file, 'w') as f:
+                f.write(csource)
 
         self.parser = c_parser.CParser()
         tree = self.parse(csource)
@@ -1336,7 +1342,8 @@ def process_file(in_fname, out_fname, minify):
             f.write("{} = {}\n".format(macro.name, macro.py_src))
 
 
-def process_headers(header_paths, predef_path=None, update_cb=None, ignore_headers=()):
+def process_headers(header_paths, predef_path=None, update_cb=None, ignore_headers=(),
+                    debug_file=None):
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
     OBJ_MACROS, FUNC_MACROS = get_predef_macros()
@@ -1368,7 +1375,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
             i += 1
         return out
 
-    gen = Generator(parser, str_list_hooks=(extern_c_hook,))
+    gen = Generator(parser, str_list_hooks=(extern_c_hook,), debug_file=debug_file)
     header_src, macro_src = gen.generate()
     return header_src, macro_src
 
