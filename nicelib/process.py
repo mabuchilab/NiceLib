@@ -1116,6 +1116,8 @@ class Generator(object):
         # Remove phony typedefs
         tree.ext = tree.ext[len(cffi.commontypes.COMMON_TYPES):]
 
+        log.info("pycparser successfully re-parsed cleaned header")
+
         # Remove function defs and replace 'volatile volatile const'
         ffi = cffi.FFI()
         cleaner = FFICleaner(ffi)
@@ -1398,6 +1400,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
     parser = Parser(source, '<root>', REPLACEMENT_MAP, OBJ_MACROS,
                     FUNC_MACROS, INCLUDE_DIRS, ignore_headers=ignore_headers)
     parser.parse(update_cb=update_cb)
+    log.info("Successfully parsed input headers")
 
     def extern_c_hook(strings):
         out = []
