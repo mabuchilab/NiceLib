@@ -1073,7 +1073,7 @@ class Generator(object):
         self.parser = c_parser.CParser()
         tree = self.parse(csource)
         # Remove phony typedefs
-        tree.ext = tree.ext[len(common_types):]
+        tree.ext = tree.ext[len(cffi.commontypes.COMMON_TYPES):]
 
         # Remove function defs and replace 'volatile volatile const'
         ffi = cffi.FFI()
