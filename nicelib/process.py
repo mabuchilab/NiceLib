@@ -344,14 +344,16 @@ class Parser(object):
         return self._pop_base(tokens, test_type, test_string, dont_ignore, silent=True,
                               track_lines=False)
 
+    def _log_token(self, token):
+        log.debug("{}Popped token {}".format('[skipping]' if self.skipping else '', token))
+
     def _pop_base(self, tokens, test_type=None, test_string=None, dont_ignore=(), silent=True,
                   track_lines=False):
         while True:
             try:
                 token = tokens.pop(0)
                 if track_lines:
-                    log.debug("{}Popped token {}".format('[skipping]' if self.skipping else '',
-                                                         token))
+                    self._log_token(token)
             except IndexError:
                 raise EndOfStreamError
 
@@ -412,6 +414,9 @@ class Parser(object):
                     last_newline_idx = i
                 elif t.string == '#':
                     break
+
+            for t in self.tokens[:last_newline_idx]:
+                self._log_token(t)
 
             expanded = self.macro_expand_2([token] + self.tokens[:last_newline_idx])
             self.tokens = self.tokens[last_newline_idx:]
