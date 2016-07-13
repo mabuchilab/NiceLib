@@ -77,7 +77,7 @@ def handle_lib_name(lib_name):
     return select_platform_value(lib_name)
 
 
-def build_lib(header_info, lib_name, module_name, ignore_headers=()):
+def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=()):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -101,6 +101,10 @@ def build_lib(header_info, lib_name, module_name, ignore_headers=()):
         Name of compiled library file, e.g. 'mylib.dll'
     module_name : str
         Name of module to create. Must be in the format '_*lib', e.g. '_mylib'
+    filedir : str
+        Path indicating the directory where the generated module will be saved. If `filedir`
+        points to an existing file, that file's directory is used. Usually you would pass the
+        ``__file__`` attribute from your build module.
 
     Notes
     -----
@@ -123,6 +127,10 @@ def build_lib(header_info, lib_name, module_name, ignore_headers=()):
     if not (module_name.startswith('_') and module_name.endswith('lib')):
         raise TypeError("Module name must use the format '_*lib'")
 
+    if os.path.isfile(filedir):
+        filedir, _ = os.path.split(filedir)
+    filedir = os.path.realpath(filedir)
+
     def update_cb(cur_line, tot_lines):
         sys.stdout.write("Parsing line {}/{}\r".format(cur_line, tot_lines))
         sys.stdout.flush()
@@ -136,11 +144,12 @@ def build_lib(header_info, lib_name, module_name, ignore_headers=()):
     ffi = cffi.FFI()
     ffi.cdef(clean_header_str)
     ffi.set_source('.' + module_name, None)
-    ffi.compile()
+    ffi.compile(tmpdir=filedir)
 
     print("Writing macros...")
 
-    with open(module_name + '.py', 'a') as f:
+    module_path = os.path.join(filedir, module_name + '.py')
+    with open(module_path, 'a') as f:
         f.write("lib = ffi.dlopen('{}')\n".format(lib_name))
         f.write("class Defs(object): pass\ndefs = Defs()\n")
         f.write(macro_code)
