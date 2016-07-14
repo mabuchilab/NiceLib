@@ -8,7 +8,7 @@ import sys
 import warnings
 import pickle as pkl
 from inspect import isfunction
-from . import test_mode_is, LibInfo, _test_mode
+from . import test_mode_is, _test_mode
 
 __all__ = ['NiceLib', 'NiceObject']
 
