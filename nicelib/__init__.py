@@ -106,4 +106,4 @@ def load_lib(name, pkg):
 from .nicelib import NiceLib, NiceObject
 from .build import build_lib
 
-__all__ = ['NiceLib', 'NiceObject', 'build_lib']
+__all__ = ['NiceLib', 'NiceObject', 'build_lib', 'load_lib']
