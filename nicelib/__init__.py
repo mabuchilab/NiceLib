@@ -57,26 +57,26 @@ class LibInfo(object):
         return self.ffi, self.lib, self.defs
 
 
-def _load_or_build_lib(name):
+def _load_or_build_lib(name, pkg):
     try:
-        lib_module = import_module('_{}lib'.format(name))
+        lib_module = import_module('._{}lib'.format(name), pkg)
     except ImportError:
-        build_module = import_module('_build_{}'.format(name))
+        build_module = import_module('._build_{}'.format(name), pkg)
         build_module.build()
-        lib_module = import_module('_{}lib'.format(name))
+        lib_module = import_module('._{}lib'.format(name), pkg)
 
     if not lib_module:
         print("No lib_module!!")
     return LibInfo(lib_module)
 
 
-def load_lib(name):
+def load_lib(name, pkg):
     lib_module = None
     if arg_mode_is(None):
-        lib_module = _load_or_build_lib(name)
+        lib_module = _load_or_build_lib(name, pkg)
 
     elif arg_mode_is('run', 'record', 'record-if-missing'):
-        lib_module = _load_or_build_lib(name)
+        lib_module = _load_or_build_lib(name, pkg)
         if arg_mode_is('run'):
             _test_mode.set_mode('run')
         else:
@@ -89,7 +89,7 @@ def load_lib(name):
     elif arg_mode_is('run-or-replay'):
         if test_mode_is('none', 'run'):  # All lib imports so far have been successful
             try:
-                lib_module = _load_or_build_lib(name)
+                lib_module = _load_or_build_lib(name, pkg)
                 _test_mode.set_mode('run')
             except ImportError:
                 _test_mode.set_mode('replay')
