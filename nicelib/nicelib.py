@@ -459,6 +459,12 @@ class LibMeta(type):
             return metacls.__new_replay__(clsname, bases, classdict)
         mro_lookup = metacls._create_mro_lookup(classdict, bases)
 
+        if '_info' in classdict:
+            info = classdict['_info']
+            classdict['_ffi'] = info.ffi
+            classdict['_lib'] = info.lib
+            classdict['_defs'] = info.defs
+
         ffi = classdict['_ffi']
         lib = classdict['_lib']
         defs = mro_lookup('_defs')
