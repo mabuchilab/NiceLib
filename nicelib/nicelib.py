@@ -244,7 +244,7 @@ def _wrap_inarg(ffi, argtype, arg):
         return arg
 
 
-def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buflen):
+def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buflen):
     functype = ffi.typeof(func)
     argtypes = functype.args
     # Cast bytes to str
@@ -381,8 +381,8 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buf
         retval = func(*args)
         out_vals = [f(a) for a, f in outargs]
 
-        if err_wrap:
-            err_wrap(retval)
+        if ret_wrap:
+            ret_wrap(retval)
         else:
             out_vals.append(retval)
 
@@ -401,19 +401,19 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, err_wrap, struct_maker, default_buf
 
 # WARNING uses some stack frame hackery; should probably make use of this syntax optional
 class NiceObject(object):
-    def __init__(self, attrs=None, n_handles=1, init=None, prefix=None, err_wrap=None, doc=None):
+    def __init__(self, attrs=None, n_handles=1, init=None, prefix=None, ret_wrap=None, doc=None):
         self.doc = doc
         self.attrs = attrs
         self.n_handles = n_handles
         self.init = init
         self.prefix = prefix
-        self.err_wrap = err_wrap
+        self.ret_wrap = ret_wrap
 
         self.flags = {}
         if prefix is not None:
             self.flags['prefix'] = prefix
-        if err_wrap is not None:
-            self.flags['err_wrap'] = err_wrap
+        if ret_wrap is not None:
+            self.flags['ret_wrap'] = ret_wrap
 
         if attrs is not None:
             self.names = set(attrs.keys())
@@ -469,7 +469,7 @@ class LibMeta(type):
         lib = classdict['_lib']
         defs = mro_lookup('_defs')
         prefixes = mro_lookup('_prefix')
-        err_wrap = mro_lookup('_err_wrap')
+        ret_wrap = mro_lookup('_ret_wrap')
         struct_maker = mro_lookup('_struct_maker') or (ffi.new if ffi else None)
         buflen = mro_lookup('_buflen')
 
@@ -497,11 +497,11 @@ class LibMeta(type):
 
         funcs = {}
         func_flags = {}
-        err_wrappers = {}
+        ret_wrappers = {}
 
         for name, value in classdict.items():
-            if name.startswith('_err_') and isfunction(value):
-                err_wrappers[name[5:]] = value
+            if name.startswith('_ret_') and isfunction(value):
+                ret_wrappers[name[5:]] = value
 
         for name, value in classdict.items():
             if (not name.startswith('_') and not isinstance(value, NiceObject)):
@@ -511,13 +511,19 @@ class LibMeta(type):
                     repr_str = func.__doc__ or "{}(??) -> ??".format(name)
                 else:
                     sig_tup = value
-                    flags = {'prefix': prefixes, 'err_wrap': err_wrap}
+                    flags = {'prefix': prefixes, 'ret_wrap': ret_wrap}
                     if name in func_to_niceobj:
                         flags.update(func_to_niceobj[name].flags)
 
                     # Pop off the flags dict
                     if sig_tup and isinstance(sig_tup[-1], dict):
-                        flags.update(sig_tup[-1])
+                        func_flags = sig_tup[-1]
+
+                        # Allow use of 'ret' as a shorthand for 'ret_wrap'
+                        if 'ret' in func_flags:
+                            func_flags['ret_wrap'] = func_flags['ret']
+
+                        flags.update(func_flags)
                         sig_tup = sig_tup[:-1]
 
                     if isinstance(flags['prefix'], basestring):
@@ -543,11 +549,11 @@ class LibMeta(type):
 
                     dir_lib.remove(func_name)
 
-                    err_wrapper = flags['err_wrap']
-                    if isinstance(err_wrapper, basestring):
-                        err_wrapper = err_wrappers[flags['err_wrap']]
+                    ret_wrapper = flags['ret_wrap']
+                    if isinstance(ret_wrapper, basestring):
+                        ret_wrapper = ret_wrappers[flags['ret_wrap']]
 
-                    func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, err_wrapper,
+                    func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, ret_wrapper,
                                          struct_maker, buflen)
                     repr_str = _func_repr_str(ffi, func)
 
@@ -686,10 +692,20 @@ class NiceLib(with_metaclass(LibMeta, object)):
         named like ``SDK_Func()``, you can set `_prefix` to ``'SDK_'``, and access them as
         `Func()`. If more than one prefix is given, they are tried in order for each signature
         until the appropraite function is found.
-    _err_wrap : function, optional
-        Wrapper function to handle error codes returned by each library function. If None, the C
+    _ret_wrap : function or str, optional
+        Wrapper function to handle the return values of each library function. By default, the
         return value will be appended to the end of the Python return values. The wrapper function
-        takes the C function's return value (usually an error/success code) as its only argument.
+        takes the C function's return value (often an error/success code) as its only argument. If
+        the wrapper returns a non-``None`` value, it will be appended to the wrapped function's
+        return values.
+
+        You may also use a ``str`` instead. If you define function ``_ret_foo()`` in your
+        subclass, you may refer to it by using the ``str`` ``'foo'``.
+
+        There are two wrappers that ``NiceLib`` defines for convenience (and may also be referenced
+        as strings). ``_ret_return()`` is the default, which simply appends the return value to the
+        wrapped function's return values, and ``_ret_ignore()``, which ignores the value entirely
+        and does not return it.
     _struct_maker : function, optional
         Function that is called to create an FFI struct of the given type. Mainly useful for
         odd libraries that require you to always fill out some field of the struct, like its size
@@ -704,8 +720,12 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _prefix = ''
     _struct_maker = None  # ffi.new
     _buflen = 512
+    _ret_wrap = 'return'
 
-    def _err_wrap(ret_code):
+    def _ret_return(retval):
+        return retval
+
+    def _ret_ignore(retval):
         pass
 
     def __new__(cls):
