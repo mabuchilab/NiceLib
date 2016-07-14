@@ -931,7 +931,7 @@ class FFICleaner(c_ast.NodeVisitor):
 
         # Now add type to FFI
         src = self.generator.visit(node) + ';'
-        print(src)
+        log.debug(src)
         self.ffi.cdef(src)
         return node
 
@@ -1012,7 +1012,7 @@ class FFICleaner(c_ast.NodeVisitor):
     def visit_UnaryOp(self, node):
         if node.op == 'sizeof':
             type_str = self.generator.visit(node.expr)
-            print("SIZEOF({})".format(type_str))
+            log.debug("SIZEOF({})".format(type_str))
             val = self.ffi.sizeof(type_str)
         elif node.op in UNOPS:
             expr_val = self._val_from_const(self.visit(node.expr))
