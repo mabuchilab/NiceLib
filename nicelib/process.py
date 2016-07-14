@@ -1148,9 +1148,6 @@ class Generator(object):
         generator = c_generator.CGenerator()
         header_src = generator.visit(tree)
 
-        with open('log.txt', 'w') as f:
-            f.write(header_src)
-
         # Convert macros
         macro_src = StringIO()
         macro_src.write("# Generated macro definitions\n")
