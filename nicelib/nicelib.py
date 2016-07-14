@@ -729,4 +729,4 @@ class NiceLib(with_metaclass(LibMeta, object)):
         pass
 
     def __new__(cls):
-        raise Exception("Not allowed to instantiate {}".format(cls))
+        raise TypeError("Not allowed to instantiate {}. Use the class directly".format(cls))
