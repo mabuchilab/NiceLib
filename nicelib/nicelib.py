@@ -491,6 +491,11 @@ class LibMeta(type):
 
         funcs = {}
         func_flags = {}
+        err_wrappers = {}
+
+        for name, value in classdict.items():
+            if name.startswith('_err_') and isfunction(value):
+                err_wrappers[name[5:]] = value
 
         for name, value in classdict.items():
             if (not name.startswith('_') and not isinstance(value, NiceObject)):
@@ -531,7 +536,12 @@ class LibMeta(type):
                                                                                    flags['prefix']))
 
                     dir_lib.remove(func_name)
-                    func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, flags['err_wrap'],
+
+                    err_wrapper = flags['err_wrap']
+                    if isinstance(err_wrapper, basestring):
+                        err_wrapper = err_wrappers[flags['err_wrap']]
+
+                    func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, err_wrapper,
                                          struct_maker, buflen)
                     repr_str = _func_repr_str(ffi, func)
 
