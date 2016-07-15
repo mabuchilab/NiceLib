@@ -1070,13 +1070,16 @@ class FFICleaner(TreeModifier):
 
 
 class Generator(object):
-    def __init__(self, parser, token_list_hooks=(), str_list_hooks=(), debug_file=None):
+    def __init__(self, parser, token_list_hooks=(), str_list_hooks=(), tree_hooks=(),
+                 debug_file=None):
         self.tokens = parser.out
         self.macros = parser.macros
         self.expander = parser.macro_expand_2
 
         self.token_list_hooks = token_list_hooks
         self.str_list_hooks = str_list_hooks
+        self.tree_hooks = tree_hooks
+
         self.debug_file = debug_file
         self.parser = c_parser.CParser()
         self.tree = self.parser.parse('')
@@ -1085,8 +1088,7 @@ class Generator(object):
         # pycparser doesn't know about these types by default, but cffi does. We just need to make
         # sure that pycparser knows these are types, the particular type is unimportant
         fake_types = '\n'.join('typedef int {};'.format(t) for t in cffi.commontypes.COMMON_TYPES)
-        print(fake_types)
-        self.parse(fake_types, add_to_tree=False)
+        self.parse(fake_types)
 
         # HOOK: list of tokens
         tokens = self.tokens
@@ -1125,33 +1127,56 @@ class Generator(object):
         for hook in self.str_list_hooks:
             strings = hook(strings)
 
+        # Generate parseable chunks
+        def get_ext_chunks(strings):
+            chunk = []
+            depth = 0
+            for s in strings:
+                if s in ('{', '(', '['):
+                    depth += 1
+                elif s in ('}', ')', ']'):
+                    depth -= 1
+
+                chunk.append(s)
+
+                if depth == 0 and s == ';':
+                    yield ''.join(chunk)
+                    chunk = []
+
         # Do stdcall/WINAPI replacement hack like cffi does (see cffi.cparser for more info)
         r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
         r_stdcall2 = re.compile(r"[(]\s*(__stdcall|WINAPI)\b")
         r_cdecl = re.compile(r"\b__cdecl\b")
 
-        csource = ''.join(strings)
-        csource = r_stdcall2.sub(' volatile volatile const(', csource)
-        csource = r_stdcall1.sub(' volatile volatile const ', csource)
-        csource = r_cdecl.sub(' ', csource)
-
         # Log intermediate c-source
         if self.debug_file:
             with open(self.debug_file, 'w') as f:
-                f.write(csource)
+                f.write(''.join(strings))
 
-        self.parse(csource)
+        for csource_chunk in get_ext_chunks(strings):
+            print("Processing chunk")
+            csource_chunk = r_stdcall2.sub(' volatile volatile const(', csource_chunk)
+            csource_chunk = r_stdcall1.sub(' volatile volatile const ', csource_chunk)
+            csource_chunk = r_cdecl.sub(' ', csource_chunk)
+            print(csource_chunk)
+            chunk_tree = self.parse(csource_chunk)
+
+            for hook in self.tree_hooks:
+                print("Running tree hook")
+                chunk_tree = hook(chunk_tree, self.parse)
+
+            self.tree.ext.extend(chunk_tree.ext)
 
         log.info("pycparser successfully re-parsed cleaned header")
 
         # Remove function defs and replace 'volatile volatile const'
         ffi = cffi.FFI()
         cleaner = FFICleaner(ffi)
-        tree = cleaner.visit(tree)
+        self.tree = cleaner.visit(self.tree)
 
         # Generate cleaned C source
         generator = c_generator.CGenerator()
-        header_src = generator.visit(tree)
+        header_src = generator.visit(self.tree)
 
         # Convert macros
         macro_src = StringIO()
@@ -1191,7 +1216,7 @@ class Generator(object):
             func_src = "\nint " + prefix + macro.name + "(void){" + c_src + ";}"
 
             try:
-                tree = self.parse(func_src)
+                tree = self.parse(func_src, reset_file=True)
                 expr_node = tree.ext[0].body.block_items[0]
                 try:
                     py_src = ''.join(to_py_src(expr_node))
@@ -1203,19 +1228,14 @@ class Generator(object):
 
         return py_src
 
-    def parse(self, text, add_to_tree=True, reset_file=False):
+    def parse(self, text, reset_file=False):
         """Reimplement CParser.parse to retain scope"""
         if reset_file:
             self.parser.clex.filename = '<generator>'
             self.parser.clex.reset_lineno()
         #self.parser._scope_stack = [dict()]
         self.parser._last_yielded_token = None
-        chunk_tree = self.parser.cparser.parse(input=text, lexer=self.parser.clex, debug=0)
-
-        if add_to_tree:
-            self.tree.ext.extend(chunk_tree.ext)
-
-        return chunk_tree
+        return self.parser.cparser.parse(input=text, lexer=self.parser.clex, debug=0)
 
 
 def get_predef_macros():
