@@ -1419,87 +1419,92 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
     parser.parse(update_cb=update_cb)
     log.info("Successfully parsed input headers")
 
-    def remove_pattern(tokens, pattern):
-        it = iter(tokens)
-        p_it = iter(pattern)
-        t = next(it)
-        target = next(p_it)
-        match_buf = []
-        inner_buf = []
-        depth = 0
-        pattern_completed = False
-
-        while True:
-            if target.startswith('~~') and target.endswith('~~'):
-                found_end = False
-                if target == '~~}~~':
-                    left, right = '{', '}'
-
-                if t.string == left:
-                    depth += 1
-                elif t.string == right:
-                    if depth == 0:
-                        found_end = True
-                    depth -= 1
-
-                if found_end:
-                    try:
-                        target = next(p_it)
-                    except StopIteration:
-                        pattern_completed = True
-                        for buf_tok in inner_buf:
-                            yield buf_tok
-                else:
-                    inner_buf.append(t)
-
-            else:
-                # Ignore non-tokens
-                if t.type in NON_TOKENS:
-                    if match_buf:
-                        match_buf.append(t)
-                    else:
-                        yield t
-
-                elif t.string == target:
-                    # Found target
-                    match_buf.append(t)
-                    try:
-                        target = next(p_it)
-                    except StopIteration:
-                        pattern_completed = True
-
-                else:
-                    # Reset pattern matching
-                    if match_buf:
-                        p_it = iter(pattern)
-                        target = next(p_it)
-                        for buf_tok in match_buf:
-                            yield buf_tok
-                        match_buf = []
-                    yield t
-
-            if pattern_completed and match_buf:
-                p_it = iter(pattern)
-                target = next(p_it)
-                match_buf = []
-                pattern_completed = False
-
-            try:
-                t = next(it)
-            except StopIteration:
-                # Output pending buffers
-                for buf_tok in match_buf:
-                    yield buf_tok
-                for buf_tok in inner_buf:
-                    yield buf_tok
-                raise StopIteration
-
-    def extern_c_hook(tokens):
-        return remove_pattern(tokens, ['extern', '"C"', '{', '~~}~~'])
-
     gen = Generator(parser, token_list_hooks=(extern_c_hook,), debug_file=debug_file)
     header_src, macro_src = gen.generate()
     return header_src, macro_src
+
+
+#
+# Hooks
+#
+def remove_pattern(tokens, pattern):
+    it = iter(tokens)
+    p_it = iter(pattern)
+    t = next(it)
+    target = next(p_it)
+    match_buf = []
+    inner_buf = []
+    depth = 0
+    pattern_completed = False
+
+    while True:
+        if target.startswith('~~') and target.endswith('~~'):
+            found_end = False
+            if target == '~~}~~':
+                left, right = '{', '}'
+
+            if t.string == left:
+                depth += 1
+            elif t.string == right:
+                if depth == 0:
+                    found_end = True
+                depth -= 1
+
+            if found_end:
+                try:
+                    target = next(p_it)
+                except StopIteration:
+                    pattern_completed = True
+                    for buf_tok in inner_buf:
+                        yield buf_tok
+            else:
+                inner_buf.append(t)
+
+        else:
+            # Ignore non-tokens
+            if t.type in NON_TOKENS:
+                if match_buf:
+                    match_buf.append(t)
+                else:
+                    yield t
+
+            elif t.string == target:
+                # Found target
+                match_buf.append(t)
+                try:
+                    target = next(p_it)
+                except StopIteration:
+                    pattern_completed = True
+
+            else:
+                # Reset pattern matching
+                if match_buf:
+                    p_it = iter(pattern)
+                    target = next(p_it)
+                    for buf_tok in match_buf:
+                        yield buf_tok
+                    match_buf = []
+                yield t
+
+        if pattern_completed and match_buf:
+            p_it = iter(pattern)
+            target = next(p_it)
+            match_buf = []
+            pattern_completed = False
+
+        try:
+            t = next(it)
+        except StopIteration:
+            # Output pending buffers
+            for buf_tok in match_buf:
+                yield buf_tok
+            for buf_tok in inner_buf:
+                yield buf_tok
+            raise StopIteration
+
+
+def extern_c_hook(tokens):
+    return remove_pattern(tokens, ['extern', '"C"', '{', '~~}~~'])
 
 
 if __name__ == '__main__':
