@@ -13,7 +13,7 @@ It lets you rapidly wrap a C function like this
 
 into a Python function that can be called like this ::
 
-    out_buf = my_c_function(arg1, arg2)
+    out_arr = my_c_function(arg1, arg2)
 
 just by defining a signature like this ::
 
