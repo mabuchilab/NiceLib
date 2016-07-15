@@ -1505,15 +1505,3 @@ def remove_pattern(tokens, pattern):
 
 def extern_c_hook(tokens):
     return remove_pattern(tokens, ['extern', '"C"', '{', '~~}~~'])
-
-
-if __name__ == '__main__':
-    process_file('./NIDAQmx.h', './NIDAQmx_clean.h', minify=True)
-    #process_file('uc480.h', 'uc480_clean.h', minify=True)
-
-
-# NOTES
-# =====
-
-# - pycparser needs typedefs to be able to parse properly, e.g. "(HCAM)0" won't parse unless HCAM
-# has been typedef'd (or already macro expanded to a valid type)
