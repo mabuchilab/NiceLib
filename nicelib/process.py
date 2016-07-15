@@ -1419,37 +1419,85 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
     parser.parse(update_cb=update_cb)
     log.info("Successfully parsed input headers")
 
-    def extern_c_hook(strings):
-        out = []
-        looking_for_brace = False
+    def remove_pattern(tokens, pattern):
+        it = iter(tokens)
+        p_it = iter(pattern)
+        t = next(it)
+        target = next(p_it)
+        match_buf = []
+        inner_buf = []
         depth = 0
-        i = 0
-        while i < len(strings):
-            s = strings[i]
-            if not looking_for_brace:
-                if s == 'extern' and i + 1 < len(strings) and strings[i+1] == '"C"':
-                    depth = 0
-                    looking_for_brace = True
-                    i += 1
-                else:
-                    out.append(s)
-            else:
-                skip = False
-                if s == '{':
-                    skip = (depth == 0)
+        pattern_completed = False
+
+        while True:
+            if target.startswith('~~') and target.endswith('~~'):
+                found_end = False
+                if target == '~~}~~':
+                    left, right = '{', '}'
+
+                if t.string == left:
                     depth += 1
-                elif s == '}':
+                elif t.string == right:
+                    if depth == 0:
+                        found_end = True
                     depth -= 1
-                    skip = (depth == 0)
-                    looking_for_brace = not skip
-                    i += 1  # Skip semicolon
 
-                if not skip:
-                    out.append(s)
-            i += 1
-        return out
+                if found_end:
+                    try:
+                        target = next(p_it)
+                    except StopIteration:
+                        pattern_completed = True
+                        for buf_tok in inner_buf:
+                            yield buf_tok
+                else:
+                    inner_buf.append(t)
 
-    gen = Generator(parser, str_list_hooks=(extern_c_hook,), debug_file=debug_file)
+            else:
+                # Ignore non-tokens
+                if t.type in NON_TOKENS:
+                    if match_buf:
+                        match_buf.append(t)
+                    else:
+                        yield t
+
+                elif t.string == target:
+                    # Found target
+                    match_buf.append(t)
+                    try:
+                        target = next(p_it)
+                    except StopIteration:
+                        pattern_completed = True
+
+                else:
+                    # Reset pattern matching
+                    if match_buf:
+                        p_it = iter(pattern)
+                        target = next(p_it)
+                        for buf_tok in match_buf:
+                            yield buf_tok
+                        match_buf = []
+                    yield t
+
+            if pattern_completed and match_buf:
+                p_it = iter(pattern)
+                target = next(p_it)
+                match_buf = []
+                pattern_completed = False
+
+            try:
+                t = next(it)
+            except StopIteration:
+                # Output pending buffers
+                for buf_tok in match_buf:
+                    yield buf_tok
+                for buf_tok in inner_buf:
+                    yield buf_tok
+                raise StopIteration
+
+    def extern_c_hook(tokens):
+        return remove_pattern(tokens, ['extern', '"C"', '{', '~~}~~'])
+
+    gen = Generator(parser, token_list_hooks=(extern_c_hook,), debug_file=debug_file)
     header_src, macro_src = gen.generate()
     return header_src, macro_src
 
