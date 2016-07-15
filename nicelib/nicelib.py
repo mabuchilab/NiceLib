@@ -382,8 +382,9 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
         out_vals = [f(a) for a, f in outargs]
 
         if ret_wrap:
-            ret_wrap(retval)
-        else:
+            retval = ret_wrap(retval)
+
+        if retval is not None:
             out_vals.append(retval)
 
         if not out_vals:
