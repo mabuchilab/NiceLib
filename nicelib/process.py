@@ -1451,7 +1451,10 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
     parser.parse(update_cb=update_cb)
     log.info("Successfully parsed input headers")
 
-    gen = Generator(parser, token_list_hooks=(extern_c_hook, enum_size_hook), debug_file=debug_file)
+    gen = Generator(parser,
+                    token_list_hooks=(extern_c_hook, enum_size_hook),
+                    tree_hooks=(CPPTypedefAdder().hook,),
+                    debug_file=debug_file)
     header_src, macro_src = gen.generate()
     return header_src, macro_src
 
@@ -1568,3 +1571,40 @@ def extern_c_hook(tokens):
 def enum_size_hook(tokens):
     return modify_pattern(tokens, [('k', 'enum'), ('k', Token.IDENTIFIER), ('d', ':'),
                                    ('d', Token.IDENTIFIER)])
+
+
+class CPPTypedefAdder(TreeModifier):
+    def hook(self, tree, parse_func):
+        # Reset these every call
+        self.in_typedef = False
+        self.added_types = set()
+
+        tree = self.visit(tree)
+
+        if self.added_types:
+            # Add fake typedefs so the parser doesn't choke
+            parse_func('\n'.join('typedef int {};'.format(t) for t in self.added_types))
+        return tree
+
+    def visit_Typedef(self, node):
+        self.in_typedef = True
+        result = self.generic_visit(node)
+        self.in_typedef = False
+        return result
+
+    def visit_EnumStructUnion(self, node):
+        if self.in_typedef:
+            return node
+        else:
+            self.added_types.add(node.name)
+            typedecl_node = c_ast.TypeDecl(node.name, [], node)
+            return c_ast.Typedef(node.name, [], ['typedef'], typedecl_node)
+
+    def visit_Enum(self, node):
+        return self.visit_EnumStructUnion(node)
+
+    def visit_Struct(self, node):
+        return self.visit_EnumStructUnion(node)
+
+    def visit_Union(self, node):
+        return self.visit_EnumStructUnion(node)
