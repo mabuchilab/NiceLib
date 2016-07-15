@@ -881,26 +881,14 @@ class Parser(object):
         return False
 
 
-class FFICleaner(c_ast.NodeVisitor):
-    """A visitor class for cleaning up `c_ast`s
+class TreeModifier(c_ast.NodeVisitor):
+    """A special type of visitor class that modifies a tree in place
 
-    One major feature is that this will evaluate numeric expressions and replace them with
-    constants. This allows arrays with calculated lengths to be used by cffi. In general we want to
-    support use of `sizeof` as well, so we need to have ffi parse each typedef as we see it so we
-    know the available sizes.
-
-    This also cleans up a tricky issue where pycparser will split a multi-element typedef into
-    multiple typedefs, possible duplicating a struct/union/enum definition. Here we are careful to
-    erase all but the first definition.
-
-    All function definitions are also removed.
+    Its visit_X methods must return a value, which correspond to the transformed node. If the node
+    is contained in a parent node's list and its visit_X method returns None, it will be removed
+    from the list. This modification/removal is implemented via `generic_visit`, so you can
+    override it on a per-nodetype basis.
     """
-    def __init__(self, ffi):
-        self.ffi = ffi
-        self.generator = c_generator.CGenerator()
-        self.defined_tags = set()
-        self.cur_typedef_name = None
-
     def visit(self, node):
         method = 'visit_' + node.__class__.__name__
         return getattr(self, method, self.generic_visit)(node)
@@ -921,6 +909,27 @@ class FFICleaner(c_ast.NodeVisitor):
             setattr(node, attr_name, node_list)
 
         return node
+
+
+class FFICleaner(TreeModifier):
+    """A visitor class for cleaning up `c_ast`s
+
+    One major feature is that this will evaluate numeric expressions and replace them with
+    constants. This allows arrays with calculated lengths to be used by cffi. In general we want to
+    support use of `sizeof` as well, so we need to have ffi parse each typedef as we see it so we
+    know the available sizes.
+
+    This also cleans up a tricky issue where pycparser will split a multi-element typedef into
+    multiple typedefs, possible duplicating a struct/union/enum definition. Here we are careful to
+    erase all but the first definition.
+
+    All function definitions are also removed.
+    """
+    def __init__(self, ffi):
+        self.ffi = ffi
+        self.generator = c_generator.CGenerator()
+        self.defined_tags = set()
+        self.cur_typedef_name = None
 
     def visit_Typedef(self, node):
         # Visit typedecl hierarchy first
