@@ -1086,7 +1086,7 @@ class Generator(object):
         for t in tokens:
             if (t.fpath, t.line) != (cur_fpath, expected_line):
                 if chunk_water_mark > 0:
-                    strings.append('#line {} "{}"\n'.format(chunk_start_line, cur_fpath))
+                    strings.append('\n#line {} "{}"\n'.format(chunk_start_line, cur_fpath))
                     strings.extend(chunk[:chunk_water_mark])
                 cur_fpath = t.fpath
                 expected_line = t.line
