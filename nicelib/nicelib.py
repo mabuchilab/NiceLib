@@ -402,7 +402,8 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
 
 # WARNING uses some stack frame hackery; should probably make use of this syntax optional
 class NiceObject(object):
-    def __init__(self, attrs=None, n_handles=1, init=None, prefix=None, ret_wrap=None, doc=None):
+    def __init__(self, attrs=None, n_handles=1, init=None, prefix=None, ret_wrap=None, buflen=None,
+                 doc=None):
         self.doc = doc
         self.attrs = attrs
         self.n_handles = n_handles
@@ -415,6 +416,8 @@ class NiceObject(object):
             self.flags['prefix'] = prefix
         if ret_wrap is not None:
             self.flags['ret_wrap'] = ret_wrap
+        if buflen is not None:
+            self.flags['buflen'] = buflen
 
         if attrs is not None:
             self.names = set(attrs.keys())
@@ -512,7 +515,7 @@ class LibMeta(type):
                     repr_str = func.__doc__ or "{}(??) -> ??".format(name)
                 else:
                     sig_tup = value
-                    flags = {'prefix': prefixes, 'ret_wrap': ret_wrap}
+                    flags = {'prefix': prefixes, 'ret_wrap': ret_wrap, 'buflen': buflen}
                     if name in func_to_niceobj:
                         flags.update(func_to_niceobj[name].flags)
 
@@ -555,7 +558,7 @@ class LibMeta(type):
                         ret_wrapper = ret_wrappers[flags['ret_wrap']]
 
                     func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, ret_wrapper,
-                                         struct_maker, buflen)
+                                         struct_maker, flags['buflen'])
                     repr_str = _func_repr_str(ffi, func)
 
                 # Save for use by niceobjs
