@@ -1078,8 +1078,15 @@ class Generator(object):
         self.token_list_hooks = token_list_hooks
         self.str_list_hooks = str_list_hooks
         self.debug_file = debug_file
+        self.parser = c_parser.CParser()
+        self.tree = self.parser.parse('')
 
     def generate(self):
+        # pycparser doesn't know about these types by default, but cffi does. We just need to make
+        # sure that pycparser knows these are types, the particular type is unimportant
+        fake_types = '\n'.join('typedef int {};'.format(t) for t in cffi.commontypes.COMMON_TYPES)
+        print(fake_types)
+        self.parse(fake_types, add_to_tree=False)
 
         # HOOK: list of tokens
         tokens = self.tokens
@@ -1118,19 +1125,12 @@ class Generator(object):
         for hook in self.str_list_hooks:
             strings = hook(strings)
 
-        out = StringIO()
-
-        # pycparser doesn't know about these types by default, but cffi does. We just need to make
-        # sure that pycparser knows these are types, the particular type is unimportant
-        for type_name in cffi.commontypes.COMMON_TYPES:
-            out.write("typedef int {};\n".format(type_name))
-        out.write(''.join(strings))
-
         # Do stdcall/WINAPI replacement hack like cffi does (see cffi.cparser for more info)
         r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
         r_stdcall2 = re.compile(r"[(]\s*(__stdcall|WINAPI)\b")
         r_cdecl = re.compile(r"\b__cdecl\b")
-        csource = out.getvalue()
+
+        csource = ''.join(strings)
         csource = r_stdcall2.sub(' volatile volatile const(', csource)
         csource = r_stdcall1.sub(' volatile volatile const ', csource)
         csource = r_cdecl.sub(' ', csource)
@@ -1140,10 +1140,7 @@ class Generator(object):
             with open(self.debug_file, 'w') as f:
                 f.write(csource)
 
-        self.parser = c_parser.CParser()
-        tree = self.parse(csource)
-        # Remove phony typedefs
-        tree.ext = tree.ext[len(cffi.commontypes.COMMON_TYPES):]
+        self.parse(csource)
 
         log.info("pycparser successfully re-parsed cleaned header")
 
@@ -1206,13 +1203,19 @@ class Generator(object):
 
         return py_src
 
-    def parse(self, text):
+    def parse(self, text, add_to_tree=True, reset_file=False):
         """Reimplement CParser.parse to retain scope"""
-        self.parser.clex.filename = '<generator>'
-        self.parser.clex.reset_lineno()
+        if reset_file:
+            self.parser.clex.filename = '<generator>'
+            self.parser.clex.reset_lineno()
         #self.parser._scope_stack = [dict()]
         self.parser._last_yielded_token = None
-        return self.parser.cparser.parse(input=text, lexer=self.parser.clex, debug=0)
+        chunk_tree = self.parser.cparser.parse(input=text, lexer=self.parser.clex, debug=0)
+
+        if add_to_tree:
+            self.tree.ext.extend(chunk_tree.ext)
+
+        return chunk_tree
 
 
 def get_predef_macros():
