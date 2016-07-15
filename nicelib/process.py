@@ -1452,7 +1452,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
     log.info("Successfully parsed input headers")
 
     gen = Generator(parser,
-                    token_list_hooks=(extern_c_hook, enum_size_hook),
+                    token_list_hooks=(extern_c_hook, enum_size_hook, declspec_hook),
                     tree_hooks=(CPPTypedefAdder().hook,),
                     debug_file=debug_file)
     header_src, macro_src = gen.generate()
@@ -1562,6 +1562,16 @@ def modify_pattern(tokens, pattern):
                 if keep_tok == 'k':
                     yield buf_tok
             raise StopIteration
+
+
+def remove_pattern(tokens, pattern):
+    """Convenience function that works like modify_pattern, but you only specify targets"""
+    pattern = [('d', target) for target in pattern]
+    return modify_pattern(tokens, pattern)
+
+
+def declspec_hook(tokens):
+    return remove_pattern(tokens, ['__declspec', '(', 'dllimport', ')'])
 
 
 def extern_c_hook(tokens):
