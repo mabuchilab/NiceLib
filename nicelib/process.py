@@ -1099,7 +1099,6 @@ class Generator(object):
             elif t.type is Token.NEWLINE:
                 expected_line += 1
             elif t.type is Token.BLOCK_COMMENT:
-                expected_line += t.string.count('\n')
                 continue  # Don't output
             elif t.type is Token.LINE_COMMENT:
                 continue  # Don't output
