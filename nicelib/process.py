@@ -1427,18 +1427,42 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
 #
 # Hooks
 #
-def remove_pattern(tokens, pattern):
+
+def modify_pattern(tokens, pattern):
+    """Helper function for easily matching and modifying patterns in a token stream
+
+    Parameters
+    ----------
+    tokens : sequence of Tokens
+        Token stream
+    pattern : sequence of tuples
+        Pattern to match, as a sequence of (keep, target) pairs. Targets are compared against
+        tokens; when the first target is matched, we then try matching the rest in order. If the
+        whole pattern is matched, each target's corresponding ``keep`` indicates whether the token
+        should be kept in the sequence, or discarded. ``keep`` is a string, where 'k' means 'keep',
+        while anything else means discard.
+
+        A ``target`` can be either a string or a `TokenType`.
+
+        There is some more advanced functionality which is currently undocumented.
+    """
     it = iter(tokens)
     p_it = iter(pattern)
     t = next(it)
-    target = next(p_it)
+    keep, target = next(p_it)
     match_buf = []
-    inner_buf = []
     depth = 0
     pattern_completed = False
 
+    def matches(token, target):
+        if isinstance(target, TokenType):
+            return token.type is target
+        elif isinstance(target, basestring):
+            return token.string == target
+        return False
+
     while True:
-        if target.startswith('~~') and target.endswith('~~'):
+        if isinstance(target, basestring) and target.startswith('~~') and target.endswith('~~'):
             found_end = False
             if target == '~~}~~':
                 left, right = '{', '}'
@@ -1451,28 +1475,27 @@ def remove_pattern(tokens, pattern):
                 depth -= 1
 
             if found_end:
+                match_buf.append((keep[1], t))
                 try:
-                    target = next(p_it)
+                    keep, target = next(p_it)
                 except StopIteration:
                     pattern_completed = True
-                    for buf_tok in inner_buf:
-                        yield buf_tok
             else:
-                inner_buf.append(t)
+                match_buf.append((keep[0], t))
 
         else:
             # Ignore non-tokens
             if t.type in NON_TOKENS:
                 if match_buf:
-                    match_buf.append(t)
+                    match_buf.append((keep, t))
                 else:
                     yield t
 
-            elif t.string == target:
+            elif matches(t, target):
                 # Found target
-                match_buf.append(t)
+                match_buf.append((keep, t))
                 try:
-                    target = next(p_it)
+                    keep, target = next(p_it)
                 except StopIteration:
                     pattern_completed = True
 
@@ -1480,15 +1503,19 @@ def remove_pattern(tokens, pattern):
                 # Reset pattern matching
                 if match_buf:
                     p_it = iter(pattern)
-                    target = next(p_it)
-                    for buf_tok in match_buf:
-                        yield buf_tok
+                    keep, target = next(p_it)
+                    for keep_tok, buf_tok in match_buf:
+                        if keep_tok == 'k':
+                            yield buf_tok
                     match_buf = []
                 yield t
 
         if pattern_completed and match_buf:
             p_it = iter(pattern)
-            target = next(p_it)
+            keep, target = next(p_it)
+            for keep_tok, buf_tok in match_buf:
+                if keep_tok == 'k':
+                    yield buf_tok
             match_buf = []
             pattern_completed = False
 
@@ -1496,12 +1523,11 @@ def remove_pattern(tokens, pattern):
             t = next(it)
         except StopIteration:
             # Output pending buffers
-            for buf_tok in match_buf:
-                yield buf_tok
-            for buf_tok in inner_buf:
-                yield buf_tok
+            for keep_tok, buf_tok in match_buf:
+                if keep_tok == 'k':
+                    yield buf_tok
             raise StopIteration
 
 
 def extern_c_hook(tokens):
-    return remove_pattern(tokens, ['extern', '"C"', '{', '~~}~~'])
+    return modify_pattern(tokens, [('d', 'extern'), ('d', '"C"'), ('d', '{'), ('kd', '~~}~~')])
