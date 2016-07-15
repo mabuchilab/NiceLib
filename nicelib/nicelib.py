@@ -10,7 +10,7 @@ import pickle as pkl
 from inspect import isfunction
 from . import test_mode_is, _test_mode
 
-__all__ = ['NiceLib', 'NiceObject']
+__all__ = ['NiceLib', 'NiceObjectDef']
 
 
 class StateNode(object):
@@ -129,32 +129,32 @@ class Record(object):
                 raise Exception("Unknown mode '{}'".format(_test_mode.mode))
 
 
-class _NiceObject(object):
+class NiceObject(object):
     pass
 
 
 class NiceClassMeta(type):
-    def __new__(metacls, cls_name, niceobj, ffi, funcs):
+    def __new__(metacls, cls_name, niceobjdef, ffi, funcs):
         repr_strs = {}
-        for func_name in niceobj.names:
+        for func_name in niceobjdef.names:
             func = funcs[func_name]
             if hasattr(func, '_ffi_func'):
-                repr_str = _func_repr_str(ffi, funcs[func_name], niceobj.n_handles)
+                repr_str = _func_repr_str(ffi, funcs[func_name], niceobjdef.n_handles)
             else:
                 repr_str = func.__doc__ or '{}(??) -> ??'.format(func_name)
             repr_strs[func_name] = repr_str
 
         def __init__(self, *args):
-            handles = niceobj.init(*args) if niceobj.init else args
+            handles = niceobjdef.init(*args) if niceobjdef.init else args
             if not isinstance(handles, tuple):
                 handles = (handles,)
 
-            if len(handles) != niceobj.n_handles:
+            if len(handles) != niceobjdef.n_handles:
                 raise TypeError("__init__() takes exactly {} arguments "
-                                "({} given)".format(niceobj.n_handles, len(handles)))
+                                "({} given)".format(niceobjdef.n_handles, len(handles)))
 
             # Generate "bound methods"
-            for func_name in niceobj.names:
+            for func_name in niceobjdef.names:
                 lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles, cls_name)
                 setattr(self, func_name, lib_func)
 
@@ -162,8 +162,8 @@ class NiceClassMeta(type):
                 Record.ensure_created()
                 Record.record.add_niceobject(cls_name, handles)
 
-        niceobj_dict = {'__init__': __init__, '__doc__': niceobj.doc}
-        return type(cls_name, (_NiceObject,), niceobj_dict)
+        niceobj_dict = {'__init__': __init__, '__doc__': niceobjdef.doc}
+        return type(cls_name, (NiceObject,), niceobj_dict)
 
 
 class MockNiceObjectClass(object):
@@ -401,7 +401,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
 
 
 # WARNING uses some stack frame hackery; should probably make use of this syntax optional
-class NiceObject(object):
+class NiceObjectDef(object):
     def __init__(self, attrs=None, n_handles=1, init=None, prefix=None, ret_wrap=None, buflen=None,
                  doc=None):
         self.doc = doc
@@ -429,7 +429,7 @@ class NiceObject(object):
 
     def __enter__(self):
         if self.attrs is not None:
-            raise Exception("NiceObject already constructed with an `attrs` dict, this is not "
+            raise Exception("NiceObjectDef already constructed with an `attrs` dict, this is not "
                             "compatible with the context manager syntax")
         outer_vars = sys._getframe(1).f_locals
         self.doc = outer_vars.pop('__doc__', None)
@@ -485,19 +485,19 @@ class LibMeta(type):
         else:
             prefixes = tuple(prefixes) + ('',)
 
-        # Unpack NiceObject sigs into the classdict
-        niceobjects = {}  # name: NiceObject
+        # Unpack NiceObjectDef sigs into the classdict
+        niceobjectdefs = {}  # name: NiceObjectDef
         func_to_niceobj = {}
         for name, value in list(classdict.items()):
-            if isinstance(value, NiceObject):
-                niceobj = value
-                if niceobj.attrs is None:
-                    niceobj.names.remove(name)  # Remove self
+            if isinstance(value, NiceObjectDef):
+                niceobjdef = value
+                if niceobjdef.attrs is None:
+                    niceobjdef.names.remove(name)  # Remove self
                 else:
-                    for attr_name, attr_val in niceobj.attrs.items():
+                    for attr_name, attr_val in niceobjdef.attrs.items():
                         classdict[attr_name] = attr_val
-                        func_to_niceobj[attr_name] = niceobj
-                niceobjects[name] = niceobj
+                        func_to_niceobj[attr_name] = niceobjdef
+                niceobjectdefs[name] = niceobjdef
 
         funcs = {}
         func_flags = {}
@@ -508,7 +508,7 @@ class LibMeta(type):
                 ret_wrappers[name[5:]] = value
 
         for name, value in classdict.items():
-            if (not name.startswith('_') and not isinstance(value, NiceObject)):
+            if (not name.startswith('_') and not isinstance(value, NiceObjectDef)):
                 if isfunction(value):
                     func = value
                     flags = {}
@@ -568,9 +568,9 @@ class LibMeta(type):
                 # HACK to get nice repr
                 classdict[name] = LibFunction(func, repr_str)
 
-        for cls_name, niceobj in niceobjects.items():
+        for cls_name, niceobjdef in niceobjectdefs.items():
             # Need to use a separate function so we have a per-class closure
-            classdict[cls_name] = NiceClassMeta(cls_name, niceobj, ffi, funcs)
+            classdict[cls_name] = NiceClassMeta(cls_name, niceobjdef, ffi, funcs)
 
         # Add macro defs
         if defs:
