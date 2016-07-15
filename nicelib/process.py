@@ -1419,7 +1419,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
     parser.parse(update_cb=update_cb)
     log.info("Successfully parsed input headers")
 
-    gen = Generator(parser, token_list_hooks=(extern_c_hook,), debug_file=debug_file)
+    gen = Generator(parser, token_list_hooks=(extern_c_hook, enum_size_hook), debug_file=debug_file)
     header_src, macro_src = gen.generate()
     return header_src, macro_src
 
@@ -1531,3 +1531,8 @@ def modify_pattern(tokens, pattern):
 
 def extern_c_hook(tokens):
     return modify_pattern(tokens, [('d', 'extern'), ('d', '"C"'), ('d', '{'), ('kd', '~~}~~')])
+
+
+def enum_size_hook(tokens):
+    return modify_pattern(tokens, [('k', 'enum'), ('k', Token.IDENTIFIER), ('d', ':'),
+                                   ('d', Token.IDENTIFIER)])
