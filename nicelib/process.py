@@ -1146,7 +1146,7 @@ class Generator(object):
         # Do stdcall/WINAPI replacement hack like cffi does (see cffi.cparser for more info)
         r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
         r_stdcall2 = re.compile(r"[(]\s*(__stdcall|WINAPI)\b")
-        r_cdecl = re.compile(r"\b__cdecl\b")
+        r_cdecl = re.compile(r"\b[_]{0,2}cdecl\b")
 
         # Log intermediate c-source
         if self.debug_file:
