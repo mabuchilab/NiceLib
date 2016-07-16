@@ -1441,9 +1441,12 @@ def process_file(in_fname, out_fname, minify):
 
 
 def process_headers(header_paths, predef_path=None, update_cb=None, ignore_headers=(),
-                    debug_file=None):
+                    debug_file=None, preamble=None):
     header_paths = (header_paths,) if isinstance(header_paths, basestring) else header_paths
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
+
+    if preamble:
+        source = preamble + '\n' + source
 
     OBJ_MACROS, FUNC_MACROS = get_predef_macros()
     parser = Parser(source, '<root>', REPLACEMENT_MAP, OBJ_MACROS,
