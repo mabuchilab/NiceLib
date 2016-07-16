@@ -1154,15 +1154,12 @@ class Generator(object):
                 f.write(''.join(strings))
 
         for csource_chunk in get_ext_chunks(strings):
-            print("Processing chunk")
             csource_chunk = r_stdcall2.sub(' volatile volatile const(', csource_chunk)
             csource_chunk = r_stdcall1.sub(' volatile volatile const ', csource_chunk)
             csource_chunk = r_cdecl.sub(' ', csource_chunk)
-            print(csource_chunk)
             chunk_tree = self.parse(csource_chunk)
 
             for hook in self.tree_hooks:
-                print("Running tree hook")
                 chunk_tree = hook(chunk_tree, self.parse)
 
             self.tree.ext.extend(chunk_tree.ext)
