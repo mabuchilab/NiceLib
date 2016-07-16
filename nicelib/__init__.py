@@ -103,7 +103,7 @@ def load_lib(name, pkg):
     return lib_module
 
 
-from .nicelib import NiceLib, NiceObject
+from .nicelib import NiceLib, NiceObject, NiceObjectDef
 from .build import build_lib
 
-__all__ = ['NiceLib', 'NiceObject', 'build_lib', 'load_lib']
+__all__ = ['NiceLib', 'NiceObjectDef', 'build_lib', 'load_lib']
