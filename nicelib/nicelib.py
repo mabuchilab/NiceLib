@@ -501,7 +501,10 @@ class LibMeta(type):
 
         funcs = {}
         func_flags = {}
-        ret_wrappers = {}
+        ret_wrappers = {
+            'return': mro_lookup('_ret_return'),
+            'ignore': mro_lookup('_ret_ignore')
+        }
 
         for name, value in classdict.items():
             if name.startswith('_ret_') and isfunction(value):
