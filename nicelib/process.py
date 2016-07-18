@@ -1452,7 +1452,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
     log.info("Successfully parsed input headers")
 
     gen = Generator(parser,
-                    token_list_hooks=(extern_c_hook, enum_size_hook, declspec_hook),
+                    token_list_hooks=(extern_c_hook, enum_type_hook, declspec_hook),
                     tree_hooks=(CPPTypedefAdder().hook,),
                     debug_file=debug_file)
     header_src, macro_src = gen.generate()
@@ -1571,19 +1571,23 @@ def remove_pattern(tokens, pattern):
 
 
 def declspec_hook(tokens):
+    """Removes all occurences of `__declspec(dllimport)``"""
     return remove_pattern(tokens, ['__declspec', '(', 'dllimport', ')'])
 
 
 def extern_c_hook(tokens):
+    """Removes `extern "C" { ... }` while keeping the block's contents"""
     return modify_pattern(tokens, [('d', 'extern'), ('d', '"C"'), ('d', '{'), ('kd', '~~}~~')])
 
 
-def enum_size_hook(tokens):
+def enum_type_hook(tokens):
+    """Removes enum type, e.g. `enum myEnum : short {...};` becomes `enum myEnum {...};"""
     return modify_pattern(tokens, [('k', 'enum'), ('k', Token.IDENTIFIER), ('d', ':'),
                                    ('d', Token.IDENTIFIER)])
 
 
 class CPPTypedefAdder(TreeModifier):
+    """Wraps enum/struct/union definitions in a typedef if they lack one"""
     def hook(self, tree, parse_func):
         # Reset these every call
         self.in_typedef = False
