@@ -3,8 +3,8 @@
     :alt: Travis CI
 
 
-NiceLib
-=======
+|logo| NiceLib
+==============
 
 NiceLib is a Python library for rapidly developing "nice" basic wrappers for calling C libraries,
 using ``cffi``. Essentially, it lets you take a C shared library (.dll or .so) and its headers and
@@ -16,3 +16,8 @@ cleanly defining pythonic mid-level interfaces that wrap low-level libraries.
 
 For install information, documentation, examples, and more, see our page on
 `ReadTheDocs <http://nicelib.readthedocs.org/>`_.
+
+
+.. |logo| image:: images/nicelib-logo.svg
+    :alt: NiceLib
+    :height: 50

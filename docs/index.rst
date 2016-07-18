@@ -1,3 +1,8 @@
+.. image:: ../images/nicelib-logo.svg
+    :alt: NiceLib
+    :align: right
+    :width: 80
+
 NiceLib
 =======
 
