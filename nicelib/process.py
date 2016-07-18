@@ -1143,6 +1143,10 @@ class Generator(object):
                     yield ''.join(chunk)
                     chunk = []
 
+            # Yield unfinished final chunk
+            if chunk:
+                yield ''.join(chunk)
+
         # Do stdcall/WINAPI replacement hack like cffi does (see cffi.cparser for more info)
         r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
         r_stdcall2 = re.compile(r"[(]\s*(__stdcall|WINAPI)\b")
