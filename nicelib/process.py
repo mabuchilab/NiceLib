@@ -1440,6 +1440,47 @@ def process_file(in_fname, out_fname, minify):
 
 def process_headers(header_paths, predef_path=None, update_cb=None, ignore_headers=(),
                     debug_file=None, preamble=None, token_hooks=(), ast_hooks=(), hook_groups=()):
+    """Preprocess header(s) and split into a cleaned header and macros
+
+    Parameters
+    ----------
+    header_paths : str or sequence of strs
+        Paths of the headers
+    ignore_headers : sequence of strs
+        Names of headers to ignore; `#include`\s containing these will be skipped.
+    debug_file : str
+        File to write a partially-processed header to just before it is parsed b y `pycparser`.
+        Useful for debugging the preprocessor when `pycparser`'s parser chokes on its output.
+    preamble : str
+        C source to insert before the headers specified by `header_paths`. Useful for including
+        typedefs that would otherwise be hard to reach due to an end user missing headers.
+    token_hooks : sequence of functions
+        Hook functions to be run on the already preprocessed token stream. Each function should
+        accept and return a sequence of `Token`\s. These are applied after any builtin token hooks.
+    ast_hooks : sequence of functions
+        Hook functions to be run on chunks of the header's C AST. After preprocessing and running
+        the token hooks, the tokens are grouped and joined to form a sequence of chunks called
+        "external declarations" (declarations, typedefs, and function definitions). Each chunk is
+        parsed by `pycparser`, then passed through the list of AST hook functions to transform it.
+        These are applied after any builtin AST hooks.
+
+        AST hook functions take the parsed `FileAST` and the persistent `CParser` instance as
+        arguments, and return a transformed `FileAST`. It is useful to have a reference to the
+        parser to add phony typedefs if necessary.
+    hook_groups : str or sequence of strs
+        Predefined hook groups to use. Each hook group enables certain builtin hooks that are
+        commonly used together. The only hook group available for now is 'C++'.
+
+        'C++' : (declspec_hook, extern_c_hook, enum_type_hook, CPPTypedefAdder)
+            Hooks for converting C++-only headers into C syntax understandable by `cffi`.
+
+    Returns
+    -------
+    header_src : str
+        Cleaned header C-code.
+    macro_rc : str
+        Extracted macros expressed as Python source code.
+    """
     hook_groups = (hook_groups,) if isinstance(hook_groups, basestring) else hook_groups
     header_paths = (header_paths,) if isinstance(header_paths, basestring) else header_paths
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
