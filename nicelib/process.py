@@ -1439,7 +1439,8 @@ def process_file(in_fname, out_fname, minify):
 
 
 def process_headers(header_paths, predef_path=None, update_cb=None, ignore_headers=(),
-                    debug_file=None, preamble=None):
+                    debug_file=None, preamble=None, token_hooks=(), ast_hooks=(), hook_groups=()):
+    hook_groups = (hook_groups,) if isinstance(hook_groups, basestring) else hook_groups
     header_paths = (header_paths,) if isinstance(header_paths, basestring) else header_paths
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
@@ -1452,9 +1453,15 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
     parser.parse(update_cb=update_cb)
     log.info("Successfully parsed input headers")
 
+    token_hooks = tuple(token_hooks)
+    ast_hooks = tuple(ast_hooks)
+    for group in hook_groups:
+        token_hooks += HOOK_GROUPS[group][0]
+        ast_hooks += HOOK_GROUPS[group][1]
+
     gen = Generator(parser,
-                    token_hooks=(extern_c_hook, enum_type_hook, declspec_hook),
-                    ast_hooks=(CPPTypedefAdder().hook,),
+                    token_hooks=token_hooks,
+                    ast_hooks=ast_hooks,
                     debug_file=debug_file)
     header_src, macro_src = gen.generate()
     return header_src, macro_src
@@ -1623,3 +1630,9 @@ class CPPTypedefAdder(TreeModifier):
 
     def visit_Union(self, node):
         return self.visit_EnumStructUnion(node)
+
+
+HOOK_GROUPS = {
+    'C++': ((declspec_hook, extern_c_hook, enum_type_hook),
+            (CPPTypedefAdder().hook,)),
+}
