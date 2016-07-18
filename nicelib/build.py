@@ -77,7 +77,8 @@ def handle_lib_name(lib_name):
     return select_platform_value(lib_name)
 
 
-def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=(), preamble=None):
+def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=(), preamble=None,
+              token_hooks=(), ast_hooks=(), hook_groups=()):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -105,6 +106,12 @@ def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=(), pr
         Path indicating the directory where the generated module will be saved. If `filedir`
         points to an existing file, that file's directory is used. Usually you would pass the
         ``__file__`` attribute from your build module.
+    token_hooks : sequence of functions
+        Token hook functions. See `process_headers` for more info.
+    ast_hooks : sequence of functions
+        AST hook functions. See `process_headers` for more info.
+    hook_groups : str or sequence of strs
+        Hook groups. See `process_headers` for more info.
 
     Notes
     -----
@@ -139,7 +146,8 @@ def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=(), pr
     #print("Parsing and cleaning header {}".format(header_name))
     clean_header_str, macro_code = process_headers(header_paths, predef_path, update_cb=update_cb,
                                                    ignore_headers=ignore_headers,
-                                                   preamble=preamble)
+                                                   preamble=preamble, token_hooks=token_hooks,
+                                                   ast_hooks=ast_hooks, hook_groups=hook_groups)
 
     print("Compiling cffi module...")
     ffi = cffi.FFI()
