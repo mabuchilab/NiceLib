@@ -1070,15 +1070,15 @@ class FFICleaner(TreeModifier):
 
 
 class Generator(object):
-    def __init__(self, parser, token_list_hooks=(), str_list_hooks=(), tree_hooks=(),
+    def __init__(self, parser, token_hooks=(), string_hooks=(), ast_hooks=(),
                  debug_file=None):
         self.tokens = parser.out
         self.macros = parser.macros
         self.expander = parser.macro_expand_2
 
-        self.token_list_hooks = token_list_hooks
-        self.str_list_hooks = str_list_hooks
-        self.tree_hooks = tree_hooks
+        self.token_hooks = token_hooks
+        self.string_hooks = string_hooks
+        self.ast_hooks = ast_hooks
 
         self.debug_file = debug_file
         self.parser = c_parser.CParser()
@@ -1092,7 +1092,7 @@ class Generator(object):
 
         # HOOK: list of tokens
         tokens = self.tokens
-        for hook in self.token_list_hooks:
+        for hook in self.token_hooks:
             tokens = hook(tokens)
 
         strings = []
@@ -1124,7 +1124,7 @@ class Generator(object):
             chunk.append(t.string)
 
         # HOOK: list of strings
-        for hook in self.str_list_hooks:
+        for hook in self.string_hooks:
             strings = hook(strings)
 
         # Generate parseable chunks
@@ -1159,7 +1159,8 @@ class Generator(object):
             csource_chunk = r_cdecl.sub(' ', csource_chunk)
             chunk_tree = self.parse(csource_chunk)
 
-            for hook in self.tree_hooks:
+            # HOOK: AST chunk
+            for hook in self.ast_hooks:
                 chunk_tree = hook(chunk_tree, self.parse)
 
             self.tree.ext.extend(chunk_tree.ext)
@@ -1452,8 +1453,8 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
     log.info("Successfully parsed input headers")
 
     gen = Generator(parser,
-                    token_list_hooks=(extern_c_hook, enum_type_hook, declspec_hook),
-                    tree_hooks=(CPPTypedefAdder().hook,),
+                    token_hooks=(extern_c_hook, enum_type_hook, declspec_hook),
+                    ast_hooks=(CPPTypedefAdder().hook,),
                     debug_file=debug_file)
     header_src, macro_src = gen.generate()
     return header_src, macro_src
