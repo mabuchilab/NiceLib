@@ -7,6 +7,7 @@ These are the major NiceLib classes and functions of which you should know:
 * :py:class:`~nicelib.nicelib.NiceObjectDef`
 * :py:func:`~nicelib.build_lib`
 * :py:func:`~nicelib.load_lib`
+* :py:func:`~nicelib.process.process_headers`
 
 
 .. autoclass:: nicelib.nicelib.NiceLib
@@ -19,3 +20,4 @@ These are the major NiceLib classes and functions of which you should know:
 
 .. autofunction:: nicelib.build_lib
 .. autofunction:: nicelib.load_lib
+.. autofunction:: nicelib.process.process_headers
