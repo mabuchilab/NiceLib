@@ -18,6 +18,6 @@ For install information, documentation, examples, and more, see our page on
 `ReadTheDocs <http://nicelib.readthedocs.org/>`_.
 
 
-.. |logo| image:: images/nicelib-logo.svg
+.. |logo| image:: images/nicelib-logo-small.png
     :alt: NiceLib
     :height: 50
