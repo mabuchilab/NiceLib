@@ -40,3 +40,37 @@ finds them successfully, it then processes the header so that `cffi` can underst
 
 The platform specifiers (`'win*'` in this case) are checked against `sys.platform` to find which
 platform-specific paths and filenames to try, using pattern globbing if given.
+
+
+Behind the Scenes
+-----------------
+
+`build_lib()` does a few things when it's executed. First, it looks for the header(s) in the
+locations you've specified and invokes `process_headers()`, which preprocesses the headers and
+returns two strings: the cleaned header C code and the extracted macros expressed as Python code.
+It uses the cleaned header to generate an out-of-line `cffi` module, then appends code for loading
+the shared lib and implementing the headers' macros. This finished module can be imported like any
+other, but is usually loaded via `load_lib()`.
+
+Processing Headers
+""""""""""""""""""
+The bulk of the heavy lifting is done (and most issues are most likely to occur) in
+`process_headers()`. First, the header code is tokenized and parsed by a lexer and parser defined
+in the `process` module. This parser doesn't understand C, but does understand the language of the
+C preprocessor. It keeps track of macro definitions, removing them from the token stream and
+performing expansion of macros when they are used. It also understands and obeys other directives,
+including conditionals and ``#include``\s. After parsing, the token stream should be free of any
+harmful directives that `pycparser`/`cffi` don't understand.
+
+This token stream can then be acted upon by the so-called "token hooks", which can be supplied via
+the arguments lists of `process_headers()` and `build_lib()`. These hooks are functions which
+both accept and return a sequence of tokens. The purpose of each hook is to perform a specific
+transformation on the token stream, usually removing nonstandard syntax that `pycparser`/`cffi` may
+not understand (e.g. C++ specific syntax).
+
+Once the hooks are all applied, the tokens are joined together into chunks that are parseable by
+`pycparser`'s C parser. After each chunk is parsed, it is acted upon by the "AST hooks", which take
+the parsed abstract syntax tree (AST) and a reference to the parser and return a transformed AST.
+This allows hooks to modify the AST and the state of the parser. Once all of the chunks have been
+parsed and joined together into one big AST, this tree is used to generate the C source code which
+is later returned by `process_headers()`.

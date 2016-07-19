@@ -120,7 +120,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=(), pr
     ``sys.platform`` and can use globbing, i.e. 'linux*' will match anything starting with 'linux'.
 
     The path or paths provided by ``header_info`` may use items in ``os.environ``. For example,
-    "{PROGRAMFILES}\\\\header.h" will be formatted with ``os.environ['PROGRAMFILES']``.
+    ``'{PROGRAMFILES}\\\\header.h'`` will be formatted with ``os.environ['PROGRAMFILES']``.
     """
     print("Module {} does not yet exist, building it now. "
           "This may take a minute...".format(module_name))
