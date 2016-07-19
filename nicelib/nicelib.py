@@ -463,6 +463,11 @@ class LibMeta(type):
             return metacls.__new_replay__(clsname, bases, classdict)
         mro_lookup = metacls._create_mro_lookup(classdict, bases)
 
+        # Deprecation warnings
+        if '_err_wrap' in classdict:
+            warnings.warn("Your class defines _err_wrap, which has been renamed to _ret_wrap, "
+                          "please update your code")
+
         if '_info' in classdict:
             info = classdict['_info']
             classdict['_ffi'] = info.ffi
