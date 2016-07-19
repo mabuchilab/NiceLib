@@ -90,34 +90,35 @@ def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=(), pr
 
         There are also some other optional entries:
 
-        The 'path' value must be a str or tuple of strs that are directories which will be searched
-        for the given header(s). Any headers that are specified with a leading slash are
-        considered absolute and are not affected by this path'.
+        The ``'path'`` value must be a str or tuple of strs that are directories which will be
+        searched for the given header(s). Any headers that are specified with a leading slash are
+        considered absolute and are not affected by this path.
 
-        The 'predef' value is a str which is the name or path of a header file which will be used
-        to populate the predefined preprocessor macros that are ordinarily provided by the compiler
-        on a per-system basis. If provided, this overrides the default header that NiceLib uses for
-        your system.
+        The ``'predef'`` value is a str which is the name or path of a header file which will be
+        used to populate the predefined preprocessor macros that are ordinarily provided by the
+        compiler on a per-system basis. If provided, this overrides the default header that NiceLib
+        uses for your system.
     lib_name : str or dict
-        Name of compiled library file, e.g. 'mylib.dll'
+        Name of compiled library file, e.g. ``'mylib.dll'``
     module_name : str
-        Name of module to create. Must be in the format '_*lib', e.g. '_mylib'
+        Name of module to create. Must be in the format ``'_*lib'``, e.g. ``'_mylib'``
     filedir : str
-        Path indicating the directory where the generated module will be saved. If `filedir`
-        points to an existing file, that file's directory is used. Usually you would pass the
-        ``__file__`` attribute from your build module.
+        Path indicating the directory where the generated module will be saved. If `filedir` points
+        to an existing file, that file's directory is used. Usually you would pass the ``__file__``
+        attribute from your build module.
     token_hooks : sequence of functions
-        Token hook functions. See `process_headers` for more info.
+        Token hook functions. See `process_headers()` for more info.
     ast_hooks : sequence of functions
-        AST hook functions. See `process_headers` for more info.
+        AST hook functions. See `process_headers()` for more info.
     hook_groups : str or sequence of strs
-        Hook groups. See `process_headers` for more info.
+        Hook groups. See `process_headers()` for more info.
 
     Notes
     -----
     ``header_info`` and ``lib_name`` can each be a dict that maps from a platform to the
     corresponding path or name, allowing cross-platform support. The keys are matched against
-    ``sys.platform`` and can use globbing, i.e. 'linux*' will match anything starting with 'linux'.
+    ``sys.platform`` and can use globbing, i.e. ``'linux*'`` will match anything starting with
+    ``'linux'``.
 
     The path or paths provided by ``header_info`` may use items in ``os.environ``. For example,
     ``'{PROGRAMFILES}\\\\header.h'`` will be formatted with ``os.environ['PROGRAMFILES']``.
