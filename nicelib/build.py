@@ -77,8 +77,9 @@ def handle_lib_name(lib_name):
     return select_platform_value(lib_name)
 
 
-def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=(), preamble=None,
-              token_hooks=(), ast_hooks=(), hook_groups=()):
+def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
+              ignore_system_headers=False, preamble=None, token_hooks=(), ast_hooks=(),
+              hook_groups=()):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -106,6 +107,12 @@ def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=(), pr
         Path indicating the directory where the generated module will be saved. If `filedir` points
         to an existing file, that file's directory is used. Usually you would pass the ``__file__``
         attribute from your build module.
+    ignored_headers : sequence of strs
+        Names of headers to ignore; `#include`\s containing these will be skipped.
+    ignore_system_headers : bool
+        If True, skip inclusion of headers specified with angle brackets, e.g. `#include
+        <stdarg.h>` Header files specified with double quotes are processed as ususal. Default is
+        False.
     token_hooks : sequence of functions
         Token hook functions. See `process_headers()` for more info.
     ast_hooks : sequence of functions
@@ -146,7 +153,8 @@ def build_lib(header_info, lib_name, module_name, filedir, ignore_headers=(), pr
     #header_name = os.path.basename(header_path)
     #print("Parsing and cleaning header {}".format(header_name))
     clean_header_str, macro_code = process_headers(header_paths, predef_path, update_cb=update_cb,
-                                                   ignore_headers=ignore_headers,
+                                                   ignored_headers=ignored_headers,
+                                                   ignore_sytem_headers=ignore_system_headers,
                                                    preamble=preamble, token_hooks=token_hooks,
                                                    ast_hooks=ast_hooks, hook_groups=hook_groups)
 

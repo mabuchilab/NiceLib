@@ -250,7 +250,7 @@ class FuncMacro(Macro):
 
 class Parser(object):
     def __init__(self, source, fpath='', replacement_map=[], obj_macros=[], func_macros=[],
-                 include_dirs=[], ignore_headers=()):
+                 include_dirs=[], ignored_headers=(), ignore_system_headers=False):
         self.base_dir, self.fname = os.path.split(fpath)
         self.tokens = lexer.lex(source, fpath)
         self.last_line = self.tokens[-1].line
@@ -259,7 +259,8 @@ class Parser(object):
         self.cond_stack = []
         self.cond_done_stack = []
         self.include_dirs = include_dirs
-        self.ignored_headers = tuple(os.path.normcase(p) for p in ignore_headers)
+        self.ignored_headers = tuple(os.path.normcase(p) for p in ignored_headers)
+        self.ignore_system_headers = ignore_system_headers
 
         self.predef_obj_macros = {m.name: m for m in obj_macros}
         self.predef_func_macros = {m.name: m for m in func_macros}
@@ -855,6 +856,9 @@ class Parser(object):
             return False
 
         if token.type is Token.HEADER_NAME:
+            if self.ignore_system_headers:
+                log.info("Ignoring system header {}".format(hpath))
+                return False
             log.info("System header {}".format(hpath))
             for include_dir in self.include_dirs:
                 try_path = os.path.join(include_dir, hpath)
@@ -1442,16 +1446,21 @@ def process_file(in_fname, out_fname, minify):
             f.write("{} = {}\n".format(macro.name, macro.py_src))
 
 
-def process_headers(header_paths, predef_path=None, update_cb=None, ignore_headers=(),
-                    debug_file=None, preamble=None, token_hooks=(), ast_hooks=(), hook_groups=()):
+def process_headers(header_paths, predef_path=None, update_cb=None, ignored_headers=(),
+                    ignore_system_headers=False, debug_file=None, preamble=None, token_hooks=(),
+                    ast_hooks=(), hook_groups=()):
     """Preprocess header(s) and split into a cleaned header and macros
 
     Parameters
     ----------
     header_paths : str or sequence of strs
         Paths of the headers
-    ignore_headers : sequence of strs
+    ignored_headers : sequence of strs
         Names of headers to ignore; `#include`\s containing these will be skipped.
+    ignore_system_headers : bool
+        If True, skip inclusion of headers specified with angle brackets, e.g. `#include
+        <stdarg.h>` Header files specified with double quotes are processed as ususal. Default is
+        False.
     debug_file : str
         File to write a partially-processed header to just before it is parsed b y `pycparser`.
         Useful for debugging the preprocessor when `pycparser`'s parser chokes on its output.
@@ -1494,7 +1503,8 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
 
     OBJ_MACROS, FUNC_MACROS = get_predef_macros()
     parser = Parser(source, '<root>', REPLACEMENT_MAP, OBJ_MACROS,
-                    FUNC_MACROS, INCLUDE_DIRS, ignore_headers=ignore_headers)
+                    FUNC_MACROS, INCLUDE_DIRS, ignored_headers=ignored_headers,
+                    ignore_system_headers=ignore_system_headers)
     parser.parse(update_cb=update_cb)
     log.info("Successfully parsed input headers")
 
