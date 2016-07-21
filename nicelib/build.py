@@ -154,7 +154,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     #print("Parsing and cleaning header {}".format(header_name))
     clean_header_str, macro_code = process_headers(header_paths, predef_path, update_cb=update_cb,
                                                    ignored_headers=ignored_headers,
-                                                   ignore_sytem_headers=ignore_system_headers,
+                                                   ignore_system_headers=ignore_system_headers,
                                                    preamble=preamble, token_hooks=token_hooks,
                                                    ast_hooks=ast_hooks, hook_groups=hook_groups)
 
