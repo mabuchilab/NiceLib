@@ -13,6 +13,7 @@ These are the major NiceLib classes and functions of which you should know:
   * `NiceLib`
   * `NiceObjectDef`
   * `load_lib()`
+  * `generate_wrapper()`
 
 
 .. _Header-API:
@@ -37,3 +38,5 @@ Wrapper API
     :undoc-members:
 
 .. autofunction:: nicelib.load_lib
+
+.. autofunction:: nicelib.generate_wrapper

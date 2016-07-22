@@ -1526,8 +1526,32 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         return header_src, macro_src
 
 
-def generate_wrapper(header_paths, outfile=None, prefix=(), add_ret_ignore=False, niceobj_prefix={},
+def generate_wrapper(header_paths, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
                      fill_handle=True, **kwds):
+    """Generate a skeleton library wrapper.
+
+    Grabs all the function declarations from the given header(s), generating a
+    partially-implemented NiceLib wrapper that can be uncommented and filled in as you go. Supports
+    NiceObjects and stripping of prefixes.
+
+    Parameters
+    ----------
+    header_paths, **kwds :
+        These get passed directly to `process_headers()`
+    outfile : str or file-like object
+        File (or filename) where output is written.
+    prefix : str or tuple of strs, optional
+        Prefix(es) to strip from toplevel functions.
+    add_ret_ignore : bool, optional
+        Automatically add the 'ignore' return value wrapper for void C functions. False by default.
+    niceobj_prefix : dict, optional
+        Mapping from NiceObject name to its function prefix. If a function has this prefix, it will
+        be considered a 'method' of the given NiceObject. These prefixes are checked before the
+        top-level prefixes.
+    fill_handle : bool, optional
+        If True, automatically set the first argument of every NiceObject function to ``'in'``.
+        True by default.
+    """
     if isinstance(outfile, basestring):
         with open(outfile, 'w') as f:
             return generate_wrapper(header_paths, f, prefix, add_ret_ignore, niceobj_prefix,
