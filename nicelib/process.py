@@ -1526,16 +1526,17 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         return header_src, macro_src
 
 
-def generate_wrapper(header_paths, outfile=None, prefixes=(), add_ret_ignore=False, niceobj_prefix={},
+def generate_wrapper(header_paths, outfile=None, prefix=(), add_ret_ignore=False, niceobj_prefix={},
                      fill_handle=True, **kwds):
     if isinstance(outfile, basestring):
         with open(outfile, 'w') as f:
-            return generate_wrapper(header_paths, f, prefixes, add_ret_ignore, niceobj_prefix,
+            return generate_wrapper(header_paths, f, prefix, add_ret_ignore, niceobj_prefix,
                                     fill_handle, **kwds)
 
     _, _, tree = process_headers(header_paths, return_ast=True, **kwds)
     toplevel_sigs = []
     niceobj_sigs = defaultdict(list)
+    prefixes = (prefix, '') if isinstance(prefix, basestring) else prefix + ('',)
 
     for ext in tree.ext:
         if isinstance(ext, c_ast.Decl) and isinstance(ext.type, c_ast.FuncDecl):
@@ -1547,7 +1548,7 @@ def generate_wrapper(header_paths, outfile=None, prefixes=(), add_ret_ignore=Fal
                     break
             else:
                 is_niceobj = False
-                for prefix in prefixes + ('',):
+                for prefix in prefixes:
                     if func_name.startswith(prefix):
                         break
             func_name = func_name[len(prefix):]
@@ -1577,7 +1578,7 @@ def generate_wrapper(header_paths, outfile=None, prefixes=(), add_ret_ignore=Fal
     outfile.write("from nicelib import NiceLib, NiceObjectDef\n\n\n")
     outfile.write("class MyNiceLib(NiceLib):\n")
     outfile.write("    # _info = load_lib('mylibname')\n")
-    outfile.write("    _prefix = {}\n\n".format(repr(prefixes)))
+    outfile.write("    _prefix = {}\n\n".format(repr(prefix)))
 
     indent = '    '
     for sig in toplevel_sigs:
