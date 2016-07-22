@@ -1205,7 +1205,7 @@ class Generator(object):
                 else:
                     macro_src.write("defs.{} = {}\n".format(macro.name, py_src))
 
-        return header_src, macro_src.getvalue()
+        return header_src, macro_src.getvalue(), self.tree
 
     def gen_py_src(self, macro):
         prefix = '__FMACRO_' if isinstance(macro, FuncMacro) else '__OMACRO_'
@@ -1448,7 +1448,7 @@ def process_file(in_fname, out_fname, minify):
 
 def process_headers(header_paths, predef_path=None, update_cb=None, ignored_headers=(),
                     ignore_system_headers=False, debug_file=None, preamble=None, token_hooks=(),
-                    ast_hooks=(), hook_groups=()):
+                    ast_hooks=(), hook_groups=(), return_ast=False):
     """Preprocess header(s) and split into a cleaned header and macros
 
     Parameters
@@ -1518,8 +1518,82 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
                     token_hooks=token_hooks,
                     ast_hooks=ast_hooks,
                     debug_file=debug_file)
-    header_src, macro_src = gen.generate()
-    return header_src, macro_src
+    header_src, macro_src, tree = gen.generate()
+
+    if return_ast:
+        return header_src, macro_src, tree
+    else:
+        return header_src, macro_src
+
+
+def generate_wrapper(header_paths, outfile=None, prefixes=(), add_ret_ignore=False, niceobj_prefix={},
+                     fill_handle=True, **kwds):
+    if isinstance(outfile, basestring):
+        with open(outfile, 'w') as f:
+            return generate_wrapper(header_paths, f, prefixes, add_ret_ignore, niceobj_prefix,
+                                    fill_handle, **kwds)
+
+    _, _, tree = process_headers(header_paths, return_ast=True, **kwds)
+    toplevel_sigs = []
+    niceobj_sigs = defaultdict(list)
+
+    for ext in tree.ext:
+        if isinstance(ext, c_ast.Decl) and isinstance(ext.type, c_ast.FuncDecl):
+            funcdecl = ext.type
+            func_name = funcdecl.type.declname
+            is_niceobj = True
+            for niceobj_name, prefix in niceobj_prefix.items():
+                if func_name.startswith(prefix):
+                    break
+            else:
+                is_niceobj = False
+                for prefix in prefixes + ('',):
+                    if func_name.startswith(prefix):
+                        break
+            func_name = func_name[len(prefix):]
+
+            if funcdecl.args and funcdecl.args.params[0].name is not None:
+                arg_names = [arg.name for arg in funcdecl.args.params]
+                if is_niceobj and fill_handle:
+                    arg_names[0] = "'in'"  # Auto-fill handle input
+
+                sig = ', '.join(arg_names)
+            else:
+                sig = ''
+
+            ret_type = ' '.join(funcdecl.type.type.names)
+            if ret_type == 'void' and add_ret_ignore:
+                if sig:
+                    sig += ", {'ret': 'ignore'}"
+                else:
+                    sig = "{'ret': 'ignore'},"
+
+            fullsig = '# {} = ({})\n'.format(func_name, sig)
+            if is_niceobj:
+                niceobj_sigs[niceobj_name].append(fullsig)
+            else:
+                toplevel_sigs.append(fullsig)
+
+    outfile.write("from nicelib import NiceLib, NiceObjectDef\n\n\n")
+    outfile.write("class MyNiceLib(NiceLib):\n")
+    outfile.write("    # _info = load_lib('mylibname')\n")
+    outfile.write("    _prefix = {}\n\n".format(repr(prefixes)))
+
+    indent = '    '
+    for sig in toplevel_sigs:
+        outfile.write(indent)
+        outfile.write(sig)
+
+    for niceobj_name, sigs in niceobj_sigs.items():
+        if niceobj_name:
+            outfile.write("\n")
+            outfile.write(indent)
+            outfile.write("{} = NiceObjectDef(prefix='{}', "
+                          "args=dict(\n".format(niceobj_name, niceobj_prefix[niceobj_name]))
+            for sig in sigs:
+                outfile.write(indent*2)
+                outfile.write(sig)
+            outfile.write("\n" + indent + "))\n")
 
 
 #
