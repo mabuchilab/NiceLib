@@ -200,7 +200,7 @@ def build_c_lexer():
     lexer.add(Token.CHAR_CONST, r"'([^'\\\n]|\\.)*'")
     lexer.add(Token.HEADER_NAME, r"<[^>\n]*>")
     lexer.add(Token.PUNCTUATOR,
-              r"[<>=*/*%&^|+-]=|<<==|>>==|\.\.\.|->|\+\+|--|<<|>>|&&|[|]{2}|##|"
+              r"[<>=*/*%&^|!+-]=|<<==|>>==|\.\.\.|->|\+\+|--|<<|>>|&&|[|]{2}|##|"
               r"[{}\[\]()<>.&*+-~!/%^|=;:,?#]")
     lexer.add(Token.NEWLINE, r"\n", ignore=False)
     lexer.add(Token.WHITESPACE, r"[ \t]+", ignore=False)
