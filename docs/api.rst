@@ -3,13 +3,32 @@ API Documentation
 
 These are the major NiceLib classes and functions of which you should know:
 
-* :py:class:`~nicelib.nicelib.NiceLib`
-* :py:class:`~nicelib.nicelib.NiceObjectDef`
-* :py:func:`~nicelib.build_lib`
-* :py:func:`~nicelib.load_lib`
-* :py:func:`~nicelib.process.process_headers`
+* :ref:`Header-API`
+
+  * `build_lib()`
+  * `process_headers()`
+
+* :ref:`Wrapper-API`
+
+  * `NiceLib`
+  * `NiceObjectDef`
+  * `load_lib()`
+  * `generate_wrapper()`
 
 
+.. _Header-API:
+
+Header Processing API
+---------------------
+.. autofunction:: nicelib.build_lib
+.. autofunction:: nicelib.process.process_headers
+
+
+
+.. _Wrapper-API:
+
+Wrapper API
+-----------
 .. autoclass:: nicelib.nicelib.NiceLib
     :members:
     :undoc-members:
@@ -18,6 +37,6 @@ These are the major NiceLib classes and functions of which you should know:
     :members:
     :undoc-members:
 
-.. autofunction:: nicelib.build_lib
 .. autofunction:: nicelib.load_lib
-.. autofunction:: nicelib.process.process_headers
+
+.. autofunction:: nicelib.generate_wrapper

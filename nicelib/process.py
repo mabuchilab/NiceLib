@@ -250,7 +250,7 @@ class FuncMacro(Macro):
 
 class Parser(object):
     def __init__(self, source, fpath='', replacement_map=[], obj_macros=[], func_macros=[],
-                 include_dirs=[], ignore_headers=()):
+                 include_dirs=[], ignored_headers=(), ignore_system_headers=False):
         self.base_dir, self.fname = os.path.split(fpath)
         self.tokens = lexer.lex(source, fpath)
         self.last_line = self.tokens[-1].line
@@ -259,7 +259,8 @@ class Parser(object):
         self.cond_stack = []
         self.cond_done_stack = []
         self.include_dirs = include_dirs
-        self.ignored_headers = tuple(os.path.normcase(p) for p in ignore_headers)
+        self.ignored_headers = tuple(os.path.normcase(p) for p in ignored_headers)
+        self.ignore_system_headers = ignore_system_headers
 
         self.predef_obj_macros = {m.name: m for m in obj_macros}
         self.predef_func_macros = {m.name: m for m in func_macros}
@@ -855,6 +856,9 @@ class Parser(object):
             return False
 
         if token.type is Token.HEADER_NAME:
+            if self.ignore_system_headers:
+                log.info("Ignoring system header {}".format(hpath))
+                return False
             log.info("System header {}".format(hpath))
             for include_dir in self.include_dirs:
                 try_path = os.path.join(include_dir, hpath)
@@ -1201,7 +1205,7 @@ class Generator(object):
                 else:
                     macro_src.write("defs.{} = {}\n".format(macro.name, py_src))
 
-        return header_src, macro_src.getvalue()
+        return header_src, macro_src.getvalue(), self.tree
 
     def gen_py_src(self, macro):
         prefix = '__FMACRO_' if isinstance(macro, FuncMacro) else '__OMACRO_'
@@ -1442,16 +1446,21 @@ def process_file(in_fname, out_fname, minify):
             f.write("{} = {}\n".format(macro.name, macro.py_src))
 
 
-def process_headers(header_paths, predef_path=None, update_cb=None, ignore_headers=(),
-                    debug_file=None, preamble=None, token_hooks=(), ast_hooks=(), hook_groups=()):
+def process_headers(header_paths, predef_path=None, update_cb=None, ignored_headers=(),
+                    ignore_system_headers=False, debug_file=None, preamble=None, token_hooks=(),
+                    ast_hooks=(), hook_groups=(), return_ast=False):
     """Preprocess header(s) and split into a cleaned header and macros
 
     Parameters
     ----------
     header_paths : str or sequence of strs
         Paths of the headers
-    ignore_headers : sequence of strs
+    ignored_headers : sequence of strs
         Names of headers to ignore; `#include`\s containing these will be skipped.
+    ignore_system_headers : bool
+        If True, skip inclusion of headers specified with angle brackets, e.g. `#include
+        <stdarg.h>` Header files specified with double quotes are processed as ususal. Default is
+        False.
     debug_file : str
         File to write a partially-processed header to just before it is parsed b y `pycparser`.
         Useful for debugging the preprocessor when `pycparser`'s parser chokes on its output.
@@ -1494,7 +1503,8 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
 
     OBJ_MACROS, FUNC_MACROS = get_predef_macros()
     parser = Parser(source, '<root>', REPLACEMENT_MAP, OBJ_MACROS,
-                    FUNC_MACROS, INCLUDE_DIRS, ignore_headers=ignore_headers)
+                    FUNC_MACROS, INCLUDE_DIRS, ignored_headers=ignored_headers,
+                    ignore_system_headers=ignore_system_headers)
     parser.parse(update_cb=update_cb)
     log.info("Successfully parsed input headers")
 
@@ -1508,8 +1518,107 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignore_heade
                     token_hooks=token_hooks,
                     ast_hooks=ast_hooks,
                     debug_file=debug_file)
-    header_src, macro_src = gen.generate()
-    return header_src, macro_src
+    header_src, macro_src, tree = gen.generate()
+
+    if return_ast:
+        return header_src, macro_src, tree
+    else:
+        return header_src, macro_src
+
+
+def generate_wrapper(header_paths, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
+                     fill_handle=True, **kwds):
+    """Generate a skeleton library wrapper.
+
+    Grabs all the function declarations from the given header(s), generating a
+    partially-implemented NiceLib wrapper that can be uncommented and filled in as you go. Supports
+    NiceObjects and stripping of prefixes.
+
+    Parameters
+    ----------
+    header_paths, **kwds :
+        These get passed directly to `process_headers()`
+    outfile : str or file-like object
+        File (or filename) where output is written.
+    prefix : str or tuple of strs, optional
+        Prefix(es) to strip from toplevel functions.
+    add_ret_ignore : bool, optional
+        Automatically add the 'ignore' return value wrapper for void C functions. False by default.
+    niceobj_prefix : dict, optional
+        Mapping from NiceObject name to its function prefix. If a function has this prefix, it will
+        be considered a 'method' of the given NiceObject. These prefixes are checked before the
+        top-level prefixes.
+    fill_handle : bool, optional
+        If True, automatically set the first argument of every NiceObject function to ``'in'``.
+        True by default.
+    """
+    if isinstance(outfile, basestring):
+        with open(outfile, 'w') as f:
+            return generate_wrapper(header_paths, f, prefix, add_ret_ignore, niceobj_prefix,
+                                    fill_handle, **kwds)
+
+    _, _, tree = process_headers(header_paths, return_ast=True, **kwds)
+    toplevel_sigs = []
+    niceobj_sigs = defaultdict(list)
+    prefixes = (prefix, '') if isinstance(prefix, basestring) else prefix + ('',)
+
+    for ext in tree.ext:
+        if isinstance(ext, c_ast.Decl) and isinstance(ext.type, c_ast.FuncDecl):
+            funcdecl = ext.type
+            func_name = funcdecl.type.declname
+            is_niceobj = True
+            for niceobj_name, prefix in niceobj_prefix.items():
+                if func_name.startswith(prefix):
+                    break
+            else:
+                is_niceobj = False
+                for prefix in prefixes:
+                    if func_name.startswith(prefix):
+                        break
+            func_name = func_name[len(prefix):]
+
+            if funcdecl.args and funcdecl.args.params[0].name is not None:
+                arg_names = [arg.name for arg in funcdecl.args.params]
+                if is_niceobj and fill_handle:
+                    arg_names[0] = "'in'"  # Auto-fill handle input
+
+                sig = ', '.join(arg_names)
+            else:
+                sig = ''
+
+            ret_type = ' '.join(funcdecl.type.type.names)
+            if ret_type == 'void' and add_ret_ignore:
+                if sig:
+                    sig += ", {'ret': 'ignore'}"
+                else:
+                    sig = "{'ret': 'ignore'},"
+
+            fullsig = '# {} = ({})\n'.format(func_name, sig)
+            if is_niceobj:
+                niceobj_sigs[niceobj_name].append(fullsig)
+            else:
+                toplevel_sigs.append(fullsig)
+
+    outfile.write("from nicelib import NiceLib, NiceObjectDef\n\n\n")
+    outfile.write("class MyNiceLib(NiceLib):\n")
+    outfile.write("    # _info = load_lib('mylibname')\n")
+    outfile.write("    _prefix = {}\n\n".format(repr(prefix)))
+
+    indent = '    '
+    for sig in toplevel_sigs:
+        outfile.write(indent)
+        outfile.write(sig)
+
+    for niceobj_name, sigs in niceobj_sigs.items():
+        if niceobj_name:
+            outfile.write("\n")
+            outfile.write(indent)
+            outfile.write("{} = NiceObjectDef(prefix='{}', "
+                          "args=dict(\n".format(niceobj_name, niceobj_prefix[niceobj_name]))
+            for sig in sigs:
+                outfile.write(indent*2)
+                outfile.write(sig)
+            outfile.write("\n" + indent + "))\n")
 
 
 #
