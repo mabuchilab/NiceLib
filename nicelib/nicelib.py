@@ -527,6 +527,10 @@ class LibMeta(type):
                     if name in func_to_niceobj:
                         flags.update(func_to_niceobj[name].flags)
 
+                    #Make sure that sig_tup is iterable
+                    if isinstance(sig_tup, dict):
+                        sig_tup = (sig_tup, )
+
                     # Pop off the flags dict
                     if sig_tup and isinstance(sig_tup[-1], dict):
                         func_flags = sig_tup[-1]
