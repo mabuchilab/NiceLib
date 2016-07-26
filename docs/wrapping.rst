@@ -254,3 +254,10 @@ Multi-value handles
 Usually an object will have only a single value as its handle, like an ID. In the unusual case that
 you have functions which take more than one value which act as a collective 'handle', you should
 specify this number as `n_handles` when calling `NiceObjectDef()`.
+
+
+Auto-Generating Wrappers
+------------------------
+
+If nicelib is able to parse your library's headers successfully, you can generate a convenient
+wrapper skeleton using `generate_wrapper()`.
