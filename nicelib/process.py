@@ -111,13 +111,14 @@ class Token(object):
         self.line = line
         self.col = col
         self.fpath = fpath
+        self.fname = os.path.basename(self.fpath[-17:])
 
     def matches(self, other_type, other_string):
         return self.type is other_type and self.string == other_string
 
     def __str__(self):
         string = '' if self.string == '\n' else self.string
-        return '{}[{}:{}:{}]({})'.format(self.type.name, self.fpath, self.line, self.col, string)
+        return '{}[{}:{}:{}]({})'.format(self.type.name, self.fname, self.line, self.col, string)
 
     def __repr__(self):
         return str(self)
