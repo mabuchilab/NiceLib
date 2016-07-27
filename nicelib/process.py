@@ -228,8 +228,8 @@ def build_c_lexer():
 
     lexer = Lexer()
     lexer.add(Token.DEFINED, r"defined")
-    lexer.add(Token.IDENTIFIER, r"[a-zA-Z_][a-zA-Z0-9_]*")
-    lexer.add(Token.NUMBER, r'\.?[0-9]([0-9a-zA-Z_.]|([eEpP][+-]))*')
+    lexer.add(Token.IDENTIFIER, r"[$a-zA-Z_][$a-zA-Z0-9_]*")
+    lexer.add(Token.NUMBER, r'\.?[0-9]([0-9$a-zA-Z_.]|([eEpP][+-]))*')
     lexer.add(Token.STRING_CONST, r'"([^"\\\n]|\\.)*"')
     lexer.add(Token.CHAR_CONST, r"'([^'\\\n]|\\.)*'")
     lexer.add(Token.HEADER_NAME, r"<[^>\n]*>", testfunc=include_matcher)
@@ -237,7 +237,7 @@ def build_c_lexer():
               r"[<>=*/*%&^|!+-]=|<<==|>>==|\.\.\.|->|\+\+|--|<<|>>|&&|[|]{2}|##|"
               r"[{}\[\]()<>.&*+-~!/%^|=;:,?#]")
     lexer.add(Token.NEWLINE, r"\n", ignore=False)
-    lexer.add(Token.WHITESPACE, r"[ \t]+", ignore=False)
+    lexer.add(Token.WHITESPACE, r"[ \t\v\f]+", ignore=False)
     lexer.add(Token.LINE_COMMENT, r"//.*($|(?=\n))", ignore=False)
     lexer.add(Token.BLOCK_COMMENT, r"/\*(.|\n)*?\*/", ignore=False)
     return lexer
