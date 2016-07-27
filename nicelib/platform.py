@@ -42,9 +42,15 @@ elif fnmatch(sys.platform, 'win*'):
     INCLUDE_DIRS = [r'{PROGRAMFILES}\Windows Kits\*\Include\*',
                     r'{PROGRAMFILES}\Windows Kits\*\Include\*\*',
                     r'{PROGRAMFILES}\Windows Kits\*\Include\*\*\*',
+                    r'{PROGRAMFILES}\Microsoft Visual Studio *\VC\include',
+                    r'{PROGRAMFILES}\Microsoft Visual Studio *\VC\include\*',
+                    r'{PROGRAMFILES}\Microsoft Visual Studio *\VC\include\*\*',
                     r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*',
                     r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*\*',
-                    r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*\*\*']
+                    r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*\*\*',
+                    r'{PROGRAMFILES(X86)}\Microsoft Visual Studio *\VC\include',
+                    r'{PROGRAMFILES(X86)}\Microsoft Visual Studio *\VC\include\*',
+                    r'{PROGRAMFILES(X86)}\Microsoft Visual Studio *\VC\include\*\*']
 
     if is_64bit:
         PREDEF_MACRO_STR += """
