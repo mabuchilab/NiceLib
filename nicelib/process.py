@@ -453,14 +453,14 @@ class Parser(object):
             for t in self.tokens[:last_newline_idx]:
                 self._log_token(t)
 
-            expanded = self.macro_expand_2([token] + self.tokens[:last_newline_idx])
-            self.tokens = self.tokens[last_newline_idx:]
-
             # Add to output
             if not self.skipping:
+                expanded = self.macro_expand_2([token] + self.tokens[:last_newline_idx])
                 for token in expanded:
                     self.out.append(token)
                     self.perform_replacement()
+
+            self.tokens = self.tokens[last_newline_idx:]
 
     def append_to_output(self, token):
         if not self.skipping:
