@@ -132,12 +132,14 @@ NON_TOKENS = (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT, Token.BLOCK_C
 class Lexer(object):
     def __init__(self):
         self.regexes = OrderedDict()
+        self.testfuncs = {}
         self.ignored = []
 
-    def add(self, name, regex_str, ignore=False):
+    def add(self, name, regex_str, ignore=False, testfunc=None):
         self.regexes[name] = re.compile(regex_str)
         if ignore:
             self.ignored.append(name)
+        self.testfuncs[name] = testfunc
 
     def lex(self, text, fpath='<string>'):
         self.line = 1
@@ -161,14 +163,15 @@ class Lexer(object):
         return lexer._lex_text(text)
 
     def _lex_text(self, text):
-        tokens = []
+        self.tokens = []
         pos = 0
         while pos < len(text):
             token = self.read_token(text, pos)
             if token is None:
-                raise LexError("No acceptable token found!")
+                raise LexError("({}:{}:{}) No acceptable token found!".format(self.line, self.col,
+                                                                              self.fpath))
             if token.type not in self.ignored:
-                tokens.append(token)
+                self.tokens.append(token)
             pos = pos + len(token.string)
 
             for i in range(token.string.count('\n')):
@@ -176,7 +179,7 @@ class Lexer(object):
                 self.col = 1
             self.col += len(token.string.rsplit('\n', 1)[-1])
 
-        return tokens
+        return self.tokens
 
     def read_token(self, text, pos=0):
         """Read the next token from text, starting at pos"""
@@ -185,6 +188,10 @@ class Lexer(object):
         for token_type, regex in self.regexes.items():
             match = regex.match(text, pos)
             if match:
+                testfunc = self.testfuncs[token_type]
+                if testfunc and not testfunc(self.tokens):
+                    continue
+
                 size = match.end() - match.start()
                 if size > best_size:
                     best_token = Token(token_type, match.group(0), self.line, self.col, self.fpath)
@@ -192,14 +199,40 @@ class Lexer(object):
         return best_token
 
 
+def _token_matcher_factory(match_strings, ignore_types=()):
+    def matcher(tokens):
+        match_iter = reversed(match_strings)
+        test_string = next(match_iter)
+        for token in reversed(tokens):
+            if token.type in ignore_types:
+                continue
+
+            if token.string != test_string:
+                return False
+
+            try:
+                test_string = next(match_iter)
+            except StopIteration:
+                return True  # Matched all of match_strings
+
+        return False  # Did not get through all of match_strings
+    return matcher
+
+
 def build_c_lexer():
+    # Only lex angle brackets as part of a header name immediately after `#include`
+    include_matcher = _token_matcher_factory(
+        ("#", "include"),
+        ignore_types=(Token.NEWLINE, Token.WHITESPACE, Token.LINE_COMMENT, Token.BLOCK_COMMENT)
+    )
+
     lexer = Lexer()
     lexer.add(Token.DEFINED, r"defined")
     lexer.add(Token.IDENTIFIER, r"[a-zA-Z_][a-zA-Z0-9_]*")
     lexer.add(Token.NUMBER, r'\.?[0-9]([0-9a-zA-Z_.]|([eEpP][+-]))*')
     lexer.add(Token.STRING_CONST, r'"([^"\\\n]|\\.)*"')
     lexer.add(Token.CHAR_CONST, r"'([^'\\\n]|\\.)*'")
-    lexer.add(Token.HEADER_NAME, r"<[^>\n]*>")
+    lexer.add(Token.HEADER_NAME, r"<[^>\n]*>", testfunc=include_matcher)
     lexer.add(Token.PUNCTUATOR,
               r"[<>=*/*%&^|!+-]=|<<==|>>==|\.\.\.|->|\+\+|--|<<|>>|&&|[|]{2}|##|"
               r"[{}\[\]()<>.&*+-~!/%^|=;:,?#]")
