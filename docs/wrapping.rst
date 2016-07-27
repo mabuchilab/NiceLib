@@ -28,7 +28,7 @@ We could then wrap it like this::
     from nicelib import NiceLib, NiceObjectDef, load_lib
 
     class NiceMotor(NiceLib):
-        _info = load_lib('awesomemotor')
+        _info = load_lib('awesomemotor', __package__)
         _ret_wrap = 'code'
 
         def _ret_code(retval):
