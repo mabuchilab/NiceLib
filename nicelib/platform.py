@@ -40,7 +40,11 @@ elif fnmatch(sys.platform, 'win*'):
         #define _WIN32 1
     """
     INCLUDE_DIRS = [r'{PROGRAMFILES}\Windows Kits\*\Include\*',
-                    r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*']
+                    r'{PROGRAMFILES}\Windows Kits\*\Include\*\*',
+                    r'{PROGRAMFILES}\Windows Kits\*\Include\*\*\*',
+                    r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*',
+                    r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*\*',
+                    r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*\*\*']
 
     if is_64bit:
         PREDEF_MACRO_STR += """
