@@ -884,38 +884,52 @@ class Parser(object):
             raise ParseError(self.out_line[-1], "Invalid #include line")
         token = tokens[0]
         hpath = token.string[1:-1]
+        base_dir = os.path.split(token.fpath)[0]
 
         if os.path.normcase(hpath) in self.ignored_headers:
             log.info("Explicitly ignored header '{}'".format(hpath))
             return False
 
+        def search_for_file(dirs, relpath):
+            if os.path.isabs(relpath):
+                if os.path.exists(relpath):
+                    return relpath
+                else:
+                    return None
+
+            for try_dir in dirs:
+                try_path = os.path.join(try_dir, relpath)
+                if os.path.exists(try_path):
+                    return try_path
+            return None
+
         if token.type is Token.HEADER_NAME:
             if self.ignore_system_headers:
                 log.info("Ignoring system header {}".format(hpath))
                 return False
+
             log.info("System header {}".format(hpath))
-            for include_dir in self.include_dirs:
-                try_path = os.path.join(include_dir, hpath)
-                if os.path.exists(try_path):
-                    hpath = try_path
-                    break
+            # We include the local path too, which is not standard
+            dirs = self.include_dirs + [base_dir]
+            path = search_for_file(dirs, hpath)
+
+            if not path:
+                raise PreprocessorError(token, 'System header "{}" not found'.format(hpath))
         else:
-            # TODO: Don't use base_dir if hpath is absolute
-            base_dir = os.path.split(token.fpath)[0]
-            hpath = os.path.join(base_dir, hpath)
             log.info("Local header {}".format(hpath))
+            dirs = [base_dir] + self.include_dirs
+            path = search_for_file(dirs, hpath)
 
-        if os.path.exists(hpath):
-            log.info("Including header {}".format(hpath))
-            with open(hpath, 'rU') as f:
-                tokens = lexer.lex(f.read(), hpath)
-                tokens.append(Token(Token.NEWLINE, '\n'))
+            if not path:
+                raise PreprocessorError(token, 'Program header "{}" not found'.format(hpath))
 
-            # Prepend this header's tokens
-            self.tokens = tokens + self.tokens
-        else:
-            raise PreprocessorError(token, 'Header "{}" not found'.format(hpath))
+        log.info("Including header {}".format(path))
+        with open(path, 'rU') as f:
+            tokens = lexer.lex(f.read(), path)
+            tokens.append(Token(Token.NEWLINE, '\n'))
 
+        # Prepend this header's tokens
+        self.tokens = tokens + self.tokens
         return False
 
 
