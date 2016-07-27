@@ -604,8 +604,8 @@ class Parser(object):
                             arg_lists[-1].append(token)
 
                     if len(macro.args) != len(arg_lists):
-                        raise ParseError(name_token, "Func-like macro needs {} arguments, got "
-                                         "{}".format(len(macro.args), len(arg_lists)))
+                        raise ParseError(name_token, "Func-like macro '{}' needs {} arguments, got "
+                                         "{}".format(name, len(macro.args), len(arg_lists)))
 
                     # Expand args
                     exp_arg_lists = [self.macro_expand_2(a, blacklist, func_blacklist +
