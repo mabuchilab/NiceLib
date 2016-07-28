@@ -1042,7 +1042,7 @@ class FFICleaner(TreeModifier):
     def _val_from_const(const):
         assert isinstance(const, c_ast.Constant)
         if const.type == 'int':
-            int_str = const.value.rstrip('UuLl')
+            int_str = const.value.lower().rstrip('ul')
             if int_str.startswith('0x'):
                 base = 16
             elif int_str.startswith('0b'):
@@ -1430,7 +1430,7 @@ def to_py_src(node):
 
     elif isinstance(node, c_ast.Constant):
         if node.type == 'int':
-            int_str = node.value.rstrip('UuLl')
+            int_str = node.value.lower().rstrip('ul')
             if int_str.startswith('0x'):
                 base = 16
             elif int_str.startswith('0b'):
