@@ -1175,61 +1175,37 @@ class Generator(object):
         self.parse(fake_types)
 
         # HOOK: list of tokens
+        self.token_hooks += (add_line_directive_hook,)  # Add builtin hooks
         tokens = self.tokens
         for hook in self.token_hooks:
             tokens = hook(tokens)
 
-        strings = []
-        chunk = []
-        expected_line = -1
-        cur_fpath = '<root>'
-        chunk_start_line = -1
-        chunk_water_mark = 0
-        for t in tokens:
-            if (t.fpath, t.line) != (cur_fpath, expected_line):
-                if chunk_water_mark > 0:
-                    strings.append('\n#line {} "{}"\n'.format(chunk_start_line, cur_fpath))
-                    strings.extend(chunk[:chunk_water_mark])
-                cur_fpath = t.fpath
-                expected_line = t.line
-                chunk = []
-                chunk_water_mark = 0
-                chunk_start_line = t.line
-
-            if t.type not in NON_TOKENS:
-                chunk_water_mark = len(chunk) + 1
-            elif t.type is Token.NEWLINE:
-                expected_line += 1
-            elif t.type is Token.BLOCK_COMMENT:
-                continue  # Don't output
-            elif t.type is Token.LINE_COMMENT:
-                continue  # Don't output
-
-            chunk.append(t.string)
-
-        # HOOK: list of strings
-        for hook in self.string_hooks:
-            strings = hook(strings)
-
         # Generate parseable chunks
-        def get_ext_chunks(strings):
+        def get_ext_chunks(chunk_tokens):
+            """Generates a sequence of (chunk_str, from_sys_header) pairs"""
             chunk = []
             depth = 0
-            for s in strings:
-                if s in ('{', '(', '['):
+            from_sys_header = None
+
+            for token in chunk_tokens:
+                if from_sys_header is None and not token.fname.startswith('<'):
+                    from_sys_header = token.from_sys_header
+
+                if token in ('{', '(', '['):
                     depth += 1
-                elif s in ('}', ')', ']'):
+                elif token in ('}', ')', ']'):
                     depth -= 1
 
-                chunk.append(s)
+                chunk.append(token.string)
 
-                if depth == 0 and s == ';':
-                    yield ''.join(chunk)
+                if depth == 0 and token == ';':
+                    yield ''.join(chunk), from_sys_header
                     chunk = []
+                    from_sys_header = None
 
             # Yield unfinished final chunk
             if chunk:
-                yield ''.join(chunk)
+                yield ''.join(chunk), from_sys_header
 
         # Do stdcall/WINAPI replacement hack like cffi does (see cffi.cparser for more info)
         r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
@@ -1239,9 +1215,9 @@ class Generator(object):
         # Log intermediate c-source
         if self.debug_file:
             with open(self.debug_file, 'w') as f:
-                f.write(''.join(strings))
+                f.write(''.join(t.string for t in tokens))
 
-        for csource_chunk in get_ext_chunks(strings):
+        for csource_chunk, from_sys_header in get_ext_chunks(tokens):
             csource_chunk = r_stdcall2.sub(' volatile volatile const(', csource_chunk)
             csource_chunk = r_stdcall1.sub(' volatile volatile const ', csource_chunk)
             csource_chunk = r_cdecl.sub(' ', csource_chunk)
@@ -1251,7 +1227,12 @@ class Generator(object):
             for hook in self.ast_hooks:
                 chunk_tree = hook(chunk_tree, self.parse)
 
-            self.tree.ext.extend(chunk_tree.ext)
+            # Skip adding func decls from system header files
+            if chunk_tree.ext:
+                ext = chunk_tree.ext[0]
+                if (not isinstance(ext, c_ast.Decl) or not isinstance(ext.type, c_ast.FuncDecl) or
+                        not from_sys_header):
+                    self.tree.ext.extend(chunk_tree.ext)
 
         log.info("pycparser successfully re-parsed cleaned header")
 
@@ -1810,6 +1791,49 @@ def remove_pattern(tokens, pattern):
     """Convenience function that works like modify_pattern, but you only specify targets"""
     pattern = [('d', target) for target in pattern]
     return modify_pattern(tokens, pattern)
+
+
+def add_line_directive_hook(tokens):
+    """Adds line directives to indicate where each token came from"""
+    out_tokens = []
+    chunk = []
+    expected_line = -1
+    cur_fpath = '<root>'
+    chunk_start_line = -1
+    chunk_water_mark = 0
+    for t in tokens:
+        if (t.fpath, t.line) != (cur_fpath, expected_line):
+            if chunk_water_mark > 0:
+                # For some reason the lexer's eating the trailing newline so we use two
+                line_tokens = lexer.lex('\n#line {} "{}"\n\n'.format(chunk_start_line, cur_fpath))
+                print("line tokens = {}".format(line_tokens))
+                out_tokens.extend(line_tokens)
+                out_tokens.extend(chunk[:chunk_water_mark])
+            cur_fpath = t.fpath
+            expected_line = t.line
+            chunk = []
+            chunk_water_mark = 0
+            chunk_start_line = t.line
+
+        if t.type not in NON_TOKENS:
+            chunk_water_mark = len(chunk) + 1
+        elif t.type is Token.NEWLINE:
+            expected_line += 1
+        elif t.type is Token.BLOCK_COMMENT:
+            continue  # Don't output
+        elif t.type is Token.LINE_COMMENT:
+            continue  # Don't output
+
+        chunk.append(t)
+
+    # Add trailing chunk
+    if chunk_water_mark > 0:
+        line_tokens = lexer.lex('\n#line {} "{}"\n'.format(chunk_start_line, cur_fpath))
+        print("line tokens = {}".format(line_tokens))
+        out_tokens.extend(line_tokens)
+        out_tokens.extend(chunk[:chunk_water_mark])
+
+    return out_tokens
 
 
 def declspec_hook(tokens):
