@@ -95,6 +95,16 @@ _ret_wrap
     wrapped function's return values, and `_ret_ignore()`, which ignores the value entirely
     and does not return it.
 
+    Sometimes it may be useful to give a wrapper more information about the function that was
+    called, like the parameters it was passed. If you define your wrapper to take one or more
+    specially-named args, they will be automatically injected for you. These currently include::
+
+    funcargs:
+        The list of all args (including output) that were passed to the C function
+
+    niceobj:
+        The `NiceObject` instance whose function was called, or None it was a top-level function
+
 _struct_maker
     Function that is called to create an FFI struct of the given type. Mainly useful for
     odd libraries that require you to always fill out some field of the struct, like its size
