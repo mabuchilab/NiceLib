@@ -7,7 +7,7 @@ from future.utils import with_metaclass
 import sys
 import warnings
 import pickle as pkl
-from inspect import isfunction
+from inspect import isfunction, getargspec
 from . import test_mode_is, _test_mode
 
 __all__ = ['NiceLib', 'NiceObjectDef']
@@ -245,6 +245,7 @@ def _wrap_inarg(ffi, argtype, arg):
 
 
 def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buflen):
+    retwrap_takes_args = ret_wrap and len(getargspec(ret_wrap).args) > 1
     functype = ffi.typeof(func)
     argtypes = functype.args
     # Cast bytes to str
@@ -382,7 +383,10 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
         out_vals = [f(a) for a, f in outargs]
 
         if ret_wrap:
-            retval = ret_wrap(retval)
+            if retwrap_takes_args:
+                retval = ret_wrap(retval, args)
+            else:
+                retval = ret_wrap(retval)
 
         if retval is not None:
             out_vals.append(retval)
