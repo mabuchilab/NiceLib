@@ -89,7 +89,7 @@ def handle_lib_name(lib_name):
 
 def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
               ignore_system_headers=False, preamble=None, token_hooks=(), ast_hooks=(),
-              hook_groups=()):
+              hook_groups=(), debug_file=None):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -166,7 +166,8 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
                                                    ignored_headers=ignored_headers,
                                                    ignore_system_headers=ignore_system_headers,
                                                    preamble=preamble, token_hooks=token_hooks,
-                                                   ast_hooks=ast_hooks, hook_groups=hook_groups)
+                                                   ast_hooks=ast_hooks, hook_groups=hook_groups,
+                                                   debug_file=debug_file)
 
     print("Compiling cffi module...")
     ffi = cffi.FFI()
