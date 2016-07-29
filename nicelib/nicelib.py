@@ -212,9 +212,9 @@ def _wrap_inarg(ffi, argtype, arg):
             raise TypeError
 
         cname = argtype.item.cname
-        if cname.startswith('int'):
+        if cname.startswith(('int', 'long', 'short', 'char', 'signed')):
             prefix = 'i'
-        elif cname.startswith('uint'):
+        elif cname.startswith('unsigned'):
             prefix = 'u'
         elif cname.startswith(('float', 'double')):
             prefix = 'f'
