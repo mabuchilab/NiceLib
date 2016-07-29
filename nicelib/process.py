@@ -473,7 +473,7 @@ class Parser(object):
 
             # Add to output
             if not self.skipping:
-                expanded = self.macro_expand_2([token] + self.tokens[:last_newline_idx])
+                expanded = self.macro_expand([token] + self.tokens[:last_newline_idx])
                 for token in expanded:
                     self.out.append(token)
                     self.perform_replacement()
@@ -577,7 +577,7 @@ class Parser(object):
             self.start_if_clause(bool(value))
         return False
 
-    def macro_expand_2(self, tokens, blacklist=[], func_blacklist=[]):
+    def macro_expand(self, tokens, blacklist=[], func_blacklist=[]):
         if tokens:
             tokens = tokens[:]  # Copy so we can pop
             token = tokens.pop(0)
@@ -626,7 +626,7 @@ class Parser(object):
                                          "{}".format(name, len(macro.args), len(arg_lists)))
 
                     # Expand args
-                    exp_arg_lists = [self.macro_expand_2(a, blacklist, func_blacklist + [name]) for
+                    exp_arg_lists = [self.macro_expand(a, blacklist, func_blacklist + [name]) for
                                      a in arg_lists]
 
                     # Substitute args into body, then expand it
@@ -644,8 +644,8 @@ class Parser(object):
                         # Object-like macro expand
                         body = self.get_obj_macro(token.string).body
                         copied_body = [t.copy(from_sys_header=token.from_sys_header) for t in body]
-                        expanded_body = self.macro_expand_2(copied_body, blacklist +
-                                                            [token.string], func_blacklist)
+                        expanded_body = self.macro_expand(copied_body, blacklist + [token.string],
+                                                          func_blacklist)
                         expanded.extend(expanded_body)
 
                     else:
@@ -703,19 +703,7 @@ class Parser(object):
                     last_real_token_idx = len(body) - 1
 
         # Expand body and return
-        return self.macro_expand_2(body, blacklist, func_blacklist + [macro.name])
-
-    def macro_expand_tokens(self, tokens, blacklist=[]):
-        expanded = []
-        for token in tokens:
-            if (token.type is Token.IDENTIFIER and self.obj_macro_defined(token.string) and
-                    token.string not in blacklist):
-                vals = self.get_obj_macro(token.string).body
-                vals = self.macro_expand_tokens(vals, blacklist + [token.string])
-                expanded.extend(vals)
-            else:
-                expanded.append(token)
-        return expanded
+        return self.macro_expand(body, blacklist, func_blacklist + [macro.name])
 
     def parse_expression(self, tokens):
         tokens = tokens[:]
@@ -734,7 +722,7 @@ class Parser(object):
             else:
                 expanded.append(token)
 
-        exp = self.macro_expand_2(expanded)
+        exp = self.macro_expand(expanded)
         tokens = []
         for token in exp:
             if token.type is Token.IDENTIFIER:
@@ -1158,7 +1146,7 @@ class Generator(object):
                  debug_file=None):
         self.tokens = parser.out
         self.macros = parser.macros
-        self.expander = parser.macro_expand_2
+        self.expander = parser.macro_expand
 
         self.token_hooks = token_hooks
         self.string_hooks = string_hooks
