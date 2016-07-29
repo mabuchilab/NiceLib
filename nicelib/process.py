@@ -687,7 +687,8 @@ class Parser(object):
                 if token.type not in NON_TOKENS:
                     concat_str = last_real_token.string + token.string
                     log.debug("Macro concat produced '{}'".format(concat_str))
-                    new_token = lexer.read_token(concat_str, pos=0, from_sys_header=in_sys_header)
+                    lexer.is_sys_header = in_sys_header
+                    new_token = lexer.read_token(concat_str, pos=0)
                     body.append(new_token)
                     concatting = False
                 continue
