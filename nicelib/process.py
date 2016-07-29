@@ -160,7 +160,7 @@ class Lexer(object):
     def lex(self, text, fpath='<string>', is_sys_header=False):
         self.line = 1
         self.col = 1
-        self.fpath = fpath
+        self.fpath = os.path.normcase(fpath)
         self.esc_newlines = defaultdict(int)
         self.is_sys_header = is_sys_header
 
@@ -313,6 +313,7 @@ class Parser(object):
         self.include_dirs = include_dirs
         self.ignored_headers = tuple(os.path.normcase(p) for p in ignored_headers)
         self.ignore_system_headers = ignore_system_headers
+        self.pragma_once = set()
 
         self.predef_obj_macros = {m.name: m for m in obj_macros}
         self.predef_func_macros = {m.name: m for m in func_macros}
@@ -868,7 +869,11 @@ class Parser(object):
         return False
 
     def parse_pragma(self):
-        self.pop_until_newline()  # Ignore pragmas
+        tokens = self.pop_until_newline()
+
+        if len(tokens) == 1 and tokens[0] == 'once':
+            self.pragma_once.add(tokens[0].fpath)
+
         return False
 
     def parse_error(self):
@@ -936,6 +941,11 @@ class Parser(object):
 
             if not path:
                 raise PreprocessorError(token, 'Program header "{}" not found'.format(hpath))
+
+        path = os.path.normcase(path)
+        if path in self.pragma_once:
+            log.info("Skipping header due to '#pragma once'")
+            return False
 
         log.info("Including header {}".format(path))
         with open(path, 'rU') as f:
