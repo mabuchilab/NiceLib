@@ -11,7 +11,7 @@ import os.path
 import warnings
 import logging as log
 from enum import Enum
-from collections import OrderedDict, namedtuple, defaultdict
+from collections import OrderedDict, namedtuple, defaultdict, Sequence
 import ast
 from io import StringIO
 from pycparser import c_parser, c_generator, c_ast, plyparser
@@ -115,6 +115,14 @@ class Token(object):
 
     def matches(self, other_type, other_string):
         return self.type is other_type and self.string == other_string
+
+    def __eq__(self, other):
+        if isinstance(other, basestring):
+            return self.string == other
+        elif isinstance(other, TokenType):
+            return self.type == other
+
+        return self.string == other.string and self.type == other.type
 
     def __str__(self):
         string = '' if self.string == '\n' else self.string
