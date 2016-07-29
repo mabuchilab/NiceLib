@@ -10,11 +10,21 @@ from fnmatch import fnmatch
 import cffi
 from .process import process_headers
 
+is_64bit = sys.maxsize > 2**32
+
 
 def select_platform_value(platform_dict):
     for platform_pattern, value in platform_dict.items():
-        if fnmatch(sys.platform, platform_pattern):
-            return value
+        bitwidth = None
+        if ':' in platform_pattern:
+            platform_pattern, bitwidth = platform_pattern.split(':')
+            if bitwidth not in ('32', '64'):
+                raise ValueError("Only support 32 or 64 bits, got '{}'".format(bitwidth))
+            pattern_is_64bit = bitwidth == '64'
+
+        if bitwidth is None or (pattern_is_64bit == is_64bit):
+            if fnmatch(sys.platform, platform_pattern):
+                return value
     raise ValueError("No matching platform pattern found")
 
 
