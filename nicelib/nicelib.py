@@ -245,8 +245,26 @@ def _wrap_inarg(ffi, argtype, arg):
         return arg
 
 
-def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buflen):
+def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buflen, use_numpy):
     ret_wrap_args = set(getargspec(ret_wrap).args[1:])
+
+    def c_to_numpy_array(c_arr, size):
+        import numpy as np
+        arrtype = ffi.typeof(c_arr)
+        cname = arrtype.item.cname
+        if cname.startswith(('int', 'long', 'short', 'char', 'signed')):
+            prefix = 'i'
+        elif cname.startswith('unsigned'):
+            prefix = 'u'
+        elif cname.startswith(('float', 'double')):
+            prefix = 'f'
+        else:
+            raise TypeError("Unknown type {}".format(cname))
+
+        dtype = np.dtype(prefix + str(ffi.sizeof(arrtype.item)))
+        return np.frombuffer(ffi.buffer(c_arr), dtype=dtype)
+
+    arr_out_wrapper = c_to_numpy_array if use_numpy else (lambda arr, size: arr)
 
     functype = ffi.typeof(func)
     argtypes = functype.args
@@ -368,7 +386,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
             elif info.startswith('arr'):
                 buflen = (buflens if len(info) == 3 else solo_buflens).pop(0)
                 arg = ffi.new('{}[]'.format(argtype.item.cname), buflen)
-                outargs.append((arg, lambda o: o))
+                outargs.append((arg, lambda arr: arr_out_wrapper(arr, buflen)))
                 bufs.append(arg)
             elif info.startswith('len'):
                 if info == 'len=in':
@@ -415,7 +433,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
 # WARNING uses some stack frame hackery; should probably make use of this syntax optional
 class NiceObjectDef(object):
     def __init__(self, attrs=None, n_handles=1, init=None, prefix=None, ret_wrap=None, buflen=None,
-                 doc=None):
+                 doc=None, use_numpy=None):
         self.doc = doc
         self.attrs = attrs
         self.n_handles = n_handles
@@ -430,6 +448,8 @@ class NiceObjectDef(object):
             self.flags['ret_wrap'] = ret_wrap
         if buflen is not None:
             self.flags['buflen'] = buflen
+        if use_numpy is not None:
+            self.flags['use_numpy'] = use_numpy
 
         if attrs is not None:
             self.names = set(attrs.keys())
@@ -493,6 +513,7 @@ class LibMeta(type):
         ret_wrap = mro_lookup('_ret_wrap')
         struct_maker = mro_lookup('_struct_maker') or (ffi.new if ffi else None)
         buflen = mro_lookup('_buflen')
+        use_numpy = mro_lookup('_use_numpy')
 
         dir_lib = dir(lib)
 
@@ -535,7 +556,8 @@ class LibMeta(type):
                     repr_str = func.__doc__ or "{}(??) -> ??".format(name)
                 else:
                     sig_tup = value
-                    flags = {'prefix': prefixes, 'ret_wrap': ret_wrap, 'buflen': buflen}
+                    flags = {'prefix': prefixes, 'ret_wrap': ret_wrap, 'buflen': buflen,
+                             'use_numpy': use_numpy}
                     if name in func_to_niceobj:
                         flags.update(func_to_niceobj[name].flags)
 
@@ -578,7 +600,7 @@ class LibMeta(type):
                         ret_wrapper = ret_wrappers[flags['ret_wrap']]
 
                     func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, ret_wrapper,
-                                         struct_maker, flags['buflen'])
+                                         struct_maker, flags['buflen'], flags['use_numpy'])
                     repr_str = _func_repr_str(ffi, func)
 
                 # Save for use by niceobjs
@@ -738,6 +760,9 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _buflen : int, optional
         The default length for buffers. This can be overridden on a per-argument basis in the
         argument's spec string, e.g `'len=64'` will make a 64-byte buffer.
+    _use_numpy : bool, optional
+        If true, convert output args marked as 'arr' to ``numpy`` arrays. Obviously requires
+        ``numpy`` to be installed.
     """
     _ffi = None  # MUST be filled in by subclass
     _lib = None  # MUST be filled in by subclass
@@ -745,6 +770,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _prefix = ''
     _struct_maker = None  # ffi.new
     _buflen = 512
+    _use_numpy = False
     _ret_wrap = 'return'
 
     def _ret_return(retval):
