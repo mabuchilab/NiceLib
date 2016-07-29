@@ -1005,10 +1005,13 @@ class FFICleaner(TreeModifier):
         return node
 
     def visit_Enum(self, node):
-        node.name = node.name or '__autotag_' + self.cur_typedef_name
+        if not node.name and self.cur_typedef_name:
+            node.name = '__autotag_' + self.cur_typedef_name
 
         if node.values:  # Is a definition
-            if node.name in self.defined_tags:
+            if node.name is None:
+                self.generic_visit(node)
+            elif node.name in self.defined_tags:
                 node = c_ast.Enum(node.name, ())
             else:
                 self.defined_tags.add(node.name)
@@ -1016,10 +1019,13 @@ class FFICleaner(TreeModifier):
         return node
 
     def visit_StructOrUnion(self, node, node_class):
-        node.name = node.name or '__autotag_' + self.cur_typedef_name
+        if not node.name and self.cur_typedef_name:
+            node.name = '__autotag_' + self.cur_typedef_name
 
         if node.decls:  # Is a definition
-            if node.name in self.defined_tags:
+            if node.name is None:
+                self.generic_visit(node)
+            elif node.name in self.defined_tags:
                 node = node_class(node.name, ())
             else:
                 self.defined_tags.add(node.name)
