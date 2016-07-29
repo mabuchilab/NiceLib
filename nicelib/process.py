@@ -1806,7 +1806,6 @@ def add_line_directive_hook(tokens):
             if chunk_water_mark > 0:
                 # For some reason the lexer's eating the trailing newline so we use two
                 line_tokens = lexer.lex('\n#line {} "{}"\n\n'.format(chunk_start_line, cur_fpath))
-                print("line tokens = {}".format(line_tokens))
                 out_tokens.extend(line_tokens)
                 out_tokens.extend(chunk[:chunk_water_mark])
             cur_fpath = t.fpath
