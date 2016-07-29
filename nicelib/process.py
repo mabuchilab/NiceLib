@@ -8,6 +8,7 @@ from past.builtins import basestring
 
 import re
 import os.path
+import copy
 import warnings
 import logging as log
 from enum import Enum
@@ -105,13 +106,20 @@ class ParseError(PreprocessorError):
 
 
 class Token(object):
-    def __init__(self, type, string, line=0, col=0, fpath='<string>'):
+    def __init__(self, type, string, line=0, col=0, fpath='<string>', from_sys_header=False):
         self.type = type
         self.string = string
         self.line = line
         self.col = col
         self.fpath = fpath
         self.fname = os.path.basename(self.fpath[-17:])
+        self.from_sys_header = from_sys_header
+
+    def copy(self, from_sys_header=None):
+        other = copy.copy(self)
+        if from_sys_header is not None:
+            other.from_sys_header = from_sys_header
+        return other
 
     def matches(self, other_type, other_string):
         return self.type is other_type and self.string == other_string
@@ -149,11 +157,12 @@ class Lexer(object):
             self.ignored.append(name)
         self.testfuncs[name] = testfunc
 
-    def lex(self, text, fpath='<string>'):
+    def lex(self, text, fpath='<string>', is_sys_header=False):
         self.line = 1
         self.col = 1
         self.fpath = fpath
         self.esc_newlines = defaultdict(int)
+        self.is_sys_header = is_sys_header
 
         lines = text.splitlines()
         joined_lines = []
@@ -202,7 +211,8 @@ class Lexer(object):
 
                 size = match.end() - match.start()
                 if size > best_size:
-                    best_token = Token(token_type, match.group(0), self.line, self.col, self.fpath)
+                    best_token = Token(token_type, match.group(0), self.line, self.col, self.fpath,
+                                       self.is_sys_header)
                     best_size = size
         return best_token
 
@@ -616,12 +626,14 @@ class Parser(object):
                                          "{}".format(name, len(macro.args), len(arg_lists)))
 
                     # Expand args
-                    exp_arg_lists = [self.macro_expand_2(a, blacklist, func_blacklist +
-                                                         [name]) for a in arg_lists]
+                    exp_arg_lists = [self.macro_expand_2(a, blacklist, func_blacklist + [name]) for
+                                     a in arg_lists]
 
                     # Substitute args into body, then expand it
-                    body = self.macro_expand_funclike_body(macro, exp_arg_lists)
-                    expanded.extend(body)
+                    expanded_body = self.macro_expand_funclike_body(
+                        macro, exp_arg_lists, in_sys_header=name_token.from_sys_header
+                    )
+                    expanded.extend(expanded_body)
 
                     if tokens:
                         token = tokens.pop(0)
@@ -631,8 +643,11 @@ class Parser(object):
                     if self.obj_macro_defined(token.string) and token.string not in blacklist:
                         # Object-like macro expand
                         body = self.get_obj_macro(token.string).body
-                        expanded.extend(self.macro_expand_2(body, blacklist + [token.string],
-                                                            func_blacklist))
+                        copied_body = [t.copy(from_sys_header=token.from_sys_header) for t in body]
+                        expanded_body = self.macro_expand_2(copied_body, blacklist +
+                                                            [token.string], func_blacklist)
+                        expanded.extend(expanded_body)
+
                     else:
                         # Ordinary identifier
                         expanded.append(token)
@@ -649,7 +664,8 @@ class Parser(object):
                     done = True
         return expanded
 
-    def macro_expand_funclike_body(self, macro, exp_arg_lists, blacklist=[], func_blacklist=[]):
+    def macro_expand_funclike_body(self, macro, exp_arg_lists, blacklist=[], func_blacklist=[],
+                                   in_sys_header=False):
         body = []
         last_real_token = None
         last_real_token_idx = -1
@@ -662,7 +678,7 @@ class Parser(object):
                 arg_idx = macro.args.index(token.string)
                 substituted.extend(exp_arg_lists[arg_idx])
             else:
-                substituted.append(token)
+                substituted.append(token.copy(from_sys_header=in_sys_header))
 
         # Do concatting pass
         for token in substituted:
@@ -670,7 +686,7 @@ class Parser(object):
                 if token.type not in NON_TOKENS:
                     concat_str = last_real_token.string + token.string
                     log.debug("Macro concat produced '{}'".format(concat_str))
-                    new_token = lexer.read_token(concat_str, pos=0)
+                    new_token = lexer.read_token(concat_str, pos=0, from_sys_header=in_sys_header)
                     body.append(new_token)
                     concatting = False
                 continue
@@ -920,6 +936,7 @@ class Parser(object):
             # We include the local path too, which is not standard
             dirs = self.include_dirs + [base_dir]
             path = search_for_file(dirs, hpath)
+            is_sys_header = True
 
             if not path:
                 raise PreprocessorError(token, 'System header "{}" not found'.format(hpath))
@@ -927,13 +944,14 @@ class Parser(object):
             log.info("Local header {}".format(hpath))
             dirs = [base_dir] + self.include_dirs
             path = search_for_file(dirs, hpath)
+            is_sys_header = False
 
             if not path:
                 raise PreprocessorError(token, 'Program header "{}" not found'.format(hpath))
 
         log.info("Including header {}".format(path))
         with open(path, 'rU') as f:
-            tokens = lexer.lex(f.read(), path)
+            tokens = lexer.lex(f.read(), path, is_sys_header=is_sys_header)
             tokens.append(Token(Token.NEWLINE, '\n'))
 
         # Prepend this header's tokens
