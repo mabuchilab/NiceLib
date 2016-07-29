@@ -1804,6 +1804,139 @@ def enum_type_hook(tokens):
                                    ('d', Token.IDENTIFIER)])
 
 
+class ParseHelper(object):
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.tok_it = iter(tokens)
+        self.depth = 0
+        self.next_token = next(self.tok_it)
+
+    def pop(self):
+        token = self.next_token
+
+        if token is None:
+            raise StopIteration
+
+        try:
+            self.next_token = next(self.tok_it)
+        except StopIteration:
+            self.next_token = None
+
+        if token in ('(', '{', '['):
+            self.depth += 1
+        elif token in (')', '}', ']'):
+            self.depth -= 1
+
+        return token
+
+    def peek(self):
+        return self.next_token
+
+    def read_until(self, tokens, discard=False):
+        if isinstance(tokens, basestring) or not isinstance(tokens, Sequence):
+            tokens = (tokens,)
+        buf = []
+
+        while True:
+            try:
+                token = self.pop()
+            except StopIteration:
+                return False if discard else buf
+
+            if not discard:
+                buf.append(token)
+
+            if token in tokens:
+                return True if discard else buf
+
+    def read_until_depth(self, depth, discard=False):
+        buf = []
+
+        while True:
+            try:
+                token = self.pop()
+            except StopIteration:
+                return False if discard else buf
+
+            if not discard:
+                buf.append(token)
+
+            if self.depth == depth:
+                return True if discard else buf
+
+
+def struct_func_hook(tokens):
+    """Removes function definitions from inside struct definitions.
+
+    Once we're inside the struct's curly braces, we look member-by-member. We push each next token
+    into a buffer, if we see an open brace then we assume this member is a funcdef. (NOTE: to be
+    more correct we should make sure it's not a nested struct/union/enum def.) The funcdef is over
+    after the matching close brace and an optional semicolon. Otherwise, if we see a semicolon
+    outside of any nesting, that's the end of an ordinary member declaration.
+
+    If we see a funcdef, throw away all its tokens. If we see a member declaration, pass the tokens
+    on.
+    """
+    ph = ParseHelper(tokens)
+
+    while True:
+        for token in ph.read_until('struct'):
+            yield token
+        if token != 'struct':
+            raise StopIteration
+
+        # Yield until opening of struct def (or end of statement)
+        start_depth = ph.depth
+        maybe_a_def = True
+        in_struct_def = False
+        done = False
+        while not done:
+            token = ph.pop()
+            yield token
+
+            if ph.depth == start_depth and token == ';':
+                done = True
+            elif ph.depth == start_depth and token == '=':
+                maybe_a_def = False
+            elif maybe_a_def and token == '{':
+                done = True
+                in_struct_def = True
+
+        if not in_struct_def:
+            continue
+
+        struct_def_done = False
+        while not struct_def_done:
+            # Process each member
+            buf = []
+            member_depth = ph.depth
+            member_done = False
+            while not member_done:
+                token = ph.pop()
+                buf.append(token)
+
+                if token == '{':
+                    # In a funcdef, ignore these tokens
+                    buf = []
+                    ph.read_until_depth(ph.depth - 1, discard=True)
+
+                    # Discard optional semicolon
+                    if ph.peek() == ';':
+                        ph.pop()
+                    member_done = True
+
+                elif ph.depth == member_depth and token == ';':
+                    # End of ordinary member declaration
+                    member_done = True
+
+                elif ph.depth == member_depth - 1:
+                    member_done = True
+                    struct_def_done = True
+
+            for token in buf:
+                yield token
+
+
 class CPPTypedefAdder(TreeModifier):
     """Wraps enum/struct/union definitions in a typedef if they lack one"""
     def hook(self, tree, parse_func):
@@ -1843,6 +1976,6 @@ class CPPTypedefAdder(TreeModifier):
 
 
 HOOK_GROUPS = {
-    'C++': ((declspec_hook, extern_c_hook, enum_type_hook),
+    'C++': ((declspec_hook, extern_c_hook, enum_type_hook, struct_func_hook),
             (CPPTypedefAdder().hook,)),
 }
