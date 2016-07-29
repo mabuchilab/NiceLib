@@ -155,7 +155,8 @@ class NiceClassMeta(type):
 
             # Generate "bound methods"
             for func_name in niceobjdef.names:
-                lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles, cls_name)
+                lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles, cls_name,
+                                       self)
                 setattr(self, func_name, lib_func)
 
             if test_mode_is('record'):
@@ -245,7 +246,8 @@ def _wrap_inarg(ffi, argtype, arg):
 
 
 def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buflen):
-    retwrap_takes_args = ret_wrap and len(getargspec(ret_wrap).args) > 1
+    ret_wrap_args = set(getargspec(ret_wrap).args[1:])
+
     functype = ffi.typeof(func)
     argtypes = functype.args
     # Cast bytes to str
@@ -259,8 +261,10 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
         raise TypeError("{}() takes {} args, but your signature specifies "
                         "{}".format(fname, len(argtypes), len(sig_tup)))
 
-    def wrapped(*inargs):
+    def wrapped(*inargs, **kwds):
         inargs = list(inargs)
+        available_args = {}
+        available_args['niceobj'] = kwds.pop('niceobj', None)
 
         if not functype.ellipsis and len(inargs) != n_expected_inargs:
             message = '{}() takes '.format(fname)
@@ -379,14 +383,18 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
                 arg = arg.encode('ascii')
             args.append(arg)
 
+        available_args['funcargs'] = args
+
         retval = func(*args)
         out_vals = [f(a) for a, f in outargs]
 
         if ret_wrap:
-            if retwrap_takes_args:
-                retval = ret_wrap(retval, args)
-            else:
-                retval = ret_wrap(retval)
+            try:
+                kwds = {arg: available_args[arg] for arg in ret_wrap_args}
+            except KeyError as e:
+                raise KeyError("Unknown arg '{}' in arglist of ret-wrapping function "
+                               "'{}'".format(e.args[0], ret_wrap.__name__))
+            retval = ret_wrap(retval, **kwds)
 
         if retval is not None:
             out_vals.append(retval)
@@ -663,14 +671,15 @@ def _func_repr_str(ffi, func, n_handles=0):
 
 
 class LibFunction(object):
-    def __init__(self, func, repr_str, handles=(), niceobj_name=None):
+    def __init__(self, func, repr_str, handles=(), niceobj_name=None, niceobj=None):
         self.__name__ = niceobj_name + '.' + func.__name__ if niceobj_name else func.__name__
         self._func = func
         self._repr = repr_str
         self._handles = handles
+        self._niceobj = niceobj
 
     def __call__(self, *args):
-        result = self._func(*(self._handles + args))
+        result = self._func(*(self._handles + args), niceobj=self._niceobj)
 
         if test_mode_is('record', 'replay'):
             Record.ensure_created()
