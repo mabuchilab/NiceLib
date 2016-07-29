@@ -1800,22 +1800,24 @@ def add_line_directive_hook(tokens):
     expected_line = -1
     cur_fpath = '<root>'
     chunk_start_line = -1
-    chunk_water_mark = 0
+    high_mark, low_mark = 0, -1
     for t in tokens:
         if (t.fpath, t.line) != (cur_fpath, expected_line):
-            if chunk_water_mark > 0:
+            if high_mark > low_mark >= 0:
                 # For some reason the lexer's eating the trailing newline so we use two
                 line_tokens = lexer.lex('\n#line {} "{}"\n\n'.format(chunk_start_line, cur_fpath))
                 out_tokens.extend(line_tokens)
-                out_tokens.extend(chunk[:chunk_water_mark])
+                out_tokens.extend(chunk[low_mark:high_mark])
             cur_fpath = t.fpath
             expected_line = t.line
             chunk = []
-            chunk_water_mark = 0
+            high_mark, low_mark = 0, -1
             chunk_start_line = t.line
 
         if t.type not in NON_TOKENS:
-            chunk_water_mark = len(chunk) + 1
+            high_mark = len(chunk) + 1
+            if low_mark == -1:
+                low_mark = len(chunk)
         elif t.type is Token.NEWLINE:
             expected_line += 1
         elif t.type is Token.BLOCK_COMMENT:
@@ -1826,11 +1828,11 @@ def add_line_directive_hook(tokens):
         chunk.append(t)
 
     # Add trailing chunk
-    if chunk_water_mark > 0:
-        line_tokens = lexer.lex('\n#line {} "{}"\n'.format(chunk_start_line, cur_fpath))
+    if high_mark > low_mark >= 0:
+        line_tokens = lexer.lex('\n#line {} "{}"\n\n'.format(chunk_start_line, cur_fpath))
         print("line tokens = {}".format(line_tokens))
         out_tokens.extend(line_tokens)
-        out_tokens.extend(chunk[:chunk_water_mark])
+        out_tokens.extend(chunk[low_mark:high_mark])
 
     return out_tokens
 
