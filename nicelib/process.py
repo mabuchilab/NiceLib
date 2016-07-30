@@ -778,7 +778,7 @@ class Parser(object):
 
     def parse_endif(self):
         self.end_if_clause()
-        self.assert_line_empty()
+        self.pop_until_newline()  # Apparently the line doesn't need to be empty...
         return False
 
     def parse_define(self):
