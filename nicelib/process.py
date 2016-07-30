@@ -1470,7 +1470,8 @@ def to_py_src(node):
                   to_py_src(node.iffalse) + [')'])
 
     elif isinstance(node, c_ast.FuncCall):
-        args = ', '.join(''.join(to_py_src(e)) for e in node.args.exprs)
+        exprs = node.args.exprs if node.args else []
+        args = ', '.join(''.join(to_py_src(e)) for e in exprs)
         py_src = [node.name.name, '(', args, ')']
 
     elif isinstance(node, c_ast.Cast):
