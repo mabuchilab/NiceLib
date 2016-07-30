@@ -1174,9 +1174,11 @@ class Generator(object):
         self.parse(fake_types)
 
         # HOOK: list of tokens
+        log.info("Applying token hooks")
         self.token_hooks += (add_line_directive_hook,)  # Add builtin hooks
         tokens = self.tokens
         for hook in self.token_hooks:
+            log.info("Applying hook '{}'".format(hook.__name__))
             tokens = hook(tokens)
 
         # Generate parseable chunks
@@ -1216,6 +1218,7 @@ class Generator(object):
             with open(self.debug_file, 'w') as f:
                 f.write(''.join(t.string for t in tokens))
 
+        log.info("Parsing chunks")
         for csource_chunk, from_sys_header in get_ext_chunks(tokens):
             csource_chunk = r_stdcall2.sub(' volatile volatile const(', csource_chunk)
             csource_chunk = r_stdcall1.sub(' volatile volatile const ', csource_chunk)
