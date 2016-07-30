@@ -106,13 +106,13 @@ class ParseError(PreprocessorError):
 
 
 class Token(object):
-    def __init__(self, type, string, line=0, col=0, fpath='<string>', from_sys_header=False):
+    def __init__(self, type, string, line=0, col=0, fpath='<string>', fname='<string>', from_sys_header=False):
         self.type = type
         self.string = string
         self.line = line
         self.col = col
         self.fpath = fpath
-        self.fname = os.path.basename(self.fpath[-17:])
+        self.fname = fname
         self.from_sys_header = from_sys_header
 
     def copy(self, from_sys_header=None):
@@ -159,6 +159,8 @@ class Lexer(object):
         self.line = 1
         self.col = 1
         self.fpath = os.path.normcase(fpath)
+        self.fname = os.path.basename(self.fpath[-17:])  # Do this once
+
         self.esc_newlines = defaultdict(int)
         self.is_sys_header = is_sys_header
 
@@ -209,7 +211,7 @@ class Lexer(object):
                 size = match.end() - match.start()
                 if size > best_size:
                     best_token = Token(token_type, match.group(0), self.line, self.col, self.fpath,
-                                       self.is_sys_header)
+                                       self.fname, self.is_sys_header)
                     best_size = size
         return best_token
 
