@@ -1885,6 +1885,26 @@ class ParseHelper(object):
         return self.next_token
 
     def read_until(self, tokens, discard=False):
+        """Read until the given token; don't consume the given token"""
+        if isinstance(tokens, basestring) or not isinstance(tokens, Sequence):
+            tokens = (tokens,)
+        buf = []
+
+        while True:
+            token = self.peek()
+            if token is None:
+                return False if discard else buf
+
+            if not discard:
+                buf.append(token)
+
+            if token in tokens:
+                return True if discard else buf
+
+            self.pop()
+
+    def read_to(self, tokens, discard=False):
+        """Read to and consume the given token"""
         if isinstance(tokens, basestring) or not isinstance(tokens, Sequence):
             tokens = (tokens,)
         buf = []
@@ -1901,7 +1921,7 @@ class ParseHelper(object):
             if token in tokens:
                 return True if discard else buf
 
-    def read_until_depth(self, depth, discard=False):
+    def read_to_depth(self, depth, discard=False):
         buf = []
 
         while True:
@@ -1932,7 +1952,7 @@ def struct_func_hook(tokens):
     ph = ParseHelper(tokens)
 
     while True:
-        for token in ph.read_until('struct'):
+        for token in ph.read_to('struct'):
             yield token
         if token != 'struct':
             raise StopIteration
@@ -1970,7 +1990,7 @@ def struct_func_hook(tokens):
                 if token == '{':
                     # In a funcdef, ignore these tokens
                     buf = []
-                    ph.read_until_depth(ph.depth - 1, discard=True)
+                    ph.read_to_depth(ph.depth - 1, discard=True)
 
                     # Discard optional semicolon
                     if ph.peek() == ';':
