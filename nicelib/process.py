@@ -384,7 +384,7 @@ class Parser(object):
         elif name in self.func_macros:
             del self.func_macros[name]
         else:
-            warnings.warn("#undef of nonexistent macro '{}'".format(name))
+            log.info("#undef of nonexistent macro '{}'".format(name))
 
     def ordered_macro_items(self):
         all_items = list(self.obj_macros.items()) + list(self.func_macros.items())
@@ -728,8 +728,8 @@ class Parser(object):
         tokens = []
         for token in exp:
             if token.type is Token.IDENTIFIER:
-                warnings.warn(PreprocessorWarning(token, "Unidentified identifier {} in expression"
-                                                  ", treating as 0...".format(token.string)))
+                log.info(PreprocessorWarning(token, "Unidentified identifier {} in expression"
+                                                    ", treating as 0...".format(token.string)))
                 tokens.append(Token(Token.NUMBER, '0'))
             else:
                 tokens.append(token)
