@@ -147,15 +147,13 @@ NON_TOKENS = (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT, Token.BLOCK_C
 
 class Lexer(object):
     def __init__(self):
-        self.regexes = OrderedDict()
-        self.testfuncs = {}
+        self.token_info = []
         self.ignored = []
 
     def add(self, name, regex_str, ignore=False, testfunc=None):
-        self.regexes[name] = re.compile(regex_str)
+        self.token_info.append((name, re.compile(regex_str), testfunc))
         if ignore:
             self.ignored.append(name)
-        self.testfuncs[name] = testfunc
 
     def lex(self, text, fpath='<string>', is_sys_header=False):
         self.line = 1
@@ -202,10 +200,9 @@ class Lexer(object):
         """Read the next token from text, starting at pos"""
         best_token = None
         best_size = 0
-        for token_type, regex in self.regexes.items():
+        for token_type, regex, testfunc in self.token_info:
             match = regex.match(text, pos)
             if match:
-                testfunc = self.testfuncs[token_type]
                 if testfunc and not testfunc(self.tokens):
                     continue
 
