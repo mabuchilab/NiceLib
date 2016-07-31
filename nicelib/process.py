@@ -1289,7 +1289,7 @@ class Generator(object):
                 try:
                     py_src = ''.join(to_py_src(expr_node))
                 except ConvertError as e:
-                    warnings.warn(e)
+                    warnings.warn(str(e))
 
             except (plyparser.ParseError, AttributeError):
                 warnings.warn("Un-pythonable macro {}".format(macro.name))
