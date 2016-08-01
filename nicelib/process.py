@@ -106,13 +106,13 @@ class ParseError(PreprocessorError):
 
 
 class Token(object):
-    def __init__(self, type, string, line=0, col=0, fpath='<string>', from_sys_header=False):
+    def __init__(self, type, string, line=0, col=0, fpath='<string>', fname='<string>', from_sys_header=False):
         self.type = type
         self.string = string
         self.line = line
         self.col = col
         self.fpath = fpath
-        self.fname = os.path.basename(self.fpath[-17:])
+        self.fname = fname
         self.from_sys_header = from_sys_header
 
     def copy(self, from_sys_header=None):
@@ -132,6 +132,9 @@ class Token(object):
 
         return self.string == other.string and self.type == other.type
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __str__(self):
         string = '' if self.string == '\n' else self.string
         return '{}[{}:{}:{}]({})'.format(self.type.name, self.fname, self.line, self.col, string)
@@ -147,20 +150,20 @@ NON_TOKENS = (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT, Token.BLOCK_C
 
 class Lexer(object):
     def __init__(self):
-        self.regexes = OrderedDict()
-        self.testfuncs = {}
+        self.token_info = []
         self.ignored = []
 
     def add(self, name, regex_str, ignore=False, testfunc=None):
-        self.regexes[name] = re.compile(regex_str)
+        self.token_info.append((name, re.compile(regex_str), testfunc))
         if ignore:
             self.ignored.append(name)
-        self.testfuncs[name] = testfunc
 
     def lex(self, text, fpath='<string>', is_sys_header=False):
         self.line = 1
         self.col = 1
         self.fpath = os.path.normcase(fpath)
+        self.fname = os.path.basename(self.fpath[-17:])  # Do this once
+
         self.esc_newlines = defaultdict(int)
         self.is_sys_header = is_sys_header
 
@@ -202,17 +205,16 @@ class Lexer(object):
         """Read the next token from text, starting at pos"""
         best_token = None
         best_size = 0
-        for token_type, regex in self.regexes.items():
+        for token_type, regex, testfunc in self.token_info:
             match = regex.match(text, pos)
             if match:
-                testfunc = self.testfuncs[token_type]
                 if testfunc and not testfunc(self.tokens):
                     continue
 
                 size = match.end() - match.start()
                 if size > best_size:
                     best_token = Token(token_type, match.group(0), self.line, self.col, self.fpath,
-                                       self.is_sys_header)
+                                       self.fname, self.is_sys_header)
                     best_size = size
         return best_token
 
@@ -245,19 +247,19 @@ def build_c_lexer():
     )
 
     lexer = Lexer()
+    lexer.add(Token.NEWLINE, r"\n", ignore=False)
+    lexer.add(Token.WHITESPACE, r"[ \t\v\f]+", ignore=False)
+    lexer.add(Token.NUMBER, r'\.?[0-9](?:[0-9$a-zA-Z_.]|(?:[eEpP][+-]))*')
     lexer.add(Token.DEFINED, r"defined")
     lexer.add(Token.IDENTIFIER, r"[$a-zA-Z_][$a-zA-Z0-9_]*")
-    lexer.add(Token.NUMBER, r'\.?[0-9]([0-9$a-zA-Z_.]|([eEpP][+-]))*')
-    lexer.add(Token.STRING_CONST, r'"([^"\\\n]|\\.)*"')
-    lexer.add(Token.CHAR_CONST, r"'([^'\\\n]|\\.)*'")
+    lexer.add(Token.STRING_CONST, r'"(?:[^"\\\n]|\\.)*"')
+    lexer.add(Token.CHAR_CONST, r"'(?:[^'\\\n]|\\.)*'")
     lexer.add(Token.HEADER_NAME, r"<[^>\n]*>", testfunc=include_matcher)
+    lexer.add(Token.LINE_COMMENT, r"//.*(?:$|(?=\n))", ignore=False)
+    lexer.add(Token.BLOCK_COMMENT, r"/\*(?:.|\n)*?\*/", ignore=False)
     lexer.add(Token.PUNCTUATOR,
               r"[<>=*/*%&^|!+-]=|<<==|>>==|\.\.\.|->|\+\+|--|<<|>>|&&|[|]{2}|##|"
               r"[{}\[\]()<>.&*+-~!/%^|=;:,?#]")
-    lexer.add(Token.NEWLINE, r"\n", ignore=False)
-    lexer.add(Token.WHITESPACE, r"[ \t\v\f]+", ignore=False)
-    lexer.add(Token.LINE_COMMENT, r"//.*($|(?=\n))", ignore=False)
-    lexer.add(Token.BLOCK_COMMENT, r"/\*(.|\n)*?\*/", ignore=False)
     return lexer
 
 
@@ -804,6 +806,8 @@ class Parser(object):
                 elif token.type is Token.IDENTIFIER:
                     args.append(token.string)
                     needs_comma = True
+                elif token == '...':
+                    args.append(token.string)
                 else:
                     raise ParseError(token, "Invalid token {} in arg list".format(token))
 
@@ -1007,6 +1011,8 @@ class FFICleaner(TreeModifier):
         self.generator = c_generator.CGenerator()
         self.defined_tags = set()
         self.cur_typedef_name = None
+        self.id_vals = {}  # Ordinary C identifiers (use just for enum values)
+        self.cur_enum_val = 0
 
     def visit_Typedef(self, node):
         # Visit typedecl hierarchy first
@@ -1026,6 +1032,7 @@ class FFICleaner(TreeModifier):
             node.name = '__autotag_' + self.cur_typedef_name
 
         if node.values:  # Is a definition
+            self.cur_enum_val = 0  # Reset per enum definition
             if node.name is None:
                 self.generic_visit(node)
             elif node.name in self.defined_tags:
@@ -1067,11 +1074,27 @@ class FFICleaner(TreeModifier):
     def visit_Enumerator(self, node):
         if node.value is not None:
             node.value = self.visit(node.value)
+            py_value = self._val_from_const(node.value)
+        else:
+            py_value = self.cur_enum_val
+
+        self.cur_enum_val = py_value + 1
+        self.id_vals[node.name] = py_value
+
         return node
 
-    @staticmethod
-    def _val_from_const(const):
-        assert isinstance(const, c_ast.Constant)
+    def _val_from_id(self, id):
+        try:
+            return self.id_vals[id.name]
+        except KeyError:
+            raise ConvertError("Unknown identifier '{}'".format(id.name))
+
+    def _val_from_const(self, const):
+        """Gets the python numeric value of a c_ast Constant (or ID)"""
+        assert isinstance(const, (c_ast.Constant, c_ast.ID))
+        if isinstance(const, c_ast.ID):
+            return self._val_from_id(const)
+
         if const.type == 'int':
             int_str = const.value.lower().rstrip('ul')
             if int_str.startswith('0x'):
@@ -1223,6 +1246,8 @@ class Generator(object):
             csource_chunk = r_stdcall2.sub(' volatile volatile const(', csource_chunk)
             csource_chunk = r_stdcall1.sub(' volatile volatile const ', csource_chunk)
             csource_chunk = r_cdecl.sub(' ', csource_chunk)
+
+            log.info("Parsing chunk '{}'".format(csource_chunk))
             chunk_tree = self.parse(csource_chunk)
 
             # HOOK: AST chunk
@@ -1290,7 +1315,7 @@ class Generator(object):
                 try:
                     py_src = ''.join(to_py_src(expr_node))
                 except ConvertError as e:
-                    warnings.warn(e)
+                    warnings.warn(str(e))
 
             except (plyparser.ParseError, AttributeError):
                 warnings.warn("Un-pythonable macro {}".format(macro.name))
@@ -1510,6 +1535,10 @@ def process_file(in_fname, out_fname, minify):
             f.write("{} = {}\n".format(macro.name, macro.py_src))
 
 
+def to_str_seq(arg):
+    return (arg,) if isinstance(arg, basestring) else arg
+
+
 def process_headers(header_paths, predef_path=None, update_cb=None, ignored_headers=(),
                     ignore_system_headers=False, debug_file=None, preamble=None, token_hooks=(),
                     ast_hooks=(), hook_groups=(), return_ast=False):
@@ -1558,8 +1587,8 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
     macro_rc : str
         Extracted macros expressed as Python source code.
     """
-    hook_groups = (hook_groups,) if isinstance(hook_groups, basestring) else hook_groups
-    header_paths = (header_paths,) if isinstance(header_paths, basestring) else header_paths
+    hook_groups = to_str_seq(hook_groups)
+    header_paths = to_str_seq(header_paths)
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
     if preamble:
@@ -1956,6 +1985,24 @@ class ParseHelper(object):
 
             if self.depth == depth:
                 return True if discard else buf
+
+
+def vc_pragma_hook(tokens):
+    """Remove __pragma() usage"""
+    ph = ParseHelper(tokens)
+
+    while True:
+        tokens = ph.read_until('__pragma')
+        log.info(tokens)
+        if not tokens:
+            raise StopIteration
+
+        for token in tokens:
+            yield token
+
+        # Throw away pragmas
+        ph.read_to('(', discard=True)
+        ph.read_to_depth(ph.depth-1, discard=True)
 
 
 def struct_func_hook(tokens):
