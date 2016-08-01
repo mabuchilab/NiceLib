@@ -1715,10 +1715,16 @@ def modify_pattern(tokens, pattern):
         raise TypeError("Incorrect keyword for modify_pattern."
                         "Allowed keywords are {}".format(allowed_keywords))
 
+    # Convert any strings that are paired with 'a' keywords to tokens
+    for i in range(len(pattern)):
+        keep, target = pattern[i]
+        if keep == 'a':
+            pattern[i] = (keep, lexer.read_token(target))
     it = iter(tokens)
     p_it = iter(pattern)
-    t = next(it)
     keep, target = next(p_it)
+    if keep !='a':
+        t = next(it)
     match_buf = []
     depth = 0
     pattern_completed = False
@@ -1731,7 +1737,14 @@ def modify_pattern(tokens, pattern):
         return False
 
     while True:
-        if isinstance(target, basestring) and target.startswith('~~') and target.endswith('~~'):
+        if keep == 'a':
+                # This target should be inserted
+                match_buf.append((keep, target))
+                try:
+                    keep, target = next(p_it)
+                except StopIteration:
+                    pattern_completed = True
+        elif isinstance(target, basestring) and target.startswith('~~') and target.endswith('~~'):
             found_end = False
             if target == '~~}~~':
                 left, right = '{', '}'
@@ -1783,13 +1796,14 @@ def modify_pattern(tokens, pattern):
             p_it = iter(pattern)
             keep, target = next(p_it)
             for keep_tok, buf_tok in match_buf:
-                if keep_tok == 'k':
+                if keep_tok in ('k', 'a'):
                     yield buf_tok
             match_buf = []
             pattern_completed = False
 
         try:
-            t = next(it)
+            if keep!='a':
+                t = next(it)
         except StopIteration:
             # Output pending buffers
             for keep_tok, buf_tok in match_buf:
