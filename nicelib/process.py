@@ -1011,6 +1011,8 @@ class FFICleaner(TreeModifier):
         self.generator = c_generator.CGenerator()
         self.defined_tags = set()
         self.cur_typedef_name = None
+        self.id_vals = {}  # Ordinary C identifiers (objects, enum constants, typedefs, func names)
+        self.cur_enum_val = 0
 
     def visit_Typedef(self, node):
         # Visit typedecl hierarchy first
@@ -1030,6 +1032,7 @@ class FFICleaner(TreeModifier):
             node.name = '__autotag_' + self.cur_typedef_name
 
         if node.values:  # Is a definition
+            self.cur_enum_val = 0  # Reset per enum definition
             if node.name is None:
                 self.generic_visit(node)
             elif node.name in self.defined_tags:
@@ -1071,11 +1074,27 @@ class FFICleaner(TreeModifier):
     def visit_Enumerator(self, node):
         if node.value is not None:
             node.value = self.visit(node.value)
+            py_value = self._val_from_const(node.value)
+        else:
+            py_value = self.cur_enum_val
+
+        self.cur_enum_val = py_value + 1
+        self.id_vals[node.name] = py_value
+
         return node
 
-    @staticmethod
-    def _val_from_const(const):
-        assert isinstance(const, c_ast.Constant)
+    def _val_from_id(self, id):
+        try:
+            return self.id_vals[id.name]
+        except KeyError:
+            raise ConvertError("Unknown identifier '{}'".format(id.name))
+
+    def _val_from_const(self, const):
+        """Gets the python numeric value of a c_ast Constant (or ID)"""
+        assert isinstance(const, (c_ast.Constant, c_ast.ID))
+        if isinstance(const, c_ast.ID):
+            return self._val_from_id(const)
+
         if const.type == 'int':
             int_str = const.value.lower().rstrip('ul')
             if int_str.startswith('0x'):
