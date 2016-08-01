@@ -132,6 +132,9 @@ class Token(object):
 
         return self.string == other.string and self.type == other.type
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __str__(self):
         string = '' if self.string == '\n' else self.string
         return '{}[{}:{}:{}]({})'.format(self.type.name, self.fname, self.line, self.col, string)
