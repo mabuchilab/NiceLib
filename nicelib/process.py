@@ -1223,6 +1223,8 @@ class Generator(object):
             csource_chunk = r_stdcall2.sub(' volatile volatile const(', csource_chunk)
             csource_chunk = r_stdcall1.sub(' volatile volatile const ', csource_chunk)
             csource_chunk = r_cdecl.sub(' ', csource_chunk)
+
+            log.info("Parsing chunk '{}'".format(csource_chunk))
             chunk_tree = self.parse(csource_chunk)
 
             # HOOK: AST chunk
