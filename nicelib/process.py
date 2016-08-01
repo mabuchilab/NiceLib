@@ -1535,6 +1535,10 @@ def process_file(in_fname, out_fname, minify):
             f.write("{} = {}\n".format(macro.name, macro.py_src))
 
 
+def to_str_seq(arg):
+    return (arg,) if isinstance(arg, basestring) else arg
+
+
 def process_headers(header_paths, predef_path=None, update_cb=None, ignored_headers=(),
                     ignore_system_headers=False, debug_file=None, preamble=None, token_hooks=(),
                     ast_hooks=(), hook_groups=(), return_ast=False):
@@ -1583,8 +1587,8 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
     macro_rc : str
         Extracted macros expressed as Python source code.
     """
-    hook_groups = (hook_groups,) if isinstance(hook_groups, basestring) else hook_groups
-    header_paths = (header_paths,) if isinstance(header_paths, basestring) else header_paths
+    hook_groups = to_str_seq(hook_groups)
+    header_paths = to_str_seq(header_paths)
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
     if preamble:
