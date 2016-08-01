@@ -1787,8 +1787,7 @@ def modify_pattern(tokens, pattern):
                     p_it = iter(pattern)
                     keep, target = next(p_it)
                     for keep_tok, buf_tok in match_buf:
-                        if keep_tok == 'k':
-                            yield buf_tok
+                        yield buf_tok
                     match_buf = []
                 yield t
 
