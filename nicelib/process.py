@@ -804,6 +804,8 @@ class Parser(object):
                 elif token.type is Token.IDENTIFIER:
                     args.append(token.string)
                     needs_comma = True
+                elif token == '...':
+                    args.append(token.string)
                 else:
                     raise ParseError(token, "Invalid token {} in arg list".format(token))
 
