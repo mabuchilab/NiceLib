@@ -106,13 +106,13 @@ class ParseError(PreprocessorError):
 
 
 class Token(object):
-    def __init__(self, type, string, line=0, col=0, fpath='<string>', from_sys_header=False):
+    def __init__(self, type, string, line=0, col=0, fpath='<string>', fname='<string>', from_sys_header=False):
         self.type = type
         self.string = string
         self.line = line
         self.col = col
         self.fpath = fpath
-        self.fname = os.path.basename(self.fpath[-17:])
+        self.fname = fname
         self.from_sys_header = from_sys_header
 
     def copy(self, from_sys_header=None):
@@ -132,6 +132,9 @@ class Token(object):
 
         return self.string == other.string and self.type == other.type
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __str__(self):
         string = '' if self.string == '\n' else self.string
         return '{}[{}:{}:{}]({})'.format(self.type.name, self.fname, self.line, self.col, string)
@@ -147,20 +150,20 @@ NON_TOKENS = (Token.WHITESPACE, Token.NEWLINE, Token.LINE_COMMENT, Token.BLOCK_C
 
 class Lexer(object):
     def __init__(self):
-        self.regexes = OrderedDict()
-        self.testfuncs = {}
+        self.token_info = []
         self.ignored = []
 
     def add(self, name, regex_str, ignore=False, testfunc=None):
-        self.regexes[name] = re.compile(regex_str)
+        self.token_info.append((name, re.compile(regex_str), testfunc))
         if ignore:
             self.ignored.append(name)
-        self.testfuncs[name] = testfunc
 
     def lex(self, text, fpath='<string>', is_sys_header=False):
         self.line = 1
         self.col = 1
         self.fpath = os.path.normcase(fpath)
+        self.fname = os.path.basename(self.fpath[-17:])  # Do this once
+
         self.esc_newlines = defaultdict(int)
         self.is_sys_header = is_sys_header
 
@@ -202,17 +205,16 @@ class Lexer(object):
         """Read the next token from text, starting at pos"""
         best_token = None
         best_size = 0
-        for token_type, regex in self.regexes.items():
+        for token_type, regex, testfunc in self.token_info:
             match = regex.match(text, pos)
             if match:
-                testfunc = self.testfuncs[token_type]
                 if testfunc and not testfunc(self.tokens):
                     continue
 
                 size = match.end() - match.start()
                 if size > best_size:
                     best_token = Token(token_type, match.group(0), self.line, self.col, self.fpath,
-                                       self.is_sys_header)
+                                       self.fname, self.is_sys_header)
                     best_size = size
         return best_token
 
@@ -245,19 +247,19 @@ def build_c_lexer():
     )
 
     lexer = Lexer()
+    lexer.add(Token.NEWLINE, r"\n", ignore=False)
+    lexer.add(Token.WHITESPACE, r"[ \t\v\f]+", ignore=False)
+    lexer.add(Token.NUMBER, r'\.?[0-9](?:[0-9$a-zA-Z_.]|(?:[eEpP][+-]))*')
     lexer.add(Token.DEFINED, r"defined")
     lexer.add(Token.IDENTIFIER, r"[$a-zA-Z_][$a-zA-Z0-9_]*")
-    lexer.add(Token.NUMBER, r'\.?[0-9]([0-9$a-zA-Z_.]|([eEpP][+-]))*')
-    lexer.add(Token.STRING_CONST, r'"([^"\\\n]|\\.)*"')
-    lexer.add(Token.CHAR_CONST, r"'([^'\\\n]|\\.)*'")
+    lexer.add(Token.STRING_CONST, r'"(?:[^"\\\n]|\\.)*"')
+    lexer.add(Token.CHAR_CONST, r"'(?:[^'\\\n]|\\.)*'")
     lexer.add(Token.HEADER_NAME, r"<[^>\n]*>", testfunc=include_matcher)
+    lexer.add(Token.LINE_COMMENT, r"//.*(?:$|(?=\n))", ignore=False)
+    lexer.add(Token.BLOCK_COMMENT, r"/\*(?:.|\n)*?\*/", ignore=False)
     lexer.add(Token.PUNCTUATOR,
               r"[<>=*/*%&^|!+-]=|<<==|>>==|\.\.\.|->|\+\+|--|<<|>>|&&|[|]{2}|##|"
               r"[{}\[\]()<>.&*+-~!/%^|=;:,?#]")
-    lexer.add(Token.NEWLINE, r"\n", ignore=False)
-    lexer.add(Token.WHITESPACE, r"[ \t\v\f]+", ignore=False)
-    lexer.add(Token.LINE_COMMENT, r"//.*($|(?=\n))", ignore=False)
-    lexer.add(Token.BLOCK_COMMENT, r"/\*(.|\n)*?\*/", ignore=False)
     return lexer
 
 
@@ -1294,7 +1296,7 @@ class Generator(object):
                 try:
                     py_src = ''.join(to_py_src(expr_node))
                 except ConvertError as e:
-                    warnings.warn(e)
+                    warnings.warn(str(e))
 
             except (plyparser.ParseError, AttributeError):
                 warnings.warn("Un-pythonable macro {}".format(macro.name))
