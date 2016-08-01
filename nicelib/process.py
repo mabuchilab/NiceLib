@@ -1587,6 +1587,10 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
     macro_rc : str
         Extracted macros expressed as Python source code.
     """
+    try:
+        iter(token_hooks)
+    except:
+        token_hooks = (token_hooks, )
     hook_groups = to_str_seq(hook_groups)
     header_paths = to_str_seq(header_paths)
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
