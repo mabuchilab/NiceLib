@@ -1937,6 +1937,24 @@ class ParseHelper(object):
                 return True if discard else buf
 
 
+def vc_pragma_hook(tokens):
+    """Remove __pragma() usage"""
+    ph = ParseHelper(tokens)
+
+    while True:
+        tokens = ph.read_until('__pragma')
+        log.info(tokens)
+        if not tokens:
+            raise StopIteration
+
+        for token in tokens:
+            yield token
+
+        # Throw away pragmas
+        ph.read_to('(', discard=True)
+        ph.read_to_depth(ph.depth-1, discard=True)
+
+
 def struct_func_hook(tokens):
     """Removes function definitions from inside struct definitions.
 
