@@ -1011,7 +1011,7 @@ class FFICleaner(TreeModifier):
         self.generator = c_generator.CGenerator()
         self.defined_tags = set()
         self.cur_typedef_name = None
-        self.id_vals = {}  # Ordinary C identifiers (objects, enum constants, typedefs, func names)
+        self.id_vals = {}  # Ordinary C identifiers (use just for enum values)
         self.cur_enum_val = 0
 
     def visit_Typedef(self, node):
