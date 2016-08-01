@@ -1707,6 +1707,14 @@ def modify_pattern(tokens, pattern):
 
         There is some more advanced functionality which is currently undocumented.
     """
+    # Check that only the correct keywords are passed
+    allowed_keywords = ('a', 'k', 'd', 'kd', 'kk', 'dk', 'dd')
+    try:
+        assert all(pattern_element[0] in allowed_keywords for pattern_element in pattern)
+    except:
+        raise TypeError("Incorrect keyword for modify_pattern."
+                        "Allowed keywords are {}".format(allowed_keywords))
+
     it = iter(tokens)
     p_it = iter(pattern)
     t = next(it)
