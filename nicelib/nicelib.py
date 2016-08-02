@@ -378,6 +378,12 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
                 else:
                     arg = ffi.new(argtype)
                 outargs.append((arg, lambda o: o[0]))
+            elif info == 'bufout':
+                if not (argtype.kind == 'pointer' and argtype.item.kind == 'pointer' and
+                        argtype.item.item.kind == 'primitive'):
+                    raise TypeError("'bufout' applies only to type 'char**'")
+                arg = ffi.new(argtype)
+                outargs.append((arg, lambda pbuf: ffi.string(pbuf[0])))
             elif info.startswith('buf'):
                 buflen = (buflens if len(info) == 3 else solo_buflens).pop(0)
                 arg = ffi.new('char[]', buflen)
