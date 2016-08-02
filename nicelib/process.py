@@ -1919,8 +1919,8 @@ def add_line_directive_hook(tokens):
 
 
 def declspec_hook(tokens):
-    """Removes all occurences of `__declspec(dllimport)``"""
-    return remove_pattern(tokens, ['__declspec', '(', 'dllimport', ')'])
+    """Removes all occurences of `__declspec(...)``"""
+    return remove_pattern(tokens, ['__declspec', '(', '~~)~~'])
 
 
 def extern_c_hook(tokens):
