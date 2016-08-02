@@ -19,7 +19,8 @@ from pycparser import c_parser, c_generator, c_ast, plyparser
 import cffi
 import cffi.commontypes
 from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
-import build
+
+from . import build
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
 
