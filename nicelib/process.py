@@ -19,6 +19,7 @@ from pycparser import c_parser, c_generator, c_ast, plyparser
 import cffi
 import cffi.commontypes
 from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
+import build
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
 
@@ -1623,7 +1624,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         return header_src, macro_src
 
 
-def generate_wrapper(header_paths, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
+def generate_wrapper(header_info, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
                      fill_handle=True, **kwds):
     """Generate a skeleton library wrapper.
 
@@ -1633,7 +1634,7 @@ def generate_wrapper(header_paths, outfile, prefix=(), add_ret_ignore=False, nic
 
     Parameters
     ----------
-    header_paths, **kwds :
+    header_info, **kwds :
         These get passed directly to `process_headers()`
     outfile : str or file-like object
         File (or filename) where output is written.
@@ -1651,8 +1652,12 @@ def generate_wrapper(header_paths, outfile, prefix=(), add_ret_ignore=False, nic
     """
     if isinstance(outfile, basestring):
         with open(outfile, 'w') as f:
-            return generate_wrapper(header_paths, f, prefix, add_ret_ignore, niceobj_prefix,
+            return generate_wrapper(header_info, f, prefix, add_ret_ignore, niceobj_prefix,
                                     fill_handle, **kwds)
+
+    print("Searching for headers...")
+    header_paths, predef_path = build.handle_header_path(header_info)
+    print("Found {}".format(header_paths))
 
     _, _, tree = process_headers(header_paths, return_ast=True, **kwds)
     toplevel_sigs = []
