@@ -1929,7 +1929,8 @@ def add_line_directive_hook(tokens):
         if (t.fpath, t.line) != (cur_fpath, expected_line):
             if high_mark > low_mark >= 0:
                 # For some reason the lexer's eating the trailing newline so we use two
-                line_tokens = lexer.lex('\n#line {} "{}"\n\n'.format(chunk_start_line, cur_fpath))
+                line_tokens = lexer.lex('\n#line {} "{}"\n\n'.format(chunk_start_line + low_mark,
+                                                                     cur_fpath))
                 out_tokens.extend(line_tokens)
                 out_tokens.extend(chunk[low_mark:high_mark])
             cur_fpath = t.fpath
