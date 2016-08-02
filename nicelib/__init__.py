@@ -49,7 +49,6 @@ class LibInfo(object):
             self._defs = lib_module.defs
             self.__dict__.update(self._defs)
         else:
-            print("Stuff is None!!")
             self._ffi = None
             self._lib = None
             self._defs = None
@@ -66,8 +65,6 @@ def _load_or_build_lib(name, pkg):
         build_module.build()
         lib_module = import_module('._{}lib'.format(name), pkg)
 
-    if not lib_module:
-        print("No lib_module!!")
     return LibInfo(lib_module)
 
 
