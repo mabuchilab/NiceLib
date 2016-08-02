@@ -608,7 +608,7 @@ class LibMeta(type):
 
                     ret_wrapper = flags['ret_wrap']
                     if isinstance(ret_wrapper, basestring):
-                        ret_wrapper = ret_wrappers[flags['ret_wrap']]
+                        flags['ret_wrap'] = ret_wrappers[flags['ret_wrap']]
 
                     func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, **flags)
                     repr_str = _func_repr_str(ffi, func)
