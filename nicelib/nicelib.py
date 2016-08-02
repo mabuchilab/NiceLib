@@ -11,6 +11,7 @@ from inspect import isfunction, getargspec
 from . import test_mode_is, _test_mode
 
 __all__ = ['NiceLib', 'NiceObjectDef']
+FLAGS = ('prefix', 'ret_wrap', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
 
 
 class StateNode(object):
@@ -245,8 +246,9 @@ def _wrap_inarg(ffi, argtype, arg):
         return arg
 
 
-def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buflen, use_numpy,
-                  free_buf):
+def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buflen,
+                  use_numpy, free_buf):
+    default_buflen = buflen
     ret_wrap_args = set(getargspec(ret_wrap).args[1:])
 
     def bufout_wrap(buf_ptr):
@@ -449,29 +451,19 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
 
 # WARNING uses some stack frame hackery; should probably make use of this syntax optional
 class NiceObjectDef(object):
-    def __init__(self, attrs=None, n_handles=1, init=None, prefix=None, ret_wrap=None, buflen=None,
-                 doc=None, use_numpy=None, free_buf=None):
+    def __init__(self, attrs=None, n_handles=1, init=None, doc=None, **flags):
         self.doc = doc
         self.attrs = attrs
         self.n_handles = n_handles
         self.init = init
-        self.prefix = prefix
-        self.ret_wrap = ret_wrap
-
-        self.flags = {}
-        if prefix is not None:
-            self.flags['prefix'] = prefix
-        if ret_wrap is not None:
-            self.flags['ret_wrap'] = ret_wrap
-        if buflen is not None:
-            self.flags['buflen'] = buflen
-        if use_numpy is not None:
-            self.flags['use_numpy'] = use_numpy
-        if free_buf is not None:
-            self.flags['free_buf'] = free_buf
 
         if attrs is not None:
             self.names = set(attrs.keys())
+
+        bad_kwds = [k for k in flags if k not in FLAGS]
+        if bad_kwds:
+            raise ValueError("Unknown flags {}".format(bad_kwds))
+        self.flags = flags
 
     def set_signatures(self, sigs={}, **kwds):
         self.attrs = sigs
@@ -528,12 +520,10 @@ class LibMeta(type):
         ffi = classdict['_ffi']
         lib = classdict['_ffilib']
         defs = mro_lookup('_defs')
-        prefixes = mro_lookup('_prefix')
-        ret_wrap = mro_lookup('_ret_wrap')
-        struct_maker = mro_lookup('_struct_maker') or (ffi.new if ffi else None)
-        buflen = mro_lookup('_buflen')
-        use_numpy = mro_lookup('_use_numpy')
-        free_buf = mro_lookup('_free_buf')
+
+        base_flags = {name: mro_lookup('_' + name) for name in FLAGS}
+        if ffi and not base_flags['struct_maker']:
+            base_flags['struct_maker'] = ffi.new
 
         dir_lib = []
         for name in dir(lib):
@@ -542,10 +532,10 @@ class LibMeta(type):
                 dir_lib.append(name)
 
         # Add default empty prefix
-        if isinstance(prefixes, basestring):
-            prefixes = (prefixes, '')
+        if isinstance(base_flags['prefix'], basestring):
+            base_flags['prefix'] = (base_flags['prefix'], '')
         else:
-            prefixes = tuple(prefixes) + ('',)
+            base_flags['prefix'] = tuple(base_flags['prefix']) + ('',)
 
         # Unpack NiceObjectDef sigs into the classdict
         niceobjectdefs = {}  # name: NiceObjectDef
@@ -580,8 +570,7 @@ class LibMeta(type):
                     repr_str = func.__doc__ or "{}(??) -> ??".format(name)
                 else:
                     sig_tup = value
-                    flags = {'prefix': prefixes, 'ret_wrap': ret_wrap, 'buflen': buflen,
-                             'use_numpy': use_numpy, 'free_buf': free_buf}
+                    flags = base_flags.copy()
                     if name in func_to_niceobj:
                         flags.update(func_to_niceobj[name].flags)
 
@@ -621,9 +610,7 @@ class LibMeta(type):
                     if isinstance(ret_wrapper, basestring):
                         ret_wrapper = ret_wrappers[flags['ret_wrap']]
 
-                    func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, ret_wrapper,
-                                         struct_maker, flags['buflen'], flags['use_numpy'],
-                                         flags['free_buf'])
+                    func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, **flags)
                     repr_str = _func_repr_str(ffi, func)
 
                 # Save for use by niceobjs
@@ -640,7 +627,7 @@ class LibMeta(type):
         # Add macro defs
         if defs:
             for name, attr in defs.items():
-                for prefix in prefixes:
+                for prefix in flags['prefix']:
                     if name.startswith(prefix):
                         shortname = name[len(prefix):]
                         if shortname in classdict:
