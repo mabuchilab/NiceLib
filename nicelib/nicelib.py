@@ -515,7 +515,11 @@ class LibMeta(type):
         buflen = mro_lookup('_buflen')
         use_numpy = mro_lookup('_use_numpy')
 
-        dir_lib = dir(lib)
+        dir_lib = []
+        for name in dir(lib):
+            attr = getattr(lib, name)
+            if ffi and isinstance(attr, ffi.CData) and ffi.typeof(attr).kind != 'function':
+                dir_lib.append(name)
 
         # Add default empty prefix
         if isinstance(prefixes, basestring):
@@ -592,8 +596,6 @@ class LibMeta(type):
                         raise AttributeError("No lib function found with a name ending in '{}', wi"
                                              "th any of these prefixes: {}".format(name,
                                                                                    flags['prefix']))
-
-                    dir_lib.remove(func_name)
 
                     ret_wrapper = flags['ret_wrap']
                     if isinstance(ret_wrapper, basestring):
