@@ -1805,7 +1805,7 @@ def modify_pattern(tokens, pattern):
         elif isinstance(target, basestring) and target.startswith('~~') and target.endswith('~~'):
             found_end = False
             right = target[2]
-            left = {'}': '{', ')': '(', '[': ']'}[right]
+            left = {'}': '{', ')': '(', ']': '['}[right]
 
             if t.string == left:
                 depth += 1
