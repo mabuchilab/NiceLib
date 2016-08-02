@@ -584,7 +584,7 @@ class LibMeta(type):
 
                         # Allow use of 'ret' as a shorthand for 'ret_wrap'
                         if 'ret' in func_flags:
-                            func_flags['ret_wrap'] = func_flags['ret']
+                            func_flags['ret_wrap'] = func_flags.pop('ret')
 
                         flags.update(func_flags)
                         sig_tup = sig_tup[:-1]
