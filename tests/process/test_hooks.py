@@ -1,6 +1,6 @@
 from util import local_fpath
 from nicelib.process import (lexer, add_line_directive_hook, declspec_hook, extern_c_hook,
-                             enum_type_hook, struct_func_hook)
+                             enum_type_hook, struct_func_hook, vc_pragma_hook)
 
 
 def use_hook(hook, src):
@@ -73,3 +73,25 @@ def test_struct_func_hook():
 
 
 # typedef_adder
+
+
+
+#
+# vc_pragma
+#
+VC_PRAGMA_SRC = """
+#define OPEN    __pragma(pack(push, 8))
+#define CLOSE   __pragma(pack(pop))
+
+OPEN
+typedef unsigned int size_t;
+CLOSE
+"""
+
+def test_vc_pragma_hook():
+    src = use_hook(vc_pragma_hook, VC_PRAGMA_SRC)
+    print(src)
+    assert '__pragma' not in src
+    assert '(' not in src
+    assert ')' not in src
+    assert 'pack' not in src
