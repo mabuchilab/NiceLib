@@ -305,17 +305,17 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
             if argtype == '...':
                 continue
 
-            elif sig.startswith(('buf', 'arr')):
-                if len(sig) > 3:
-                    try:
-                        assert sig[3] == '[' and sig[-1] == ']'
-                        num = int(sig[4:-1])
-                        assert num > 0
-                    except (AssertionError, ValueError):
-                        raise ValueError("Bad sig element '{}'".format(sig))
-                    solo_buflens.append(num)
-                else:
-                    n_paired_bufs += 1
+            elif sig in ('buf', 'arr'):
+                n_paired_bufs += 1
+
+            elif sig.startswith(('buf[', 'arr[')):
+                try:
+                    assert sig[3] == '[' and sig[-1] == ']'
+                    num = int(sig[4:-1])
+                    assert num > 0
+                except (AssertionError, ValueError):
+                    raise ValueError("Bad sig element '{}'".format(sig))
+                solo_buflens.append(num)
 
             elif sig.startswith('len'):
                 if len(sig) == 3:
