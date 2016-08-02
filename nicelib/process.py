@@ -1974,11 +1974,11 @@ class ParseHelper(object):
             if token is None:
                 return False if discard else buf
 
-            if not discard:
-                buf.append(token)
-
             if token in tokens:
                 return True if discard else buf
+
+            if not discard:
+                buf.append(token)
 
             self.pop()
 
