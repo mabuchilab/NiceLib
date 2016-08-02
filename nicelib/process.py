@@ -1734,11 +1734,18 @@ def modify_pattern(tokens, pattern):
         tokens; when the first target is matched, we then try matching the rest in order. If the
         whole pattern is matched, each target's corresponding ``keep`` indicates whether the token
         should be kept in the sequence, or discarded. ``keep`` is a string, where 'k' means 'keep',
-        while anything else means discard.
+        'd' means discard and 'a' means add.
 
         A ``target`` can be either a string or a `TokenType`.
 
-        There is some more advanced functionality which is currently undocumented.
+        There is also some functionality for dealing with blocks enclosed in
+        curly braces {}.
+
+        Passing a sequence of the type ``((keep_start, '{'), ('keep_end', '~~}~~'))``
+        Will look keep the opening ``{`` according to ``keep_start``.
+        ``keep_end`` is a two letter string, the first letter of which indicates
+        whether the contents of the block enclosed in brackets should be kept,
+        and the second of which indicates is the closing ``}`` should be kept.
     """
     # Check that only the correct keywords are passed
     allowed_keywords = ('a', 'k', 'd', 'kd', 'kk', 'dk', 'dd')
