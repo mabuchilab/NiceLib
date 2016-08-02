@@ -16,17 +16,24 @@ def use_hook(hook, src):
 # declspec
 #
 DECLSPEC_SRC = """
-__declspec(dllimport) int x;
-__declspec(dllexport) float y;
+__declspec(dllimport) int xx;
+__declspec(dllexport) float yy;
 __declspec(noreturn) void func(void);
+__declspec(deprecated(_Text)) int blah();
 """
 
 def test_declspec_hook():
     src = use_hook(declspec_hook, DECLSPEC_SRC)
+    print(src)
     assert '__declspec' not in src
     assert 'dllimport' not in src
     assert 'dllexport' not in src
     assert 'noreturn' not in src
+    assert 'xx' in src
+    assert 'yy' in src
+    assert 'void' in src
+    assert 'func' in src
+    assert 'blah' in src
 
 
 #
