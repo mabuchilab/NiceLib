@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015-2016 Nate Bogdanowicz
+from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
+
 from builtins import str, zip
 from past.builtins import basestring
 from future.utils import with_metaclass
