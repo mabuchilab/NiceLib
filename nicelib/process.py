@@ -19,6 +19,7 @@ from pycparser import c_parser, c_generator, c_ast, plyparser
 import cffi
 import cffi.commontypes
 from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
+import build
 
 '__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
 
@@ -1602,6 +1603,10 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
     macro_rc : str
         Extracted macros expressed as Python source code.
     """
+    try:
+        iter(token_hooks)
+    except:
+        token_hooks = (token_hooks, )
     hook_groups = to_str_seq(hook_groups)
     header_paths = to_str_seq(header_paths)
     source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
@@ -1634,7 +1639,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         return header_src, macro_src
 
 
-def generate_wrapper(header_paths, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
+def generate_wrapper(header_info, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
                      fill_handle=True, **kwds):
     """Generate a skeleton library wrapper.
 
@@ -1644,7 +1649,7 @@ def generate_wrapper(header_paths, outfile, prefix=(), add_ret_ignore=False, nic
 
     Parameters
     ----------
-    header_paths, **kwds :
+    header_info, **kwds :
         These get passed directly to `process_headers()`
     outfile : str or file-like object
         File (or filename) where output is written.
@@ -1662,8 +1667,12 @@ def generate_wrapper(header_paths, outfile, prefix=(), add_ret_ignore=False, nic
     """
     if isinstance(outfile, basestring):
         with open(outfile, 'w') as f:
-            return generate_wrapper(header_paths, f, prefix, add_ret_ignore, niceobj_prefix,
+            return generate_wrapper(header_info, f, prefix, add_ret_ignore, niceobj_prefix,
                                     fill_handle, **kwds)
+
+    print("Searching for headers...")
+    header_paths, predef_path = build.handle_header_path(header_info)
+    print("Found {}".format(header_paths))
 
     _, _, tree = process_headers(header_paths, return_ast=True, **kwds)
     toplevel_sigs = []
@@ -1745,16 +1754,37 @@ def modify_pattern(tokens, pattern):
         tokens; when the first target is matched, we then try matching the rest in order. If the
         whole pattern is matched, each target's corresponding ``keep`` indicates whether the token
         should be kept in the sequence, or discarded. ``keep`` is a string, where 'k' means 'keep',
-        while anything else means discard.
+        'd' means discard and 'a' means add.
 
         A ``target`` can be either a string or a `TokenType`.
 
-        There is some more advanced functionality which is currently undocumented.
+        There is also some functionality for dealing with blocks enclosed in
+        curly braces {}.
+
+        Passing a sequence of the type ``((keep_start, '{'), ('keep_end', '~~}~~'))``
+        Will look keep the opening ``{`` according to ``keep_start``.
+        ``keep_end`` is a two letter string, the first letter of which indicates
+        whether the contents of the block enclosed in brackets should be kept,
+        and the second of which indicates is the closing ``}`` should be kept.
     """
+    # Check that only the correct keywords are passed
+    allowed_keywords = ('a', 'k', 'd', 'kd', 'kk', 'dk', 'dd')
+    try:
+        assert all(pattern_element[0] in allowed_keywords for pattern_element in pattern)
+    except:
+        raise TypeError("Incorrect keyword for modify_pattern."
+                        "Allowed keywords are {}".format(allowed_keywords))
+
+    # Convert any strings that are paired with 'a' keywords to tokens
+    for i in range(len(pattern)):
+        keep, target = pattern[i]
+        if keep == 'a':
+            pattern[i] = (keep, lexer.read_token(target))
     it = iter(tokens)
     p_it = iter(pattern)
-    t = next(it)
     keep, target = next(p_it)
+    if keep !='a':
+        t = next(it)
     match_buf = []
     depth = 0
     pattern_completed = False
@@ -1767,7 +1797,14 @@ def modify_pattern(tokens, pattern):
         return False
 
     while True:
-        if isinstance(target, basestring) and target.startswith('~~') and target.endswith('~~'):
+        if keep == 'a':
+                # This target should be inserted
+                match_buf.append((keep, target))
+                try:
+                    keep, target = next(p_it)
+                except StopIteration:
+                    pattern_completed = True
+        elif isinstance(target, basestring) and target.startswith('~~') and target.endswith('~~'):
             found_end = False
             if target == '~~}~~':
                 left, right = '{', '}'
@@ -1810,8 +1847,7 @@ def modify_pattern(tokens, pattern):
                     p_it = iter(pattern)
                     keep, target = next(p_it)
                     for keep_tok, buf_tok in match_buf:
-                        if keep_tok == 'k':
-                            yield buf_tok
+                        yield buf_tok
                     match_buf = []
                 yield t
 
@@ -1819,13 +1855,14 @@ def modify_pattern(tokens, pattern):
             p_it = iter(pattern)
             keep, target = next(p_it)
             for keep_tok, buf_tok in match_buf:
-                if keep_tok == 'k':
+                if keep_tok in ('k', 'a'):
                     yield buf_tok
             match_buf = []
             pattern_completed = False
 
         try:
-            t = next(it)
+            if keep!='a':
+                t = next(it)
         except StopIteration:
             # Output pending buffers
             for keep_tok, buf_tok in match_buf:
