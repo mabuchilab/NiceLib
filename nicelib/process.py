@@ -19,8 +19,7 @@ from pycparser import c_parser, c_generator, c_ast, plyparser
 import cffi
 import cffi.commontypes
 from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
-
-from . import build
+from .util import handle_header_path
 
 TokenType = Enum('TokenType', 'DEFINED IDENTIFIER NUMBER STRING_CONST CHAR_CONST HEADER_NAME '
                  'PUNCTUATOR NEWLINE WHITESPACE LINE_COMMENT BLOCK_COMMENT')
@@ -1670,7 +1669,7 @@ def generate_wrapper(header_info, outfile, prefix=(), add_ret_ignore=False, nice
                                     fill_handle, **kwds)
 
     print("Searching for headers...")
-    header_paths, predef_path = build.handle_header_path(header_info)
+    header_paths, predef_path = handle_header_path(header_info)
     print("Found {}".format(header_paths))
 
     _, _, tree = process_headers(header_paths, return_ast=True, **kwds)
