@@ -245,8 +245,19 @@ def _wrap_inarg(ffi, argtype, arg):
         return arg
 
 
-def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buflen, use_numpy):
+def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buflen, use_numpy,
+                  free_buf):
     ret_wrap_args = set(getargspec(ret_wrap).args[1:])
+
+    def bufout_wrap(buf_ptr):
+        """buf_ptr is a char**"""
+        if buf_ptr[0] == ffi.NULL:
+            return None
+
+        string = ffi.string(buf_ptr[0])
+        if free_buf:
+            free_buf(buf_ptr[0])
+        return string
 
     def c_to_numpy_array(c_arr, size):
         import numpy as np
@@ -383,7 +394,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
                         argtype.item.item.kind == 'primitive'):
                     raise TypeError("'bufout' applies only to type 'char**'")
                 arg = ffi.new(argtype)
-                outargs.append((arg, lambda pbuf: ffi.string(pbuf[0])))
+                outargs.append((arg, bufout_wrap))
             elif info.startswith('buf'):
                 buflen = (buflens if len(info) == 3 else solo_buflens).pop(0)
                 arg = ffi.new('char[]', buflen)
@@ -439,7 +450,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, ret_wrap, struct_maker, default_buf
 # WARNING uses some stack frame hackery; should probably make use of this syntax optional
 class NiceObjectDef(object):
     def __init__(self, attrs=None, n_handles=1, init=None, prefix=None, ret_wrap=None, buflen=None,
-                 doc=None, use_numpy=None):
+                 doc=None, use_numpy=None, free_buf=None):
         self.doc = doc
         self.attrs = attrs
         self.n_handles = n_handles
@@ -456,6 +467,8 @@ class NiceObjectDef(object):
             self.flags['buflen'] = buflen
         if use_numpy is not None:
             self.flags['use_numpy'] = use_numpy
+        if free_buf is not None:
+            self.flags['free_buf'] = free_buf
 
         if attrs is not None:
             self.names = set(attrs.keys())
@@ -520,6 +533,7 @@ class LibMeta(type):
         struct_maker = mro_lookup('_struct_maker') or (ffi.new if ffi else None)
         buflen = mro_lookup('_buflen')
         use_numpy = mro_lookup('_use_numpy')
+        free_buf = mro_lookup('_free_buf')
 
         dir_lib = []
         for name in dir(lib):
@@ -567,7 +581,7 @@ class LibMeta(type):
                 else:
                     sig_tup = value
                     flags = {'prefix': prefixes, 'ret_wrap': ret_wrap, 'buflen': buflen,
-                             'use_numpy': use_numpy}
+                             'use_numpy': use_numpy, 'free_buf': free_buf}
                     if name in func_to_niceobj:
                         flags.update(func_to_niceobj[name].flags)
 
@@ -608,7 +622,8 @@ class LibMeta(type):
                         ret_wrapper = ret_wrappers[flags['ret_wrap']]
 
                     func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, ret_wrapper,
-                                         struct_maker, flags['buflen'], flags['use_numpy'])
+                                         struct_maker, flags['buflen'], flags['use_numpy'],
+                                         flags['free_buf'])
                     repr_str = _func_repr_str(ffi, func)
 
                 # Save for use by niceobjs
@@ -779,6 +794,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _struct_maker = None  # ffi.new
     _buflen = 512
     _use_numpy = False
+    _free_buf = None
     _ret_wrap = 'return'
 
     def _ret_return(retval):
