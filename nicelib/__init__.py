@@ -103,7 +103,7 @@ def load_lib(name, pkg):
     return lib_module
 
 
-from .nicelib import NiceLib, NiceObject, NiceObjectDef
+from .nicelib import NiceLib, NiceObjectDef
 from .build import build_lib
 from .process import generate_wrapper
 
