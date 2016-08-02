@@ -1784,7 +1784,7 @@ def modify_pattern(tokens, pattern):
     it = iter(tokens)
     p_it = iter(pattern)
     keep, target = next(p_it)
-    if keep !='a':
+    if keep != 'a':
         t = next(it)
     match_buf = []
     depth = 0
@@ -1862,7 +1862,7 @@ def modify_pattern(tokens, pattern):
             pattern_completed = False
 
         try:
-            if keep!='a':
+            if keep != 'a':
                 t = next(it)
         except StopIteration:
             # Output pending buffers
