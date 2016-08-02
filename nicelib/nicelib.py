@@ -503,11 +503,11 @@ class LibMeta(type):
         if '_info' in classdict:
             info = classdict['_info']
             classdict['_ffi'] = info._ffi
-            classdict['_lib'] = info._lib
+            classdict['_ffilib'] = info._ffilib
             classdict['_defs'] = info._defs
 
         ffi = classdict['_ffi']
-        lib = classdict['_lib']
+        lib = classdict['_ffilib']
         defs = mro_lookup('_defs')
         prefixes = mro_lookup('_prefix')
         ret_wrap = mro_lookup('_ret_wrap')
@@ -645,7 +645,7 @@ class LibMeta(type):
             Record.ensure_created()
             value = Record.record.get_attr(name)
         else:
-            value = getattr(self._lib, name)
+            value = getattr(self._ffilib, name)
             if test_mode_is('record'):
                 Record.ensure_created()
                 Record.record.add_attr_access(name, value)
@@ -729,7 +729,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
     ----------
     _ffi
         FFI instance variable. Required.
-    _lib
+    _ffilib
         FFI library opened with `dlopen()`. Required.
     _defs
         Dictionary containing the Python-equivalent macros defined in the header file(s).
@@ -765,7 +765,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
         ``numpy`` to be installed.
     """
     _ffi = None  # MUST be filled in by subclass
-    _lib = None  # MUST be filled in by subclass
+    _ffilib = None  # MUST be filled in by subclass
     _defs = None
     _prefix = ''
     _struct_maker = None  # ffi.new

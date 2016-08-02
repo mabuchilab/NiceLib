@@ -69,7 +69,7 @@ that NiceLib makes use of. They include:
 
 _info
     A `LibInfo` object that contains access to the underlying library and macros. Required
-    (unless you are using the old-style `_ffi`, `_lib`, and `_defs` attributes)
+    (unless you are using the old-style `_ffi`, `_ffilib`, and `_defs` attributes)
 
 _prefix
     A `str` or sequence of `str`\s specifying prefixes to strip from the library function
@@ -123,7 +123,7 @@ method, and may become deprecated in later versions of `NiceLib`.
 _ffi
     FFI instance variable. Required if not using `_info`.
 
-_lib
+_ffilib
     FFI library opened with `dlopen()`. Required if not using `_info`.
 
 _defs

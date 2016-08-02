@@ -42,19 +42,19 @@ def arg_mode_is(*modes):
 
 
 class LibInfo(object):
-    def __init__(self, lib_module=None):
+    def __init__(self, lib_module=None, prefix=None):
         if lib_module:
             self._ffi = lib_module.ffi
-            self._lib = lib_module.lib
+            self._ffilib = lib_module.lib
             self._defs = lib_module.defs
             self.__dict__.update(self._defs)
         else:
             self._ffi = None
-            self._lib = None
+            self._ffilib = None
             self._defs = None
 
     def __getattr__(self, name):
-        return getattr(self._lib, name)
+        return getattr(self._ffilib, name)
 
 
 def _load_or_build_lib(name, pkg):
