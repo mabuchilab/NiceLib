@@ -44,17 +44,18 @@ def arg_mode_is(*modes):
 class LibInfo(object):
     def __init__(self, lib_module=None):
         if lib_module:
-            self.ffi = lib_module.ffi
-            self.lib = lib_module.lib
-            self.defs = lib_module.defs
+            self._ffi = lib_module.ffi
+            self._lib = lib_module.lib
+            self._defs = lib_module.defs
+            self.__dict__.update(self._defs)
         else:
             print("Stuff is None!!")
-            self.ffi = None
-            self.lib = None
-            self.defs = None
+            self._ffi = None
+            self._lib = None
+            self._defs = None
 
-    def unpack(self):
-        return self.ffi, self.lib, self.defs
+    def __getattr__(self, name):
+        return getattr(self._lib, name)
 
 
 def _load_or_build_lib(name, pkg):

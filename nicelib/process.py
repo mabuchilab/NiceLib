@@ -1299,10 +1299,10 @@ class Generator(object):
 
                 if isinstance(macro, FuncMacro):
                     arg_list = ', '.join(macro.args)
-                    macro_src.write("defs.{} = lambda {}: {}\n".format(macro.name, arg_list,
-                                                                       py_src))
+                    macro_src.write("defs['{}'] = lambda {}: {}\n".format(macro.name, arg_list,
+                                                                          py_src))
                 else:
-                    macro_src.write("defs.{} = {}\n".format(macro.name, py_src))
+                    macro_src.write("defs['{}'] = {}\n".format(macro.name, py_src))
 
         return header_src, macro_src.getvalue(), self.tree
 

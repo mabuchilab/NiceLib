@@ -180,7 +180,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     module_path = os.path.join(filedir, module_name + '.py')
     with open(module_path, 'a') as f:
         f.write("lib = ffi.dlopen('{}')\n".format(lib_name))
-        f.write("class Defs(object): pass\ndefs = Defs()\n")
+        f.write("defs = {}\n")
         f.write(macro_code)
 
     print("Done building {}".format(module_name))

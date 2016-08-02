@@ -502,9 +502,9 @@ class LibMeta(type):
 
         if '_info' in classdict:
             info = classdict['_info']
-            classdict['_ffi'] = info.ffi
-            classdict['_lib'] = info.lib
-            classdict['_defs'] = info.defs
+            classdict['_ffi'] = info._ffi
+            classdict['_lib'] = info._lib
+            classdict['_defs'] = info._defs
 
         ffi = classdict['_ffi']
         lib = classdict['_lib']
@@ -616,7 +616,7 @@ class LibMeta(type):
 
         # Add macro defs
         if defs:
-            for name, attr in defs.__dict__.items():
+            for name, attr in defs.items():
                 for prefix in prefixes:
                     if name.startswith(prefix):
                         shortname = name[len(prefix):]
@@ -732,7 +732,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _lib
         FFI library opened with `dlopen()`. Required.
     _defs
-        Object whose attributes are the Python-equivalent macros defined in the header file(s).
+        Dictionary containing the Python-equivalent macros defined in the header file(s).
         Optional.
     _prefix : str or sequence of strs, optional
         Prefix(es) to strip from the library function names. E.g. If the library has functions
