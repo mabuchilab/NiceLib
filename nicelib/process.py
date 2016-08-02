@@ -1815,7 +1815,7 @@ def modify_pattern(tokens, pattern):
                 depth -= 1
 
             if found_end:
-                match_buf.append((keep[1], t))
+                match_buf.append((keep[1] if len(keep) > 1 else keep, t))
                 try:
                     keep, target = next(p_it)
                 except StopIteration:
