@@ -22,8 +22,6 @@ from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
 
 from . import build
 
-'__cplusplus', '__linux__', '__APPLE__', '__CVI__', '__TPC__'
-
 TokenType = Enum('TokenType', 'DEFINED IDENTIFIER NUMBER STRING_CONST CHAR_CONST HEADER_NAME '
                  'PUNCTUATOR NEWLINE WHITESPACE LINE_COMMENT BLOCK_COMMENT')
 Position = namedtuple('Position', ['row', 'col'])
