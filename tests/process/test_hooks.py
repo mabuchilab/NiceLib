@@ -90,7 +90,6 @@ CLOSE
 
 def test_vc_pragma_hook():
     src = use_hook(vc_pragma_hook, VC_PRAGMA_SRC)
-    print(src)
     assert '__pragma' not in src
     assert '(' not in src
     assert ')' not in src

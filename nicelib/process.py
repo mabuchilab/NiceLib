@@ -1912,7 +1912,6 @@ def add_line_directive_hook(tokens):
     # Add trailing chunk
     if high_mark > low_mark >= 0:
         line_tokens = lexer.lex('\n#line {} "{}"\n\n'.format(chunk_start_line, cur_fpath))
-        print("line tokens = {}".format(line_tokens))
         out_tokens.extend(line_tokens)
         out_tokens.extend(chunk[low_mark:high_mark])
 
