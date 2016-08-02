@@ -1308,14 +1308,17 @@ class Generator(object):
 
     def gen_py_src(self, macro):
         prefix = '__FMACRO_' if isinstance(macro, FuncMacro) else '__OMACRO_'
-        log.debug("Generating body of macro {} "
-                  "[{}:{}:{}]".format(macro.name, macro.fpath, macro.line, macro.col))
+        log.info("Generating body of macro {} "
+                 "[{}:{}:{}]".format(macro.name, macro.fpath, macro.line, macro.col))
+        log.debug("  body tokens are {}".format(macro.body))
 
         py_src = None
         if macro.body:
             expanded = self.expander(macro.body)
             for token in expanded:
                 if token.type is Token.IDENTIFIER:
+                    log.info("  IDENTIFIER still in the macro body after expansion, ignoring this "
+                             "macro definition")
                     return None
             c_src = ''.join(token.string for token in expanded)
             func_src = "\nint " + prefix + macro.name + "(void){" + c_src + ";}"
@@ -1331,6 +1334,7 @@ class Generator(object):
             except (plyparser.ParseError, AttributeError):
                 warnings.warn("Un-pythonable macro {}".format(macro.name))
 
+        log.info("  generated to {}".format(py_src))
         return py_src
 
     def parse(self, text, reset_file=False):
