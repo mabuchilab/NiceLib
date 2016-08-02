@@ -11,7 +11,23 @@ def use_hook(hook, src):
 
 
 # add_line_directive
+
+#
 # declspec
+#
+DECLSPEC_SRC = """
+__declspec(dllimport) int x;
+__declspec(dllexport) float y;
+__declspec(noreturn) void func(void);
+"""
+
+def test_declspec_hook():
+    src = use_hook(declspec_hook, DECLSPEC_SRC)
+    assert '__declspec' not in src
+    assert 'dllimport' not in src
+    assert 'dllexport' not in src
+    assert 'noreturn' not in src
+
 
 #
 # extern_c
