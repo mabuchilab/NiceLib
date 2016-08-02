@@ -33,7 +33,7 @@ def handle_header_path(path):
         if os.path.exists(path):
             return path
         else:
-            raise Exception("Cannot find library header")
+            raise ValueError("Cannot find library header")
 
     header_dict = select_platform_value(path)
     if 'header' not in header_dict:
