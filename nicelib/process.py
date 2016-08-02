@@ -1189,12 +1189,47 @@ class Generator(object):
         self.parser = c_parser.CParser()
         self.tree = self.parser.parse('')
 
-    def generate(self):
-        # pycparser doesn't know about these types by default, but cffi does. We just need to make
-        # sure that pycparser knows these are types, the particular type is unimportant
-        fake_types = '\n'.join('typedef int {};'.format(t) for t in cffi.commontypes.COMMON_TYPES)
-        self.parse(fake_types)
+    @staticmethod
+    def common_type_names(tokens, type_names):
+        """Get a list of common type names that haven't been typedef'd in the source.
 
+        Uses the approach taken from that of cffi's `_common_type_names()`
+        """
+        useful_tokens = set(type_names)
+        useful_tokens.update(';,()[]{}')
+        useful_tokens.add('typedef')
+        names_used = set()
+        print(useful_tokens)
+
+        in_typedef = False
+        prev_token = None
+        depth = 0
+        for token in tokens:
+            if token.string in useful_tokens:
+                if token in ('(', '{', '['):
+                    depth += 1
+                elif token in (')', '}', ']'):
+                    depth -= 1
+                elif token == 'typedef':
+                    in_typedef = True
+                elif token == ';':
+                    if in_typedef and depth == 0:
+                        names_used.discard(prev_token.string)
+                        useful_tokens.discard(prev_token.string)
+                        in_typedef = False
+                elif token == ',':
+                    if in_typedef and depth == 0:
+                        names_used.discard(prev_token.string)
+                        useful_tokens.discard(prev_token.string)
+                else:
+                    names_used.add(token.string)
+
+            if token not in NON_TOKENS:
+                prev_token = token
+        print(names_used)
+        return names_used
+
+    def generate(self):
         # HOOK: list of tokens
         log.info("Applying token hooks")
         self.token_hooks += (add_line_directive_hook,)  # Add builtin hooks
@@ -1239,6 +1274,12 @@ class Generator(object):
         if self.debug_file:
             with open(self.debug_file, 'w') as f:
                 f.write(''.join(t.string for t in tokens))
+
+        # pycparser doesn't know about these types by default, but cffi does. We just need to make
+        # sure that pycparser knows these are types, the particular type is unimportant
+        common_types = self.common_type_names(tokens, cffi.commontypes.COMMON_TYPES.keys())
+        fake_types = '\n'.join('typedef int {};'.format(t) for t in common_types)
+        self.parse(fake_types)
 
         log.info("Parsing chunks")
         for csource_chunk, from_sys_header in get_ext_chunks(tokens):
