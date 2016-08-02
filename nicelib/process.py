@@ -1243,12 +1243,23 @@ class Generator(object):
 
         log.info("Parsing chunks")
         for csource_chunk, from_sys_header in get_ext_chunks(tokens):
+            orig_chunk = csource_chunk
             csource_chunk = r_stdcall2.sub(' volatile volatile const(', csource_chunk)
             csource_chunk = r_stdcall1.sub(' volatile volatile const ', csource_chunk)
             csource_chunk = r_cdecl.sub(' ', csource_chunk)
 
             log.info("Parsing chunk '{}'".format(csource_chunk))
-            chunk_tree = self.parse(csource_chunk)
+            try:
+                chunk_tree = self.parse(csource_chunk)
+            except plyparser.ParseError as e:
+                msg = str(e)
+                if 'end of input' in msg:
+                    msg += ' chunk:\n<<<{}\n>>>'.format(orig_chunk)
+
+                msg += ('\n\nIf you a developer wrapping a lib, you may need to clean up the '
+                        'header source using hooks. See the documentation on processing headers '
+                        'for more information.')
+                raise plyparser.ParseError(msg)
 
             # HOOK: AST chunk
             for hook in self.ast_hooks:
