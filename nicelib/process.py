@@ -2029,7 +2029,10 @@ class ParseHelper(object):
         return None
 
     def read_until(self, tokens, discard=False):
-        """Read until the given token; don't consume the given token"""
+        """Read until the given token; don't consume the given token
+
+        Raises StopIteration if we're already at the end of the token stream.
+        """
         if isinstance(tokens, basestring) or not isinstance(tokens, Sequence):
             tokens = (tokens,)
         buf = []
@@ -2037,7 +2040,9 @@ class ParseHelper(object):
         while True:
             token = self.peek()
             if token is None:
-                return False if discard else buf
+                if buf:
+                    return buf
+                raise StopIteration
 
             if token in tokens:
                 return True if discard else buf
@@ -2048,7 +2053,10 @@ class ParseHelper(object):
             self.pop()
 
     def read_to(self, tokens, discard=False):
-        """Read to and consume the given token"""
+        """Read to and consume the given token
+
+        Raises StopIteration if we're already at the end of the token stream.
+        """
         if isinstance(tokens, basestring) or not isinstance(tokens, Sequence):
             tokens = (tokens,)
         buf = []
@@ -2057,7 +2065,9 @@ class ParseHelper(object):
             try:
                 token = self.pop()
             except StopIteration:
-                return False if discard else buf
+                if buf:
+                    return buf
+                raise StopIteration
 
             if not discard:
                 buf.append(token)
