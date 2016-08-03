@@ -529,9 +529,12 @@ class LibMeta(type):
 
         dir_lib = []
         for name in dir(lib):
-            attr = getattr(lib, name)
-            if ffi and isinstance(attr, ffi.CData) and ffi.typeof(attr).kind != 'function':
-                dir_lib.append(name)
+            try:
+                attr = getattr(lib, name)
+                if ffi and isinstance(attr, ffi.CData) and ffi.typeof(attr).kind != 'function':
+                    dir_lib.append(name)
+            except AttributeError:
+                pass  # Name may be from a separate library's header
 
         # Add default empty prefix
         if isinstance(base_flags['prefix'], basestring):
