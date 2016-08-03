@@ -1199,7 +1199,6 @@ class Generator(object):
         useful_tokens.update(';,()[]{}')
         useful_tokens.add('typedef')
         names_used = set()
-        print(useful_tokens)
 
         in_typedef = False
         prev_token = None
@@ -1226,7 +1225,6 @@ class Generator(object):
 
             if token not in NON_TOKENS:
                 prev_token = token
-        print(names_used)
         return names_used
 
     def generate(self):
