@@ -1,6 +1,6 @@
 from util import local_fpath
 from nicelib.process import (lexer, add_line_directive_hook, declspec_hook, extern_c_hook,
-                             enum_type_hook, struct_func_hook, vc_pragma_hook)
+                             enum_type_hook, struct_func_hook, vc_pragma_hook, asm_hook)
 
 
 def use_hook(hook, src):
@@ -116,3 +116,31 @@ def test_vc_pragma_hook():
     assert '(' not in src
     assert ')' not in src
     assert 'pack' not in src
+
+
+#
+# asm
+#
+ASM_SRC = """
+_asm int 0xff;
+
+int func(val) {
+    __asm {
+        mov  ecx, val
+        shl  eax, cl
+    }
+}
+
+_asm mov ecx, 4     _asm mov edx, 2
+
+_asm {
+    sar  edx, cl
+}
+"""
+
+def test_asm_hook():
+    src = use_hook(asm_hook, ASM_SRC)
+    assert 'asm' not in src
+    assert '0xff' not in src
+    assert 'ecx' not in src
+    assert 'func' in src
