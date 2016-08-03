@@ -1966,6 +1966,12 @@ def declspec_hook(tokens):
     return remove_pattern(tokens, ['__declspec', '(', '~~)~~'])
 
 
+def inline_hook(tokens):
+    for token in tokens:
+        if token not in ('_inline', '__inline', '__forceinline'):
+            yield token
+
+
 def extern_c_hook(tokens):
     """Removes `extern "C" { ... }` while keeping the block's contents"""
     return modify_pattern(tokens, [('d', 'extern'), ('d', '"C"'), ('d', '{'), ('kd', '~~}~~')])
