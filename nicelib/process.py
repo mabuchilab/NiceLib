@@ -2096,12 +2096,7 @@ def vc_pragma_hook(tokens):
     ph = ParseHelper(tokens)
 
     while True:
-        tokens = ph.read_until('__pragma')
-        log.info(tokens)
-        if not tokens:
-            raise StopIteration
-
-        for token in tokens:
+        for token in ph.read_until('__pragma'):
             yield token
 
         # Throw away pragmas
