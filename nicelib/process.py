@@ -12,7 +12,7 @@ import copy
 import warnings
 import logging as log
 from enum import Enum
-from collections import OrderedDict, namedtuple, defaultdict, Sequence
+from collections import OrderedDict, namedtuple, defaultdict, Sequence, deque
 import ast
 from io import StringIO
 from pycparser import c_parser, c_generator, c_ast, plyparser
@@ -1988,18 +1988,21 @@ class ParseHelper(object):
         self.tokens = tokens
         self.tok_it = iter(tokens)
         self.depth = 0
-        self.next_token = next(self.tok_it)
+        self.peek_deque = deque()
+        self.peek_deque.append(next(self.tok_it))
 
     def pop(self):
-        token = self.next_token
-
-        if token is None:
+        """Pop and return next token, raises StopIteration"""
+        try:
+            token = self.peek_deque.popleft()
+        except IndexError:
             raise StopIteration
 
         try:
-            self.next_token = next(self.tok_it)
+            if not self.peek_deque:
+                self.peek_deque.append(next(self.tok_it))
         except StopIteration:
-            self.next_token = None
+            pass
 
         if token in ('(', '{', '['):
             self.depth += 1
@@ -2009,7 +2012,21 @@ class ParseHelper(object):
         return token
 
     def peek(self):
-        return self.next_token
+        """Peek next token, returns None at end of sequence"""
+        return self.peek_deque[0] if self.peek_deque else None
+
+    def peek_true_token(self):
+        """Peek next non-non-token, returns None at end of sequence"""
+        for token in self.peek_deque:
+            if token not in NON_TOKENS:
+                return token
+
+        for token in self.tok_it:
+            self.peek_deque.append(token)
+            if token not in NON_TOKENS:
+                return token
+
+        return None
 
     def read_until(self, tokens, discard=False):
         """Read until the given token; don't consume the given token"""
