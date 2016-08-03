@@ -2091,6 +2091,28 @@ class ParseHelper(object):
                 return True if discard else buf
 
 
+def asm_hook(tokens):
+    """Remove __asm constructs"""
+    ph = ParseHelper(tokens)
+
+    while True:
+        for token in ph.read_until(('_asm', '__asm')):
+            yield token
+        ph.pop()  # Get rid of '__asm'
+
+        if ph.peek_true_token() == '{':
+            ph.read_to('{', discard=True)
+            ph.read_to_depth(ph.depth-1, discard=True)
+        else:
+            ph.read_to('\n', discard=True)
+
+        next_true_token = ph.peek_true_token()
+        if next_true_token in (';', '_asm', '__asm'):
+            ph.read_until(next_true_token, discard=True)
+        else:
+            yield Token(Token.PUNCTUATOR, ';')
+
+
 def vc_pragma_hook(tokens):
     """Remove __pragma() usage"""
     ph = ParseHelper(tokens)
