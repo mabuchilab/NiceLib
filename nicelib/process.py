@@ -2080,7 +2080,9 @@ class ParseHelper(object):
             try:
                 token = self.pop()
             except StopIteration:
-                return False if discard else buf
+                if buf:
+                    return buf
+                raise StopIteration
 
             if not discard:
                 buf.append(token)
