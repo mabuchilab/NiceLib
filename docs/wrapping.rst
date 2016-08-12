@@ -1,10 +1,10 @@
-Wrapping Libraries with NiceLib
-===============================
+Writing Bindings with NiceLib
+=============================
 
-`NiceLib` is the base class for mid-level library wrappers. It provides a nice interface for
-quickly defining mid-level library wrappers. You define a subclass for each specific library (DLL).
-`NiceLib`'s metaclass then converts your specification into a wrapped library. This subclass is
-used directly, without instantiation.
+`NiceLib` is the base class that provides a nice interface for quickly defining mid-level library
+bindings. You define a subclass for each specific library (DLL) you wish to wrap.  `NiceLib`'s
+metaclass then converts your specification into a wrapped library. You use this subclass directly,
+without instantiating it.
 
 Let's say we want to wrap a motor-control library and its header looks something like this:
 
@@ -106,9 +106,8 @@ _ret_wrap
         The `NiceObject` instance whose function was called, or None it was a top-level function
 
 _struct_maker
-    Function that is called to create an FFI struct of the given type. Mainly useful for
-    odd libraries that require you to always fill out some field of the struct, like its size
-    in bytes
+    A function that is called to create an FFI struct of the given type. Mainly useful for odd
+    libraries that require you to always fill out some field of the struct, like its size in bytes.
 
 _buflen
     An `int` specifying the default length for buffers. This can be overridden on a per-argument
@@ -122,8 +121,8 @@ _free_buf
 
 
 Typically you will want to pass the relevant library attributes via a `LibInfo` instance created
-via :py:func:`~nicelib.load_lib`. However, it is currently possible to specify them directly. This was the original
-method, and may become deprecated in later versions of `NiceLib`.
+via :py:func:`~nicelib.load_lib`. However, it is currently possible to specify them directly. This
+was the original method, and may become deprecated in later versions of `NiceLib`.
 
 _ffi
     FFI instance variable. Required if not using `_info`.

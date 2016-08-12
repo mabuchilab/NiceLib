@@ -6,9 +6,7 @@
 NiceLib
 =======
 
-NiceLib is a Python library for rapidly developing "nice" basic wrappers for calling C libraries,
-using ``cffi``. To see examples of it being used in the wild, check out `Instrumental
-<https://github.com/mabuchilab/Instrumental>`_.
+NiceLib is a package for rapidly developing "nice" Python bindings to C libraries, using ``cffi``.
 
 It lets you rapidly wrap a C function like this
 
@@ -34,12 +32,12 @@ Introduction
 
 NiceLib essentially consists of two layers:
 
-* Tools for directly using headers to generate an importable Python module
-* An interface for quickly and cleanly defining a Pythonic mid-level wrapped library
+* Tools for directly using C headers to generate an importable Python module
+* An interface for quickly and cleanly defining a Pythonic mid-level binding
 
 Mid-level means that functions take *input* arguments, return *output* arguments, and raise
 Exceptions on error. NiceLib tries to simplify commonly-seen C idioms, like using user-created
-buffers for returning output strings. Take, for example, this toy wrapper for the NIDAQmx library::
+buffers for returning output strings. Take, for example, this toy binding for the NIDAQmx library::
 
     class NiceNI(NiceLib):
         _info = load_lib('ni')
@@ -118,7 +116,7 @@ becomes the Python code::
 The preprocessor also supports conditionals (``#ifdef`` and friends), ``#include`` s, and
 platform-specific predefined macros (like ``__linux__``, ``__WIN64``, and ``__x86_64``).
 
-Currently, ``#pragma`` directives are ignored.
+Currently, ``#pragma once`` is supported, but other ``#pragma`` directives are ignored.
 
 
 
