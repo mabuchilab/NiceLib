@@ -8,6 +8,7 @@ import os.path
 import cffi
 from .util import handle_header_path, handle_lib_name
 from .process import process_headers
+from .__about__ import __version__
 
 
 class DummyBuffer(object):
@@ -118,6 +119,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
 
     module_path = os.path.join(filedir, module_name + '.py')
     with open(module_path, 'a') as f:
+        f.write("build_version = '{}'\n".format(__version__))
         f.write("lib = ffi.dlopen('{}')\n".format(lib_name))
         f.write(macro_code)
 

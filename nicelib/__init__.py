@@ -2,6 +2,7 @@
 # Copyright 2016 Nate Bogdanowicz
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 from importlib import import_module
+from .__about__ import __version__
 
 
 class TestMode(object):
@@ -48,6 +49,7 @@ class LibInfo(object):
             self._ffilib = lib_module.lib
             self._defs = lib_module.defs
             self.__dict__.update(self._defs)
+            self._build_version = lib_module.build_version
         else:
             self._ffi = None
             self._ffilib = None
