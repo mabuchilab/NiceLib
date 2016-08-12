@@ -306,7 +306,6 @@ class Parser(object):
                  include_dirs=[], ignored_headers=(), ignore_system_headers=False):
         self.base_dir, self.fname = os.path.split(fpath)
         self.tokens = lexer.lex(source, fpath)
-        self.last_line = self.tokens[-1].line
         self.replacement_map = replacement_map
         self.out = []
         self.cond_stack = []
@@ -435,7 +434,7 @@ class Parser(object):
                 break
 
             if update_cb and self.out:
-                update_cb(self.out[-1].line, self.last_line)
+                update_cb(self.out[-1].line)
 
         self.macros = [macro for (name, macro) in self.ordered_macro_items()]
 

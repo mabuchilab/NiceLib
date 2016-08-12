@@ -10,9 +10,14 @@ from .util import handle_header_path, handle_lib_name
 from .process import process_headers
 
 
+class DummyBuffer(object):
+    def write(self, msg):
+        pass
+
+
 def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
               ignore_system_headers=False, preamble=None, token_hooks=(), ast_hooks=(),
-              hook_groups=(), debug_file=None):
+              hook_groups=(), debug_file=None, logbuf=sys.stdout):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -52,6 +57,9 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         AST hook functions. See `process_headers()` for more info.
     hook_groups : str or sequence of strs
         Hook groups. See `process_headers()` for more info.
+    logbuf : writeable buffer
+        IO buffer to write() common log output to, ``sys.stdout`` by default. If None, this output
+        will be silenced.
 
     Notes
     -----
@@ -63,12 +71,15 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     The path or paths provided by ``header_info`` may use items in ``os.environ``. For example,
     ``'{PROGRAMFILES}\\\\header.h'`` will be formatted with ``os.environ['PROGRAMFILES']``.
     """
-    print("Module {} does not yet exist, building it now. "
-          "This may take a minute...".format(module_name))
+    if logbuf is None:
+        logbuf = DummyBuffer()
 
-    print("Searching for headers...")
+    logbuf.write("Module {} does not yet exist, building it now. "
+                 "This may take a minute...\n".format(module_name))
+
+    logbuf.write("Searching for headers...\n")
     header_paths, predef_path = handle_header_path(header_info)
-    print("Found {}".format(header_paths))
+    logbuf.write("Found {}\n".format(header_paths))
 
     lib_name = handle_lib_name(lib_name)
 
@@ -79,12 +90,14 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         filedir, _ = os.path.split(filedir)
     filedir = os.path.realpath(filedir)
 
-    def update_cb(cur_line, tot_lines):
-        sys.stdout.write("Parsing line {}/{}\r".format(cur_line, tot_lines))
-        sys.stdout.flush()
+    def update_cb(cur_line):
+        logbuf.write("Parsing line {}\r".format(cur_line))
+        try:
+            logbuf.flush()
+        except AttributeError:
+            pass
 
-    #header_name = os.path.basename(header_path)
-    #print("Parsing and cleaning header {}".format(header_name))
+    logbuf.write("Parsing and cleaning headers...\n")
     clean_header_str, macro_code = process_headers(header_paths, predef_path, update_cb=update_cb,
                                                    ignored_headers=ignored_headers,
                                                    ignore_system_headers=ignore_system_headers,
@@ -92,13 +105,13 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
                                                    ast_hooks=ast_hooks, hook_groups=hook_groups,
                                                    debug_file=debug_file)
 
-    print("Compiling cffi module...")
+    logbuf.write("Compiling cffi module...\n")
     ffi = cffi.FFI()
     ffi.cdef(clean_header_str)
     ffi.set_source('.' + module_name, None)
     ffi.compile(tmpdir=filedir)
 
-    print("Writing macros...")
+    logbuf.write("Writing macros...\n")
 
     module_path = os.path.join(filedir, module_name + '.py')
     with open(module_path, 'a') as f:
@@ -106,4 +119,4 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         f.write("defs = {}\n")
         f.write(macro_code)
 
-    print("Done building {}".format(module_name))
+    logbuf.write("Done building {}\n".format(module_name))
