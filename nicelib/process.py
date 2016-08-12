@@ -1323,6 +1323,8 @@ class Generator(object):
         # Convert macros
         macro_src = StringIO()
         macro_src.write("# Generated macro definitions\n")
+        macro_src.write("defs = {}\n")
+
         for macro in self.macros:
             py_src = self.gen_py_src(macro)
             if py_src:
