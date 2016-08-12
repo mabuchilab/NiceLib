@@ -115,6 +115,11 @@ _buflen
     basis in the argument's spec string, e.g. `'len=64'` will make a 64-character buffer or a
     64-element array.
 
+_free_buf
+    A function that is called on the pointer returned for 'bufout' argtypes, used for freeing their
+    associated memory. It is called immediately after the buffer is copied to produce a Python
+    string. It is not called if a null pointer is returned. May be None.
+
 
 Typically you will want to pass the relevant library attributes via a `LibInfo` instance created
 via :py:func:`~nicelib.load_lib`. However, it is currently possible to specify them directly. This was the original
@@ -166,6 +171,14 @@ The possible signature values are:
     value. For example, if the underlying C argument is an ``int *``, you can pass in an cffi int
     pointer, which will be used directly, or (more typically) you can pass in a Python int, which
     will be used as the initial value of a newly-created cffi int pointer.
+
+'bufout'
+    The argument is a pointer to a string buffer (a ``char**``). This is used for when the C
+    library creates a string buffer and returns it to the user. NiceLib will automatically convert
+    the output to a Python str, or None if a null pointer was returned.
+
+    If the memory should be cleaned up by the user (as is usually the case), you may use the
+    `free_buf` setting to specify the cleanup function.
 
 'buf'
     The argument is a string buffer used for output. The C argument is a ``char`` pointer or array,
