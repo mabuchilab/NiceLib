@@ -58,20 +58,19 @@ Then we can use the library like this::
         motor.Close()
 
 There are a number of features in use in this example: prefix removal, return value wrapping, array
-and string buffer output, and `NiceObjectDef`\s with custom initializers. Many of these settings
-are scoped so that you can specify them class-wide, NiceObject-wide, and per-function.
+and string buffer output, and `NiceObjectDef`\s with custom initializers. These make use of
+settings, which you can read more about below.
 
+Settings
+--------
+Settings, also called flags, give you extra control over how a library is wrapped. Settings are
+scoped so that you can specify them class-wide, NiceObject-wide, and per-function. To make a
+class-wide setting, give your class an attribute with one of the setting names, prefixed by an
+underscore. For example, if you want to set a class-wide buflen, specify `'_buflen'`. Pass
+per-NiceObject settings as keyword args to the NiceObjectDef constructor. For fine-grained,
+per-function control, you may append a dict to the end of the function's signature tuple.
 
-Class Attributes
-----------------
-There are a number of underscore-prefixed special class attributes, both required and optional,
-that NiceLib makes use of. They include:
-
-_info
-    A `LibInfo` object that contains access to the underlying library and macros. Required
-    (unless you are using the old-style `_ffi`, `_ffilib`, and `_defs` attributes)
-
-_prefix
+prefix
     A `str` or sequence of `str`\s specifying prefixes to strip from the library function
     names. e.g. if the library has functions named like ``SDK_Func()``, you can set `_prefix` to
     `'SDK_'`, and access them as ``Func()``. If more than one prefix is given, they are tried in
@@ -79,12 +78,12 @@ _prefix
     always tried.  Sometimes you may want to specify one library-wide prefix and a different
     per-object prefix, as done in the above example.
 
-_ret_wrap
+ret_wrap
     A function or `str` specifying a wrapper function to handle the return values of each library
     function.  By default, the return value will be appended to the end of the Python return
     values. The wrapper function takes the C function's return value (often an error/success code)
-    as its only argument. If the wrapper returns a non-None value, it will be appended to the
-    wrapped function's return values.
+    as its first argument (see below for other optional args it may take). If the wrapper returns a
+    non-None value, it will be appended to the wrapped function's return values.
 
     If you define function `_ret_foo()` in your subclass, you may refer to it by using the
     string `'foo'`. This works for any function whose name starts with ``_ret_`` that is defined in
@@ -105,20 +104,33 @@ _ret_wrap
     niceobj:
         The `NiceObject` instance whose function was called, or None it was a top-level function
 
-_struct_maker
+struct_maker
     A function that is called to create an FFI struct of the given type. Mainly useful for odd
     libraries that require you to always fill out some field of the struct, like its size in bytes.
 
-_buflen
+buflen
     An `int` specifying the default length for buffers. This can be overridden on a per-argument
     basis in the argument's spec string, e.g. `'len=64'` will make a 64-character buffer or a
     64-element array.
 
-_free_buf
+free_buf
     A function that is called on the pointer returned for 'bufout' argtypes, used for freeing their
     associated memory. It is called immediately after the buffer is copied to produce a Python
     string. It is not called if a null pointer is returned. May be None.
 
+use_numpy
+    If True, convert output args marked as 'arr' to `numpy` arrays. Requires `numpy` to be
+    installed.
+
+
+Class Attributes
+----------------
+NiceLib makes use of a few underscore-prefixed special class attributes. In addition to class-wide
+settings, as described above, they include:
+
+_info
+    A `LibInfo` object that contains access to the underlying library and macros. Required
+    (unless you are using the old-style `_ffi`, `_ffilib`, and `_defs` attributes)
 
 Typically you will want to pass the relevant library attributes via a `LibInfo` instance created
 via :py:func:`~nicelib.load_lib`. However, it is currently possible to specify them directly. This
