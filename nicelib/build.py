@@ -57,6 +57,9 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         AST hook functions. See `process_headers()` for more info.
     hook_groups : str or sequence of strs
         Hook groups. See `process_headers()` for more info.
+    debug_file : str
+        File to write a partially-processed header to just before it is parsed by `pycparser`.
+        Useful for debugging the preprocessor when `pycparser`'s parser chokes on its output.
     logbuf : writeable buffer
         IO buffer to write() common log output to, ``sys.stdout`` by default. If None, this output
         will be silenced.

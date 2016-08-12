@@ -1607,7 +1607,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         <stdarg.h>` Header files specified with double quotes are processed as ususal. Default is
         False.
     debug_file : str
-        File to write a partially-processed header to just before it is parsed b y `pycparser`.
+        File to write a partially-processed header to just before it is parsed by `pycparser`.
         Useful for debugging the preprocessor when `pycparser`'s parser chokes on its output.
     preamble : str
         C source to insert before the headers specified by `header_paths`. Useful for including
