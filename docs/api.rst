@@ -13,7 +13,7 @@ These are the major NiceLib classes and functions of which you should know:
   * `NiceLib`
   * `NiceObjectDef`
   * `load_lib()`
-  * `generate_wrapper()`
+  * `generate_bindings()`
 
 
 .. _Header-API:
@@ -39,4 +39,4 @@ Wrapper API
 
 .. autofunction:: nicelib.load_lib
 
-.. autofunction:: nicelib.generate_wrapper
+.. autofunction:: nicelib.generate_bindings

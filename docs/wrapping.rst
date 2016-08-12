@@ -290,8 +290,8 @@ you have functions which take more than one value which act as a collective 'han
 specify this number as `n_handles` when calling `NiceObjectDef()`.
 
 
-Auto-Generating Wrappers
+Auto-Generating Bindings
 ------------------------
 
 If nicelib is able to parse your library's headers successfully, you can generate a convenient
-wrapper skeleton using `generate_wrapper()`.
+binding skeleton using `generate_bindings()`.

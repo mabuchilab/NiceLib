@@ -103,6 +103,6 @@ def load_lib(name, pkg):
 
 from .nicelib import NiceLib, NiceObjectDef
 from .build import build_lib
-from .process import generate_wrapper
+from .process import generate_bindings
 
-__all__ = ['NiceLib', 'NiceObjectDef', 'build_lib', 'load_lib', 'generate_wrapper']
+__all__ = ['NiceLib', 'NiceObjectDef', 'build_lib', 'load_lib', 'generate_bindings']

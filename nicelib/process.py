@@ -1676,8 +1676,8 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         return header_src, macro_src
 
 
-def generate_wrapper(header_info, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
-                     fill_handle=True, **kwds):
+def generate_bindings(header_info, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
+                      fill_handle=True, **kwds):
     """Generate a skeleton library wrapper.
 
     Grabs all the function declarations from the given header(s), generating a
@@ -1704,8 +1704,8 @@ def generate_wrapper(header_info, outfile, prefix=(), add_ret_ignore=False, nice
     """
     if isinstance(outfile, basestring):
         with open(outfile, 'w') as f:
-            return generate_wrapper(header_info, f, prefix, add_ret_ignore, niceobj_prefix,
-                                    fill_handle, **kwds)
+            return generate_bindings(header_info, f, prefix, add_ret_ignore, niceobj_prefix,
+                                     fill_handle, **kwds)
 
     print("Searching for headers...")
     header_paths, predef_path = handle_header_path(header_info)
