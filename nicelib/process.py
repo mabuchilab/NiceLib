@@ -1230,7 +1230,7 @@ class Generator(object):
     def generate(self):
         # HOOK: list of tokens
         log.info("Applying token hooks")
-        self.token_hooks += (stdcall_hook, add_line_directive_hook)  # Add builtin hooks
+        self.token_hooks += (stdcall_hook, cdecl_hook, add_line_directive_hook)  # Add builtin hooks
         tokens = self.tokens
 
         for hook in self.token_hooks:
@@ -1264,9 +1264,6 @@ class Generator(object):
             if chunk:
                 yield ''.join(chunk), from_sys_header, tok_num + 1
 
-        # Erase cdecl like cffi does (see cffi.cparser for more info)
-        r_cdecl = re.compile(r"\b[_]{0,2}cdecl\b")
-
         # Log intermediate c-source
         if self.debug_file:
             with open(self.debug_file, 'w') as f:
@@ -1282,7 +1279,6 @@ class Generator(object):
         chunk_start_tok_num = 0
         for csource_chunk, from_sys_header, next_tok_num in get_ext_chunks(tokens):
             orig_chunk = csource_chunk
-            csource_chunk = r_cdecl.sub(' ', csource_chunk)
             csource_chunk = csource_chunk.replace('\f', ' ')
 
             log.info("Parsing chunk '{}'".format(csource_chunk))
@@ -1983,6 +1979,12 @@ def add_line_directive_hook(tokens):
 def declspec_hook(tokens):
     """Removes all occurences of `__declspec(...)``"""
     return remove_pattern(tokens, ['__declspec', '(', '~~)~~'])
+
+
+def cdecl_hook(tokens):
+    for token in tokens:
+        if token not in ('cdecl', '_cdecl', '__cdecl'):
+            yield token
 
 
 def inline_hook(tokens):
