@@ -1244,7 +1244,7 @@ class Generator(object):
             depth = 0
             from_sys_header = None
 
-            for token in chunk_tokens:
+            for tok_num, token in enumerate(chunk_tokens):
                 if from_sys_header is None and not token.fname.startswith('<'):
                     from_sys_header = token.from_sys_header
 
@@ -1256,13 +1256,13 @@ class Generator(object):
                 chunk.append(token.string)
 
                 if depth == 0 and token == ';':
-                    yield ''.join(chunk), from_sys_header
+                    yield ''.join(chunk), from_sys_header, tok_num + 1
                     chunk = []
                     from_sys_header = None
 
             # Yield unfinished final chunk
             if chunk:
-                yield ''.join(chunk), from_sys_header
+                yield ''.join(chunk), from_sys_header, tok_num + 1
 
         # Erase cdecl like cffi does (see cffi.cparser for more info)
         r_cdecl = re.compile(r"\b[_]{0,2}cdecl\b")
@@ -1279,7 +1279,8 @@ class Generator(object):
         self.parse(fake_types)
 
         log.info("Parsing chunks")
-        for csource_chunk, from_sys_header in get_ext_chunks(tokens):
+        chunk_start_tok_num = 0
+        for csource_chunk, from_sys_header, next_tok_num in get_ext_chunks(tokens):
             orig_chunk = csource_chunk
             csource_chunk = r_cdecl.sub(' ', csource_chunk)
 
@@ -1306,6 +1307,9 @@ class Generator(object):
                 if (not isinstance(ext, c_ast.Decl) or not isinstance(ext.type, c_ast.FuncDecl) or
                         not from_sys_header):
                     self.tree.ext.extend(chunk_tree.ext)
+
+            chunk_start_tok_num = next_tok_num
+            log.info("Parsed to token {}/{}".format(next_tok_num-1, len(tokens)))
 
         log.info("pycparser successfully re-parsed cleaned header")
 
