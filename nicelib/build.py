@@ -18,7 +18,8 @@ class DummyBuffer(object):
 
 def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
               ignore_system_headers=False, preamble=None, token_hooks=(), ast_hooks=(),
-              hook_groups=(), debug_file=None, logbuf=sys.stdout, load_dump_file=False):
+              hook_groups=(), debug_file=None, logbuf=sys.stdout, load_dump_file=False,
+              save_dump_file=False):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -64,6 +65,13 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     logbuf : writeable buffer
         IO buffer to write() common log output to, ``sys.stdout`` by default. If None, this output
         will be silenced.
+    load_dump_file : bool
+        Save the list of tokens resulting from preprocessing to 'token_dump.pkl'. See save_dump_file
+        for more info.
+    save_dump_file : bool
+        Ignore `header_paths` and load the already-preprocessed tokens from 'token_dump.pkl'. This
+        can significantly speed up your turnaround time when debugging really large header sets
+        when writing and debugging hooks.
 
     Notes
     -----
@@ -108,7 +116,8 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
                                                    preamble=preamble, token_hooks=token_hooks,
                                                    ast_hooks=ast_hooks, hook_groups=hook_groups,
                                                    debug_file=debug_file,
-                                                   load_dump_file=load_dump_file)
+                                                   load_dump_file=load_dump_file,
+                                                   save_dump_file=save_dump_file)
 
     logbuf.write("Compiling cffi module...\n")
     ffi = cffi.FFI()

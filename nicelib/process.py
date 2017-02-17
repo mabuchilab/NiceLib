@@ -1598,7 +1598,8 @@ def to_str_seq(arg):
 
 def process_headers(header_paths, predef_path=None, update_cb=None, ignored_headers=(),
                     ignore_system_headers=False, debug_file=None, preamble=None, token_hooks=(),
-                    ast_hooks=(), hook_groups=(), return_ast=False, load_dump_file=False):
+                    ast_hooks=(), hook_groups=(), return_ast=False, load_dump_file=False,
+                    save_dump_file=False):
     """Preprocess header(s) and split into a cleaned header and macros
 
     Parameters
@@ -1636,6 +1637,13 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
 
         'C++' : (declspec_hook, extern_c_hook, enum_type_hook, CPPTypedefAdder)
             Hooks for converting C++-only headers into C syntax understandable by `cffi`.
+    load_dump_file : bool
+        Save the list of tokens resulting from preprocessing to 'token_dump.pkl'. See save_dump_file
+        for more info.
+    save_dump_file : bool
+        Ignore `header_paths` and load the already-preprocessed tokens from 'token_dump.pkl'. This
+        can significantly speed up your turnaround time when debugging really large header sets
+        when writing and debugging hooks.
 
     Returns
     -------
@@ -1672,8 +1680,9 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         macro_expand = parser.macro_expand
         log.info("Successfully parsed input headers")
 
-        with open('token_dump.pkl', 'wb') as f:
-            pkl.dump(parser.out, f, protocol=-1)
+        if save_dump_file:
+            with open('token_dump.pkl', 'wb') as f:
+                pkl.dump(parser.out, f, protocol=-1)
 
     token_hooks = tuple(token_hooks)
     ast_hooks = tuple(ast_hooks)
