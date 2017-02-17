@@ -1289,8 +1289,12 @@ class Generator(object):
                 chunk_tree = self.parse(csource_chunk)
             except plyparser.ParseError as e:
                 msg = str(e)
-                if 'end of input' in msg:
-                    msg += ' chunk:\n<<<{}\n>>>'.format(orig_chunk)
+                lines = orig_chunk.splitlines()
+                if len(lines) < 20:
+                    msg += '\nWhen parsing chunk:\n<<<{}\n>>>'.format(orig_chunk)
+                else:
+                    msg += ('\nWhen parsing chunk:\n<<<{}\n\n(...)\n\n{}'
+                            '>>>'.format('\n'.join(lines[:10]), '\n'.join(lines[-10:])))
 
                 msg += ('\n\nIf you a developer wrapping a lib, you may need to clean up the '
                         'header source using hooks. See the documentation on processing headers '
