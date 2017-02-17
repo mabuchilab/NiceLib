@@ -298,6 +298,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buf
         inargs = list(inargs)
         available_args = {}
         available_args['niceobj'] = kwds.pop('niceobj', None)
+        available_args['funcname'] = fname
 
         if not functype.ellipsis and len(inargs) != n_expected_inargs:
             message = '{}() takes '.format(fname)
