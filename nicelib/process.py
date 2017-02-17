@@ -2131,10 +2131,11 @@ def struct_func_hook(tokens):
     """Removes function definitions from inside struct definitions.
 
     Once we're inside the struct's curly braces, we look member-by-member. We push each next token
-    into a buffer, if we see an open brace then we assume this member is a funcdef. (NOTE: to be
-    more correct we should make sure it's not a nested struct/union/enum def.) The funcdef is over
-    after the matching close brace and an optional semicolon. Otherwise, if we see a semicolon
+    into a buffer, if we see an open brace then we assume this member is a funcdef. The funcdef is
+    over after the matching close brace and an optional semicolon. Otherwise, if we see a semicolon
     outside of any nesting, that's the end of an ordinary member declaration.
+
+    NOTE: Does not deal with nested structs that have methods (if that's even allowed).
 
     If we see a funcdef, throw away all its tokens. If we see a member declaration, pass the tokens
     on.
@@ -2173,11 +2174,18 @@ def struct_func_hook(tokens):
             buf = []
             member_depth = ph.depth
             member_done = False
+            sue_proximity = 99
             while not member_done:
                 token = ph.pop()
                 buf.append(token)
 
-                if token == '{':
+                if token not in NON_TOKENS:
+                    sue_proximity += 1
+
+                if token in ('struct', 'union', 'enum'):
+                    sue_proximity = 0
+
+                if sue_proximity > 2 and token == '{':
                     # In a funcdef, ignore these tokens
                     buf = []
                     ph.read_to_depth(ph.depth - 1, discard=True)
