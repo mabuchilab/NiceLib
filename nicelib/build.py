@@ -18,7 +18,7 @@ class DummyBuffer(object):
 
 def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
               ignore_system_headers=False, preamble=None, token_hooks=(), ast_hooks=(),
-              hook_groups=(), debug_file=None, logbuf=sys.stdout):
+              hook_groups=(), debug_file=None, logbuf=sys.stdout, load_dump_file=False):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -107,7 +107,8 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
                                                    ignore_system_headers=ignore_system_headers,
                                                    preamble=preamble, token_hooks=token_hooks,
                                                    ast_hooks=ast_hooks, hook_groups=hook_groups,
-                                                   debug_file=debug_file)
+                                                   debug_file=debug_file,
+                                                   load_dump_file=load_dump_file)
 
     logbuf.write("Compiling cffi module...\n")
     ffi = cffi.FFI()

@@ -11,6 +11,7 @@ import os.path
 import copy
 import warnings
 import logging as log
+import cPickle as pkl
 from enum import Enum
 from collections import OrderedDict, namedtuple, defaultdict, Sequence, deque
 import ast
@@ -1174,11 +1175,11 @@ class FFICleaner(TreeModifier):
 
 
 class Generator(object):
-    def __init__(self, parser, token_hooks=(), string_hooks=(), ast_hooks=(),
+    def __init__(self, tokens, macros, macro_expand, token_hooks=(), string_hooks=(), ast_hooks=(),
                  debug_file=None):
-        self.tokens = parser.out
-        self.macros = parser.macros
-        self.expander = parser.macro_expand
+        self.tokens = tokens
+        self.macros = macros
+        self.expander = macro_expand
 
         self.token_hooks = token_hooks
         self.string_hooks = string_hooks
@@ -1592,7 +1593,7 @@ def to_str_seq(arg):
 
 def process_headers(header_paths, predef_path=None, update_cb=None, ignored_headers=(),
                     ignore_system_headers=False, debug_file=None, preamble=None, token_hooks=(),
-                    ast_hooks=(), hook_groups=(), return_ast=False):
+                    ast_hooks=(), hook_groups=(), return_ast=False, load_dump_file=False):
     """Preprocess header(s) and split into a cleaned header and macros
 
     Parameters
@@ -1643,18 +1644,31 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
     except:
         token_hooks = (token_hooks, )
     hook_groups = to_str_seq(hook_groups)
-    header_paths = to_str_seq(header_paths)
-    source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
-    if preamble:
-        source = preamble + '\n' + source
+    if load_dump_file:
+        with open('token_dump.pkl', 'rb') as f:
+            tokens = pkl.load(f)
+        macros = []
+        macro_expand = None
+    else:
+        header_paths = to_str_seq(header_paths)
+        source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
 
-    OBJ_MACROS, FUNC_MACROS = get_predef_macros()
-    parser = Parser(source, '<root>', REPLACEMENT_MAP, OBJ_MACROS,
-                    FUNC_MACROS, INCLUDE_DIRS, ignored_headers=ignored_headers,
-                    ignore_system_headers=ignore_system_headers)
-    parser.parse(update_cb=update_cb)
-    log.info("Successfully parsed input headers")
+        if preamble:
+            source = preamble + '\n' + source
+
+        OBJ_MACROS, FUNC_MACROS = get_predef_macros()
+        parser = Parser(source, '<root>', REPLACEMENT_MAP, OBJ_MACROS,
+                        FUNC_MACROS, INCLUDE_DIRS, ignored_headers=ignored_headers,
+                        ignore_system_headers=ignore_system_headers)
+        parser.parse(update_cb=update_cb)
+        tokens = parser.out
+        macros = parser.macros
+        macro_expand = parser.macro_expand
+        log.info("Successfully parsed input headers")
+
+        with open('token_dump.pkl', 'wb') as f:
+            pkl.dump(parser.out, f, protocol=-1)
 
     token_hooks = tuple(token_hooks)
     ast_hooks = tuple(ast_hooks)
@@ -1662,7 +1676,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         token_hooks += HOOK_GROUPS[group][0]
         ast_hooks += HOOK_GROUPS[group][1]
 
-    gen = Generator(parser,
+    gen = Generator(tokens, macros, macro_expand,
                     token_hooks=token_hooks,
                     ast_hooks=ast_hooks,
                     debug_file=debug_file)
