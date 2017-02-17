@@ -1283,6 +1283,7 @@ class Generator(object):
         for csource_chunk, from_sys_header, next_tok_num in get_ext_chunks(tokens):
             orig_chunk = csource_chunk
             csource_chunk = r_cdecl.sub(' ', csource_chunk)
+            csource_chunk = csource_chunk.replace('\f', ' ')
 
             log.info("Parsing chunk '{}'".format(csource_chunk))
             try:
