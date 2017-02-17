@@ -1229,8 +1229,9 @@ class Generator(object):
     def generate(self):
         # HOOK: list of tokens
         log.info("Applying token hooks")
-        self.token_hooks += (add_line_directive_hook,)  # Add builtin hooks
+        self.token_hooks += (stdcall_hook, add_line_directive_hook)  # Add builtin hooks
         tokens = self.tokens
+
         for hook in self.token_hooks:
             log.info("Applying hook '{}'".format(hook.__name__))
             tokens = hook(tokens)
@@ -1262,9 +1263,7 @@ class Generator(object):
             if chunk:
                 yield ''.join(chunk), from_sys_header
 
-        # Do stdcall/WINAPI replacement hack like cffi does (see cffi.cparser for more info)
-        r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
-        r_stdcall2 = re.compile(r"[(]\s*(__stdcall|WINAPI)\b")
+        # Erase cdecl like cffi does (see cffi.cparser for more info)
         r_cdecl = re.compile(r"\b[_]{0,2}cdecl\b")
 
         # Log intermediate c-source
@@ -1281,8 +1280,6 @@ class Generator(object):
         log.info("Parsing chunks")
         for csource_chunk, from_sys_header in get_ext_chunks(tokens):
             orig_chunk = csource_chunk
-            csource_chunk = r_stdcall2.sub(' volatile volatile const(', csource_chunk)
-            csource_chunk = r_stdcall1.sub(' volatile volatile const ', csource_chunk)
             csource_chunk = r_cdecl.sub(' ', csource_chunk)
 
             log.info("Parsing chunk '{}'".format(csource_chunk))
@@ -2112,6 +2109,29 @@ def asm_hook(tokens):
             ph.read_until(next_true_token, discard=True)
         else:
             yield Token(Token.PUNCTUATOR, ';')
+
+
+def stdcall_hook(tokens):
+    """Replace '__stdcall' and 'WINAPI' with 'volatile volatile const'
+
+    This technique is stolen from `cffi`.
+    """
+    ph = ParseHelper(tokens)
+
+    while True:
+        token = ph.pop()
+        if token == '(':
+            if ph.peek_true_token() in ('__stdcall', 'WINAPI'):
+                ph.read_to(('__stdcall', 'WINAPI'))  # Discard
+                for t in lexer.lex(' volatile volatile const ('):
+                    yield t
+            else:
+                yield token
+        elif token in ('__stdcall', 'WINAPI'):
+            for t in lexer.lex(' volatile volatile const '):
+                yield t
+        else:
+            yield token
 
 
 def vc_pragma_hook(tokens):
