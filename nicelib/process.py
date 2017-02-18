@@ -11,7 +11,7 @@ import os.path
 import copy
 import warnings
 import logging as log
-import cPickle as pkl
+import pickle as pkl
 from enum import Enum
 from collections import OrderedDict, namedtuple, defaultdict, Sequence, deque
 import ast
