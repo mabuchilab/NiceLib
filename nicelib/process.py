@@ -3,8 +3,9 @@
 from __future__ import unicode_literals, division, print_function
 from future import standard_library
 standard_library.install_aliases()
-from builtins import str, range
+from builtins import str
 from past.builtins import basestring
+from future.utils import PY2
 
 import re
 import os.path
@@ -21,6 +22,10 @@ import cffi
 import cffi.commontypes
 from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
 from .util import handle_header_path
+
+# Faster than using future's range function, speeds up lexer significantly
+if PY2:
+    range = xrange
 
 cparser = c_parser.CParser()
 
