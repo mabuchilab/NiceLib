@@ -22,6 +22,8 @@ import cffi.commontypes
 from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
 from .util import handle_header_path
 
+cparser = c_parser.CParser()
+
 TokenType = Enum('TokenType', 'DEFINED IDENTIFIER NUMBER STRING_CONST CHAR_CONST HEADER_NAME '
                  'PUNCTUATOR NEWLINE WHITESPACE LINE_COMMENT BLOCK_COMMENT')
 Position = namedtuple('Position', ['row', 'col'])
@@ -1186,7 +1188,7 @@ class Generator(object):
         self.ast_hooks = ast_hooks
 
         self.debug_file = debug_file
-        self.parser = c_parser.CParser()
+        self.parser = cparser
         self.tree = self.parser.parse('')
 
     @staticmethod
@@ -1440,10 +1442,9 @@ def src_to_c_ast(source):
     """Convert C expression source str to a c_ast expression node"""
     if ';' in source:
         raise ConvertError("C-to-Py supports only expressions, not statements")
-    parser = c_parser.CParser()
 
     try:
-        tree = parser.parse('int main(void){' + source + ';}')
+        tree = cparser.parse('int main(void){' + source + ';}')
     except (plyparser.ParseError, AttributeError) as e:
         raise ConvertError(e)
 
