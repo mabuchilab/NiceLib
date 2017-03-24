@@ -410,8 +410,10 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buf
                     arg = inarg  # Pass straight through
                 elif argtype.kind == 'pointer' and argtype.item.kind == 'struct':
                     arg = struct_maker(argtype, inarg)
-                else:
+                elif _can_be_pointed_to(ffi, argtype, inarg):
                     arg = ffi.new(argtype, inarg)
+                else:
+                    raise TypeError("Cannot convert {} to required type {}".format(inarg, argtype))
                 outargs.append((arg, lambda o: o[0]))
             elif info == 'in':
                 arg = inargs.pop(0)
