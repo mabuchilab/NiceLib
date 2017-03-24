@@ -40,7 +40,7 @@ We could then wrap it like this::
         GetErrorString = ('in', 'buf', 'len', {'ret': 'ignore'})
         OpenMotor = ('in', 'out')
 
-        Motor = NiceObjectDef(prefix='Motor', init=OpenMotor, attrs=dict(
+        Motor = NiceObjectDef(prefix='Motor', init='OpenMotor', attrs=dict(
             Close = ('in'),
             MoveTo = ('in', 'in'),
             GetPosition = ('in', 'out'),
@@ -259,20 +259,20 @@ looks something like this::
     my_obj.AwesomeMethod()
 
 In a case like this, we can make object creation even nicer by using the `init` keyword in
-`NiceObjectDef()`. The value of `init` should be a function which returns the handle to be used for
-the new object instance. It may take whatever arguments it wants, and these are passed in from the
-object's constructor. In our case, we don't need any arguments at all; if our specification looks
-something like this::
+`NiceObjectDef()`. `init` should be the name of a wrapped function which returns the handle to be
+used for the new object instance. It may take whatever arguments it wants, and these are passed in
+from the object's constructor. In our case, we don't need any arguments at all; if our specification
+looks something like this::
 
     class MyNiceLib(NiceLib):
         ...
         GetHandle = ('out')
 
-        MyObject = NiceObjectDef(init=GetHandle, attrs=dict(
+        MyObject = NiceObjectDef(init='GetHandle', attrs=dict(
             ...
         ))
 
-We can then do this::
+we can then do this::
 
     my_obj = MyNiceLib.MyObject()
     my_obj.AwesomeMethod()
