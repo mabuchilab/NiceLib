@@ -9,6 +9,7 @@ from future.utils import with_metaclass
 import sys
 import warnings
 import pickle as pkl
+from numbers import Number
 from inspect import isfunction, getargspec
 from . import test_mode_is, _test_mode
 
@@ -239,11 +240,22 @@ def _wrap_inarg(ffi, argtype, arg):
         return ffi.cast(argtype, arg.ctypes.data)
 
     elif isinstance(argtype, ffi.CType):
+        # Convert strings
         if argtype.cname in ('char *', 'char[]') and isinstance(arg, (str, bytes)):
             if isinstance(arg, str):
                 arg = arg.encode()
             return ffi.new('char[]', arg)
 
+        # Auto-create numeric pointers and initialize them from argtype
+        elif (argtype.kind == 'pointer' and argtype.item.kind == 'primitive' and
+              isinstance(arg, Number)):
+            return ffi.new(argtype, arg)
+
+        # Create a pointer to arg if that would match argtype
+        elif _can_be_pointed_to(ffi, argtype, arg):
+            return ffi.new(argtype, arg)
+
+        # Try to directly cast; could be dangerous
         else:
             try:
                 return ffi.cast(argtype, arg)
@@ -252,6 +264,16 @@ def _wrap_inarg(ffi, argtype, arg):
                                                                                         arg))
     else:
         return arg
+
+
+def _can_be_pointed_to(ffi, ctype, cval):
+    """True if ctype is a pointer to to cval's type, i.e. if cval can be used to init a ctype"""
+    try:
+        item_type = ctype.item
+    except AttributeError:
+        return False  # Not a pointer
+
+    return ffi.typeof(cval) == item_type
 
 
 def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buflen,
