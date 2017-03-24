@@ -9,6 +9,7 @@ from future.utils import PY2
 
 import re
 import os.path
+from io import open  # Needed for opening as unicode, might be slow on Python 2
 import copy
 import warnings
 import logging as log
