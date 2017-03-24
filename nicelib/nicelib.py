@@ -147,8 +147,14 @@ class NiceClassMeta(type):
                 repr_str = func.__doc__ or '{}(??) -> ??'.format(func_name)
             repr_strs[func_name] = repr_str
 
+        # Get init function
+        try:
+            init_func = funcs[niceobjdef.init] if niceobjdef.init else None
+        except KeyError:
+            raise ValueError("Could not find function '{}'".format(niceobjdef.init))
+
         def __init__(self, *args):
-            handles = niceobjdef.init(*args) if niceobjdef.init else args
+            handles = init_func(*args) if init_func else args
             if not isinstance(handles, tuple):
                 handles = (handles,)
 
@@ -458,6 +464,10 @@ class NiceObjectDef(object):
         self.doc = doc
         self.attrs = attrs
         self.n_handles = n_handles
+
+        if not isinstance(init, basestring):
+            raise TypeError("NiceObjectDef's `init` arg must be a string that names a wrapped "
+                            "function. Got '{}' instead.".format(type(init).__name__))
         self.init = init
 
         if attrs is not None:
