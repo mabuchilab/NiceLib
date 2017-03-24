@@ -208,6 +208,19 @@ class MockCData(object):
 
 
 def _wrap_inarg(ffi, argtype, arg):
+    """Convert an input arg to the argtype required by the underlying C function
+
+    `argtype` is the ffi.CType to which `arg` should be converted.
+
+    Converts a string to `char *` or `char[]`
+    Converts a number to its corresponding CType
+                      or a new pointer to the number
+    Converts a numpy array to the correct numeric pointer (only flat arrays for now)
+    Creates a pointer to arg if argtype is a typeof(arg) pointer
+    Otherwise, tries to cast arg to argtype via ffi.cast()
+
+    If `argtype` is not a CType, returns `arg` unmodified
+    """
     # For variadic args, we can't rely on cffi auto-converting our arg to the right cdata type, so
     # we do it ourselves instead
     try:
