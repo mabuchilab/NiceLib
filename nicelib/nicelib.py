@@ -502,7 +502,7 @@ class NiceObjectDef(object):
         self.attrs = attrs
         self.n_handles = n_handles
 
-        if not isinstance(init, basestring):
+        if not (init is None or isinstance(init, basestring)):
             raise TypeError("NiceObjectDef's `init` arg must be a string that names a wrapped "
                             "function. Got '{}' instead.".format(type(init).__name__))
         self.init = init
