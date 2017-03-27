@@ -1357,7 +1357,13 @@ class Generator(object):
         return header_src, macro_src.getvalue(), self.tree
 
     def gen_py_src(self, macro):
-        prefix = '__FMACRO_' if isinstance(macro, FuncMacro) else '__OMACRO_'
+        if isinstance(macro, FuncMacro):
+            prefix = '__FMACRO_'
+            args = macro.args
+        else:
+            prefix = '__OMACRO_'
+            args = ()
+
         log.info("Generating body of macro {} "
                  "[{}:{}:{}]".format(macro.name, macro.fpath, macro.line, macro.col))
         log.debug("  body tokens are {}".format(macro.body))
@@ -1366,9 +1372,9 @@ class Generator(object):
         if macro.body:
             expanded = self.expander(macro.body)
             for token in expanded:
-                if token.type is Token.IDENTIFIER:
-                    log.info("  IDENTIFIER still in the macro body after expansion, ignoring this "
-                             "macro definition")
+                if token.type is Token.IDENTIFIER and token.string not in args:
+                    log.info("Identifier '{}' still in the macro body after expansion, ignoring "
+                             "this macro definition".format(token.string))
                     return None
             c_src = ''.join(token.string for token in expanded)
             func_src = "\nint " + prefix + macro.name + "(void){" + c_src + ";}"
@@ -1381,8 +1387,9 @@ class Generator(object):
                 except ConvertError as e:
                     warnings.warn(str(e))
 
-            except (plyparser.ParseError, AttributeError):
+            except (plyparser.ParseError, AttributeError) as e:
                 warnings.warn("Un-pythonable macro {}".format(macro.name))
+                warnings.warn(str(e))
 
         log.info("  generated to {}".format(py_src))
         return py_src
