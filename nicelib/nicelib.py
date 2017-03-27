@@ -341,7 +341,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buf
             raise TypeError(message)
 
         # First pass to get buf/arr info
-        buflens, lens, solo_buflens = [], [], []
+        buflens, lens, solo_buflens, buftypes = [], [], [], []
         n_paired_bufs = 0
         inarg_idx = 0
         for sig, argtype in zip(sig_tup, argtypes):
@@ -350,6 +350,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buf
 
             elif sig in ('buf', 'arr'):
                 n_paired_bufs += 1
+                buftypes.append(argtype.item)
 
             elif sig.startswith(('buf[', 'arr[')):
                 try:
@@ -361,6 +362,8 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buf
                 solo_buflens.append(num)
 
             elif sig.startswith('len'):
+                sig, _, size_type = sig.partition(':')
+
                 if len(sig) == 3:
                     num = default_buflen
                 else:
@@ -442,9 +445,20 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buf
                 outargs.append((arg, lambda arr: arr_out_wrapper(arr, buflen)))
                 bufs.append(arg)
             elif info.startswith('len'):
+                info, _, size_type = info.partition(':')
                 if info == 'len=in':
                     inargs.pop(0)  # We've already used this earlier
-                arg = lens.pop(0)
+                buftype = buftypes.pop(0)
+
+                # Adjust len if sig has an explicit type
+                if not size_type:
+                    meas_size = ffi.sizeof(buftype)
+                elif size_type == 'byte':
+                    meas_size = 1
+                else:
+                    meas_size = ffi.sizeof(size_type)
+
+                arg = lens.pop(0) * ffi.sizeof(buftype) // meas_size
             elif info == 'ignore':
                 arg = ffi.new(argtype.cname + '*')[0]
             else:
