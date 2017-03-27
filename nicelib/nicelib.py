@@ -9,7 +9,6 @@ from future.utils import with_metaclass
 import sys
 import warnings
 import pickle as pkl
-from numbers import Number
 from inspect import isfunction, getargspec
 from . import test_mode_is, _test_mode
 
@@ -259,34 +258,21 @@ def _wrap_inarg(ffi, argtype, arg):
                 arg = arg.encode()
             return ffi.new('char[]', arg)
 
-        # Auto-create numeric pointers and initialize them from argtype
-        elif (argtype.kind == 'pointer' and argtype.item.kind == 'primitive' and
-              isinstance(arg, Number)):
-            return ffi.new(argtype, arg)
-
-        # Create a pointer to arg if that would match argtype
-        elif _can_be_pointed_to(ffi, argtype, arg):
-            return ffi.new(argtype, arg)
-
-        # Try to directly cast; could be dangerous
         else:
+            try:
+                return ffi.new(argtype, arg)
+            except TypeError:
+                pass
+
             try:
                 return ffi.cast(argtype, arg)
             except TypeError:
-                raise TypeError("A value castable to '{}' is required, got '{}'".format(argtype,
-                                                                                        arg))
+                pass
+
+        raise TypeError("A value castable to (or a valid initializer for) '{}' is required, "
+                        "got '{}'".format(argtype, arg))
     else:
         return arg
-
-
-def _can_be_pointed_to(ffi, ctype, cval):
-    """True if ctype is a pointer to to cval's type, i.e. if cval can be used to init a ctype"""
-    try:
-        item_type = ctype.item
-    except AttributeError:
-        return False  # Not a pointer
-
-    return ffi.typeof(cval) == item_type
 
 
 def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buflen,
@@ -423,10 +409,12 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buf
                     arg = inarg  # Pass straight through
                 elif argtype.kind == 'pointer' and argtype.item.kind == 'struct':
                     arg = struct_maker(argtype, inarg)
-                elif _can_be_pointed_to(ffi, argtype, inarg):
-                    arg = ffi.new(argtype, inarg)
                 else:
-                    raise TypeError("Cannot convert {} to required type {}".format(inarg, argtype))
+                    try:
+                        arg = ffi.new(argtype, inarg)
+                    except TypeError:
+                        raise TypeError("Cannot convert {} to required type"
+                                        "{}".format(inarg, argtype))
                 outargs.append((arg, lambda o: o[0]))
             elif info == 'in':
                 arg = inargs.pop(0)
