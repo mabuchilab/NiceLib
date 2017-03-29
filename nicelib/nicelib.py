@@ -137,7 +137,7 @@ class NiceObject(object):
 
 
 class NiceClassMeta(type):
-    def __new__(metacls, cls_name, niceobjdef, ffi, funcs):
+    def __new__(metacls, cls_name, niceobjdef, ffi, funcs, user_funcs):
         repr_strs = {}
         for func_name in niceobjdef.names:
             func = funcs[func_name]
@@ -166,7 +166,12 @@ class NiceClassMeta(type):
             for func_name in niceobjdef.names:
                 lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles, cls_name,
                                        self)
-                setattr(self, func_name, lib_func)
+                if func_name in user_funcs:
+                    wrapped_func = user_funcs[func_name]
+                    wrapped_func.orig = lib_func
+                    setattr(self, func_name, wrapped_func)
+                else:
+                    setattr(self, func_name, lib_func)
 
             if test_mode_is('record'):
                 Record.ensure_created()
@@ -608,6 +613,7 @@ class LibMeta(type):
 
         funcs = {}
         func_flags = {}
+        user_funcs = {}
         ret_wrappers = {
             'return': mro_lookup('_ret_return'),
             'ignore': mro_lookup('_ret_ignore')
@@ -619,12 +625,19 @@ class LibMeta(type):
 
         for name, value in classdict.items():
             if (not name.startswith('_') and not isinstance(value, NiceObjectDef)):
+                sig_tup = None
                 if isfunction(value):
-                    func = value
-                    flags = {}
-                    repr_str = func.__doc__ or "{}(??) -> ??".format(name)
+                    if hasattr(value, 'sig'):
+                        sig_tup = value.sig
+                        user_funcs[name] = value
+                    else:
+                        func = value
+                        flags = {}
+                        repr_str = func.__doc__ or "{}(??) -> ??".format(name)
                 else:
                     sig_tup = value
+
+                if sig_tup:
                     flags = base_flags.copy()
                     if name in func_to_niceobj:
                         flags.update(func_to_niceobj[name].flags)
@@ -675,9 +688,10 @@ class LibMeta(type):
                 # HACK to get nice repr
                 classdict[name] = LibFunction(func, repr_str)
 
+        # Create NiceObject classes
         for cls_name, niceobjdef in niceobjectdefs.items():
             # Need to use a separate function so we have a per-class closure
-            classdict[cls_name] = NiceClassMeta(cls_name, niceobjdef, ffi, funcs)
+            classdict[cls_name] = NiceClassMeta(cls_name, niceobjdef, ffi, funcs, user_funcs)
 
         # Add macro defs
         if defs:
