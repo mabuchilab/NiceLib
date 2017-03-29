@@ -423,7 +423,12 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buf
                     except TypeError:
                         raise TypeError("Cannot convert {} to required type"
                                         "{}".format(inarg, argtype))
-                outargs.append((arg, lambda o: o[0]))
+
+                if argtype.kind == 'pointer' and argtype.item.cname == 'void':
+                    # Don't dereference void pointers directly
+                    outargs.append((arg, lambda o: o))
+                else:
+                    outargs.append((arg, lambda o: o[0]))
             elif info == 'in':
                 arg = inargs.pop(0)
                 arg = _wrap_inarg(ffi, argtype, arg)
