@@ -32,6 +32,16 @@ def to_tuple(value):
 
 
 def handle_header_path(path):
+    """Find the paths to the specified headers and verify they exist
+
+    `path` may take a few forms. It may be just a string, in which case it specifies the absolute
+    path to a header file.
+
+    Otherwise, it must be in the form of a "platform" dict, which maps platform-specific strings
+    to "header" dicts. Each "header" dict must contain a 'header' entry, which is a string or tuple
+    of strings indicating header paths. Optionally you may include a 'path' entry, which specifies
+    a list of directories where the headers may be located.
+    """
     if isinstance(path, basestring):
         if os.path.exists(path):
             return path
@@ -56,6 +66,13 @@ def handle_header_path(path):
 
 
 def find_header(header_name, include_dirs):
+    """Resolve the path of a header_name
+
+    Supports inclusion of environment variables in header and dir names. If `header_name` is a
+    relative path (e.g. simply a filename), it is searched for relative to each of the paths in
+    `include_dirs`, otherwise `include_dirs` is ignored and the absolute path is used directly.
+    Raises an exception if the header cannot be found.
+    """
     try:
         header_name = header_name.format(**os.environ)
     except KeyError:
