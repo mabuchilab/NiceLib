@@ -710,6 +710,20 @@ class LibMeta(type):
                             classdict[shortname] = staticmethod(attr) if callable(attr) else attr
                         break
 
+        # Add enum constant defs
+        if ffi:
+            for name in dir(lib):
+                attr = getattr(lib, name)
+                if not isinstance(attr, ffi.CData) or ffi.typeof(attr).kind != 'function':
+                    for prefix in base_flags['prefix']:
+                        if name.startswith(prefix):
+                            shortname = name[len(prefix):]
+                            if shortname in classdict:
+                                warnings.warn("Conflicting name {}, ignoring".format(shortname))
+                            else:
+                                classdict[shortname] = attr
+                            break
+
         classdict['_dir_lib'] = dir_lib
         cls = super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
