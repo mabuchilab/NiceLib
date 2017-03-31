@@ -25,6 +25,11 @@ def select_platform_value(platform_dict):
     raise ValueError("No matching platform pattern found")
 
 
+def to_tuple(value):
+    """Convert value to a tuple, or if it is a string, wrap it in a tuple"""
+    return (value,) if isinstance(value, basestring) else tuple(value)
+
+
 def handle_header_path(path):
     if isinstance(path, basestring):
         if os.path.exists(path):
