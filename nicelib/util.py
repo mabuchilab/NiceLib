@@ -6,6 +6,7 @@ import sys
 import os
 import os.path
 from fnmatch import fnmatch
+from ctypes.util import find_library
 
 is_64bit = sys.maxsize > 2**32
 
@@ -81,6 +82,19 @@ def find_header(header_name, include_dirs):
 
 
 def handle_lib_name(lib_name):
-    if isinstance(lib_name, basestring):
-        return lib_name
-    return select_platform_value(lib_name)
+    """Find the path to the library
+
+    `lib_name` can be specified directly as a string (or sequence of strings), or within a
+    "platform" dict. If multiple libs are specified, the first one found will be returned.
+    """
+    if isinstance(lib_name, dict):
+        lib_names = to_tuple(select_platform_value(lib_name))
+    else:
+        lib_names = to_tuple(lib_name)
+
+    for try_name in lib_names:
+        path = find_library(try_name)
+        if path:
+            return path
+
+    raise ValueError("Cannot find library '{}'".format(lib_names))
