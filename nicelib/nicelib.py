@@ -11,6 +11,7 @@ import warnings
 import pickle as pkl
 from inspect import isfunction, getargspec
 from . import test_mode_is, _test_mode
+from .util import to_tuple
 
 __all__ = ['NiceLib', 'NiceObjectDef']
 FLAGS = ('prefix', 'ret_wrap', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
@@ -598,10 +599,9 @@ class LibMeta(type):
                 pass  # Name may be from a separate library's header
 
         # Add default empty prefix
-        if isinstance(base_flags['prefix'], basestring):
-            base_flags['prefix'] = (base_flags['prefix'], '')
-        else:
-            base_flags['prefix'] = tuple(base_flags['prefix']) + ('',)
+        base_flags['prefix'] = to_tuple(base_flags['prefix'])
+        if '' not in base_flags['prefix']:
+            base_flags['prefix'] += ('',)
 
         # Unpack NiceObjectDef sigs into the classdict
         niceobjectdefs = {}  # name: NiceObjectDef
@@ -663,10 +663,9 @@ class LibMeta(type):
                         flags.update(func_flags)
                         sig_tup = sig_tup[:-1]
 
-                    if isinstance(flags['prefix'], basestring):
-                        flags['prefix'] = (flags['prefix'], '')
-                    else:
-                        flags['prefix'] = tuple(flags['prefix']) + ('',)
+                    flags['prefix'] = to_tuple(flags['prefix'])
+                    if '' not in flags['prefix']:
+                        flags['prefix'] += ('',)
 
                     # Try prefixes until we find the lib function
                     for prefix in flags['prefix']:
