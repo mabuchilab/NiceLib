@@ -701,7 +701,7 @@ class LibMeta(type):
         # Add macro defs
         if defs:
             for name, attr in defs.items():
-                for prefix in flags['prefix']:
+                for prefix in base_flags['prefix']:
                     if name.startswith(prefix):
                         shortname = name[len(prefix):]
                         if shortname in classdict:
