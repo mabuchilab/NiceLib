@@ -41,11 +41,8 @@ def handle_header_path(path):
     if 'header' not in header_dict:
         raise KeyError("Header dict must contain key 'header'")
 
-    header_names = header_dict['header']
-    header_names = (header_names,) if isinstance(header_names, basestring) else header_names
-
-    include_dirs = header_dict.get('path', ())
-    include_dirs = (include_dirs,) if isinstance(include_dirs, basestring) else include_dirs
+    header_names = to_tuple(header_dict['header'])
+    include_dirs = to_tuple(header_dict.get('path', ()))
 
     headers = [find_header(h, include_dirs) for h in header_names]
 
