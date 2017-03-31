@@ -157,6 +157,7 @@ class NiceClassMeta(type):
             handles = init_func(*args) if init_func else args
             if not isinstance(handles, tuple):
                 handles = (handles,)
+            self._handles = handles
 
             if len(handles) != niceobjdef.n_handles:
                 raise TypeError("__init__() takes exactly {} arguments "
