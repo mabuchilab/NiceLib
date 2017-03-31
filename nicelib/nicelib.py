@@ -674,8 +674,7 @@ class LibMeta(type):
                         ffi_func = getattr(lib, func_name, None)
                         if ffi_func is not None:
                             break
-
-                    if ffi_func is None:
+                    else:
                         raise AttributeError("No lib function found with a name ending in '{}', wi"
                                              "th any of these prefixes: {}".format(name,
                                                                                    flags['prefix']))
