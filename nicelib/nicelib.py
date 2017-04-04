@@ -14,7 +14,7 @@ from . import test_mode_is, _test_mode
 from .util import to_tuple
 
 __all__ = ['NiceLib', 'NiceObjectDef']
-FLAGS = ('prefix', 'ret_wrap', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
+FLAGS = ('prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
 
 
 class StateNode(object):
@@ -282,10 +282,10 @@ def _wrap_inarg(ffi, argtype, arg):
         return arg
 
 
-def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buflen,
+def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret, struct_maker, buflen,
                   use_numpy, free_buf):
     default_buflen = buflen
-    ret_wrap_args = set(getargspec(ret_wrap).args[1:])
+    ret_handler_args = set(getargspec(ret).args[1:])
 
     def bufout_wrap(buf_ptr):
         """buf_ptr is a char**"""
@@ -485,13 +485,13 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret_wrap, struct_maker, buf
         retval = func(*args)
         out_vals = [f(a) for a, f in outargs]
 
-        if ret_wrap:
+        if ret:
             try:
-                kwds = {arg: available_args[arg] for arg in ret_wrap_args}
+                kwds = {arg: available_args[arg] for arg in ret_handler_args}
             except KeyError as e:
-                raise KeyError("Unknown arg '{}' in arglist of ret-wrapping function "
-                               "'{}'".format(e.args[0], ret_wrap.__name__))
-            retval = ret_wrap(retval, **kwds)
+                raise KeyError("Unknown arg '{}' in arglist of ret-handling function "
+                               "'{}'".format(e.args[0], ret.__name__))
+            retval = ret(retval, **kwds)
 
         if retval is not None:
             out_vals.append(retval)
@@ -523,6 +523,10 @@ class NiceObjectDef(object):
 
         if attrs is not None:
             self.names = set(attrs.keys())
+
+        if 'ret_wrap' in flags:
+            warnings.warn("The 'ret_wrap' flag has been renamed to 'ret', please update your code")
+            flags['ret'] = flags.pop('ret_wrap')
 
         bad_kwds = [k for k in flags if k not in FLAGS]
         if bad_kwds:
@@ -572,7 +576,13 @@ class LibMeta(type):
 
         # Deprecation warnings
         if '_err_wrap' in classdict:
-            warnings.warn("Your class defines _err_wrap, which has been renamed to _ret_wrap, "
+            classdict['_ret'] = classdict.pop('_err_wrap')
+            warnings.warn("Your class defines _err_wrap, which has been renamed to _ret, "
+                          "please update your code")
+
+        if '_ret_wrap' in classdict:
+            classdict['_ret'] = classdict.pop('_ret_wrap')
+            warnings.warn("Your class defines _ret_wrap, which has been renamed to _ret, "
                           "please update your code")
 
         if '_info' in classdict:
@@ -620,14 +630,14 @@ class LibMeta(type):
         funcs = {}
         func_flags = {}
         user_funcs = {}
-        ret_wrappers = {
+        ret_handlers = {
             'return': mro_lookup('_ret_return'),
             'ignore': mro_lookup('_ret_ignore')
         }
 
         for name, value in classdict.items():
             if name.startswith('_ret_') and isfunction(value):
-                ret_wrappers[name[5:]] = value
+                ret_handlers[name[5:]] = value
 
         for name, value in classdict.items():
             if (not name.startswith('_') and not isinstance(value, NiceObjectDef)):
@@ -656,9 +666,11 @@ class LibMeta(type):
                     if sig_tup and isinstance(sig_tup[-1], dict):
                         func_flags = sig_tup[-1]
 
-                        # Allow use of 'ret' as a shorthand for 'ret_wrap'
-                        if 'ret' in func_flags:
-                            func_flags['ret_wrap'] = func_flags.pop('ret')
+                        # Temporarily allow 'ret_wrap' for backwards compatibility
+                        if 'ret_wrap' in func_flags:
+                            warnings.warn("The 'ret_wrap' flag has been renamed to 'ret', please "
+                                          "update your code")
+                            func_flags['ret'] = func_flags.pop('ret_wrap')
 
                         flags.update(func_flags)
                         sig_tup = sig_tup[:-1]
@@ -678,9 +690,9 @@ class LibMeta(type):
                                              "th any of these prefixes: {}".format(name,
                                                                                    flags['prefix']))
 
-                    ret_wrapper = flags['ret_wrap']
-                    if isinstance(ret_wrapper, basestring):
-                        flags['ret_wrap'] = ret_wrappers[flags['ret_wrap']]
+                    ret_handler = flags['ret']
+                    if isinstance(ret_handler, basestring):
+                        flags['ret'] = ret_handlers[flags['ret']]
 
                     func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, **flags)
                     repr_str = _func_repr_str(ffi, func)
@@ -836,7 +848,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
         named like ``SDK_Func()``, you can set `_prefix` to ``'SDK_'``, and access them as
         `Func()`. If more than one prefix is given, they are tried in order for each signature
         until the appropraite function is found.
-    _ret_wrap : function or str, optional
+    _ret : function or str, optional
         Wrapper function to handle the return values of each library function. By default, the
         return value will be appended to the end of the Python return values. The wrapper function
         takes the C function's return value (often an error/success code) as its only argument. If
@@ -869,7 +881,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _buflen = 512
     _use_numpy = False
     _free_buf = None
-    _ret_wrap = 'return'
+    _ret = 'return'
 
     def _ret_return(retval):
         return retval
