@@ -4,6 +4,22 @@ Change Log
 Unreleased
 ----------
 
+Added
+"""""
+- Inject ``funcname`` into ``ret``
+- Support for Unicode headers
+- Experimental support for specifying units that ``len`` sig handler uses
+- Strip prefixes of enum constants too
+- Allow searching for a lib under multiple names/locations
+
+Changed
+"""""""
+- Renamed ``ret_wrap`` to to ``ret`` for consistency
+- Fixed handling of nested structs/unions/enums in ``struct_func_hook``
+- Use only one ``cparser``. Speeds up parsing of large header sets dramatically
+- Fixed ``init`` arg handling for ``NiceObjectDef``
+- Fixed bug that prevented generation of func-like macros that had arguments
+
 
 (0.2) - 2016-8-12
 -----------------
