@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016 Nate Bogdanowicz
+# Copyright 2016-2017 Nate Bogdanowicz
 from __future__ import unicode_literals, division, print_function
 from future import standard_library
 standard_library.install_aliases()

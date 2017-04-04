@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016 Nate Bogdanowicz
+# Copyright 2016-2017 Nate Bogdanowicz
 
 # Info about macros defined here can be found at this great reference:
 # https://sourceforge.net/p/predef/wiki/Home/
