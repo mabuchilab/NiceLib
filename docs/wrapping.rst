@@ -29,7 +29,7 @@ We could then wrap it like this::
 
     class NiceMotor(NiceLib):
         _info = load_lib('awesomemotor', __package__)
-        _ret_wrap = 'code'
+        _ret = 'code'
 
         def _ret_code(retval):
             if retval != 0:
@@ -64,54 +64,44 @@ settings, which you can read more about below.
 Settings
 --------
 Settings, also called flags, give you extra control over how a library is wrapped. Settings are
-scoped so that you can specify them class-wide, NiceObject-wide, and per-function. To make a
+scoped, meaning that you can specify them class-wide, NiceObject-wide, and per-function. To make a
 class-wide setting, give your class an attribute with one of the setting names, prefixed by an
-underscore. For example, if you want to set a class-wide buflen, specify `'_buflen'`. Pass
-per-NiceObject settings as keyword args to the NiceObjectDef constructor. For fine-grained,
-per-function control, you may append a dict to the end of the function's signature tuple.
+underscore. Pass per-NiceObject settings as keyword args to the NiceObjectDef constructor. For
+fine-grained, per-function control, you may append a dict to the end of the function's signature
+tuple. For example:
+
+Class-level::
+
+   class MyLib(NiceLib):
+       _buflen = 128
+
+NiceObject-level::
+
+   MyObject = NiceObjectDef(buflen=128, ...)
+
+Function-level::
+
+   MyFunction = ('in', 'in', 'out', {'buflen': 128})
+
+
+The available settings are:
 
 prefix
     A `str` or sequence of `str`\s specifying prefixes to strip from the library function
-    names. e.g. if the library has functions named like ``SDK_Func()``, you can set `_prefix` to
-    `'SDK_'`, and access them as ``Func()``. If more than one prefix is given, they are tried in
-    order for each signature until the appropraite function is found. The empty prefix ``''`` is
-    always tried.  Sometimes you may want to specify one library-wide prefix and a different
-    per-object prefix, as done in the above example.
+    names. For example, if the library has functions named like ``SDK_Func()``, you can set
+    `_prefix` to `'SDK_'`, and access them as ``Func()``. If more than one prefix is given, they are
+    tried in order for each signature until the appropraite function is found. The empty prefix
+    ``''`` is always tried. Sometimes you may want to specify one library-wide prefix and a
+    different per-object prefix, as done in the above example.
 
-ret_wrap
-    A function or `str` specifying a wrapper function to handle the return values of each library
-    function.  By default, the return value will be appended to the end of the Python return
-    values. The wrapper function takes the C function's return value (often an error/success code)
-    as its first argument (see below for other optional args it may take). If the wrapper returns a
-    non-None value, it will be appended to the wrapped function's return values.
-
-    If you define function `_ret_foo()` in your subclass, you may refer to it by using the
-    string `'foo'`. This works for any function whose name starts with ``_ret_`` that is defined in
-    the class body.
-
-    There are two wrappers that `NiceLib` defines for convenience (and may also be referenced
-    as strings). `_ret_return()` is the default, which simply appends the return value to the
-    wrapped function's return values, and `_ret_ignore()`, which ignores the value entirely
-    and does not return it.
-
-    Sometimes it may be useful to give a wrapper more information about the function that was
-    called, like the parameters it was passed. If you define your wrapper to take one or more
-    specially-named args, they will be automatically injected for you. These currently include::
-
-    funcargs:
-        The list of all args (including output) that were passed to the C function
-
-    niceobj:
-        The `NiceObject` instance whose function was called, or None it was a top-level function
-
-struct_maker
-    A function that is called to create an FFI struct of the given type. Mainly useful for odd
-    libraries that require you to always fill out some field of the struct, like its size in bytes.
+ret
+    A function or `str` specifying a handler function to handle the return values of each library
+    function. See :ref:`retval-handlers` for details.
 
 buflen
-    An `int` specifying the default length for buffers. This can be overridden on a per-argument
-    basis in the argument's spec string, e.g. `'len=64'` will make a 64-character buffer or a
-    64-element array.
+    An `int` specifying the default length for buffers and arrays. This can be overridden on a
+    per-argument basis in the argument's spec string, e.g. `'len=64'` will make a 64-character
+    buffer or a 64-element array.
 
 free_buf
     A function that is called on the pointer returned for 'bufout' argtypes, used for freeing their
@@ -119,8 +109,12 @@ free_buf
     string. It is not called if a null pointer is returned. May be None.
 
 use_numpy
-    If True, convert output args marked as 'arr' to `numpy` arrays. Requires `numpy` to be
+    If True, convert output args marked as `'arr'` to numpy arrays. Requires numpy to be
     installed.
+
+struct_maker
+    A function that is called to create an FFI struct of the given type. Mainly useful for odd
+    libraries that require you to always fill out some field of the struct, like its size in bytes.
 
 
 Class Attributes
@@ -207,14 +201,14 @@ The possible signature values are:
 
 'buf[n]'
     The same as `'buf'`, but does not have a matching `'len'`. Because of this, the buffer length
-    is specified directly as an int. e.g. a 20-char buffer would be `'buf[20]'`.
+    is specified directly as an int. For example, a 20-char buffer would be `'buf[20]'`.
 
 'arr'
-    The same as `'buf'`, but does not call `ffi.string()` on the returned value. Used for e.g.
+    The same as `'buf'`, but does not call `ffi.string()` on the returned value. Used e.g. for
     `int` arrays.
 
 'arr[n]'
-    The same as `'buf[n]'`, but does not call `ffi.string()` on the returned value. Used for e.g.
+    The same as `'buf[n]'`, but does not call `ffi.string()` on the returned value. Used e.g. for
     ``int`` arrays.
 
 'len'
@@ -222,16 +216,57 @@ The possible signature values are:
     use the length given by the innermost `buflen` setting.
     
 'len=n'
-    The same as `'len'`, but with an overridden length. e.g. `'len=32'` would allocate a buffer or
-    array of length 32, regardless of what `buflen` is.
+    The same as `'len'`, but with an overridden length. For example, `'len=32'` would allocate a
+    buffer or array of length 32, regardless of what `buflen` is.
 
 'len=in'
-    Similar to `'len=n'`, except the wrapper function accepts an extra ``int`` argument specifying
+    Similar to `'len=n'`, except the resulting function accepts an extra ``int`` argument specifying
     the size of buffer that should be allocated for that invocation.
 
 'ignore'
     Ignore the argument, passing in 0 or NULL, depending on the arg type. This is useful for
     functions with "reserved" arguments which don't do anything.
+
+
+.. _retval-handlers:
+
+Return Value Handlers
+---------------------
+Return value handlers are specified via the ``ret`` flag. Each handler is either a function or `str`
+specifying a function to handle the return values of each library function. For example, they can be
+used to raise exceptions or return values. They can even do custom handling based on what args were
+passed to the function.
+
+A handler function takes the C function's return value, often an error/success code, as its first
+argument (see below for other optional parameters it may take). If the handler returns a non-None
+value, it will be appended to the wrapped function's return values.
+
+If you define a function `_ret_foo()` in your subclass, you may refer to it by using the string
+`'foo'`. This works for any function defined in the class body that has a name starting with
+``_ret_``, including builtin handlers.
+
+Builtin Handlers
+~~~~~~~~~~~~~~~~
+There are two handlers that `NiceLib` defines for convenience:
+
+_ret_return
+    The default handler. Simply appends the return value to the wrapped function's return values.
+
+_ret_ignore
+    Ignores the value entirely and does not return it. Useful for ``void`` functions
+
+
+Injected Parameters
+~~~~~~~~~~~~~~~~~~~
+Sometimes it may be useful to give a handler more information about the function that was called,
+like the parameters it was passed. If you define your handler to take one or more specially-named
+args, they will be automatically injected for you. These currently include::
+
+funcargs
+    The list of all `cffi`-level args (including output args) that were passed to the C function
+
+niceobj
+    The `NiceObject` instance whose method was called, or None for a top-level function
 
 
 NiceObjects
@@ -240,14 +275,13 @@ Often a C library exposes a distinctly object-like interface like the one in our
 Essentially, you have a handle or ID for some resource (a motor in our case), which gets passed as
 the first argument to a subset of the library's functions. It makes sense to treat these as the
 methods of some type of object. `NiceLib` allows you to define these types of objects via
-(suprise!) `NiceObjectDef`.
+`NiceObjectDef`.
 
 A `NiceObjectDef` definition is mostly just a grouping of function signatures, with some optional
-type-scoped settings (`prefix`, `ret_wrap`, and `buf_len`). The `NiceObjectDef` constructor also
-takes a few more optional parameters, which we'll describe below. When your `NiceLib` subclass's
-definition is processed by the metaclass, a sublass of `NiceObject` is created for each
-`NiceObjectDef` you created. These `NiceObject` subclasses can then be instantiated and used to
-invoke methods.
+type-scoped settings (`prefix`, `ret`, and `buf_len`). The `NiceObjectDef` constructor also takes a
+few more optional parameters, which we'll describe below. When your `NiceLib` subclass's definition
+is processed by the metaclass, a sublass of `NiceObject` is created for each `NiceObjectDef` you
+created. These `NiceObject` subclasses can then be instantiated and used to invoke methods.
 
 So how does NiceLib attach a handle to each object instance? It uses the argument passed into the
 `NiceObject`'s constructor. This gets stored with the object, and is automatically passed as the

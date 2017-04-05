@@ -26,7 +26,7 @@ platforms. The build module for a Windows-only lib might look like this::
         },
     }
 
-    lib_names = {'win*': 'foo.dll'}
+    lib_names = {'win*': 'foo'}
 
 
     def build():
@@ -34,12 +34,38 @@ platforms. The build module for a Windows-only lib might look like this::
 
 You then call `load_lib('foo', __package__)` in your wrapper file to load the `LibInfo` object.
 This uses the `_foolib` submodule if it exists. If it doesn't exist yet, `load_lib()` tries to
-build it by calling the `build()` function in `_build_foo`. This searches for `foo.dll` in the
-system path and looks for `foo.h` in both of the vendor-specific directories given above. If it
-finds them successfully, it then processes the header so that `cffi` can understand it.
+build it by calling the `build()` function in `_build_foo`. This calls `build_lib`, which searches
+for `foo.dll` in the system path and looks for `foo.h` in both of the vendor-specific directories
+given above. If it finds them successfully, it then processes the header so that `cffi` can
+understand it.
 
-The platform specifiers (`'win*'` in this case) are checked against `sys.platform` to find which
-platform-specific paths and filenames to try, using pattern globbing if given.
+Locating Headers and Libraries
+------------------------------
+Both the ``header_info`` and ``lib_name`` arguments to `build_lib` can be a dict that maps from a
+platform to the corresponding path or name, allowing cross-platform support. The platform specifiers
+(`'win*'` in the example above) are checked against `sys.platform` to find which platform-specific
+paths and filenames to try, using pattern globbing if given. You may also discriminate between 32-
+and 64-bit systems by appending a colon and then the bitness, e.g. `'win*:32'`. If you want the
+platforms to be checked in a specific order, for example if you want to specify a default
+fallthrough option, you can use an `ordereddict` instead of a `dict`.
+
+For ``lib_name``, each platform-specific value is a string or tuple of strings. Each string is the
+name of a library, without any prefix like `lib` or or suffix like `.so` or `.dll`. This is the form
+used by `ctypes.util.find_library`. If you use a tuple of names, nicelib will look for each library
+in turn, using the first one it finds. This is useful if the library could have any of a few
+different names.
+
+For ``header_info``, the each platform-specific value is a dict with the following keys:
+
+'header'
+    A string or tuple of strings which are the names/paths of all the headers to include.
+
+'path'
+    Optional. A tuple of base directories where the headers may be found. Each header is searched
+    for in each directory until it is found. The directories are specified as strings.
+
+Path strings can contain environment variables in the form `'{VAR_NAME}'` as shown in the example
+above. If a variable is not contained in `os.environ`, the whole string is left unsubstituted.
 
 
 Behind the Scenes
