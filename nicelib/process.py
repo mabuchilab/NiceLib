@@ -970,12 +970,19 @@ class Parser(object):
 
 
 class TreeModifier(c_ast.NodeVisitor):
-    """A special type of visitor class that modifies a tree in place
+    """A special type of visitor class that modifies an AST in place
 
-    Its visit_X methods must return a value, which correspond to the transformed node. If the node
-    is contained in a parent node's list and its visit_X method returns None, it will be removed
-    from the list. This modification/removal is implemented via `generic_visit`, so you can
-    override it on a per-nodetype basis.
+    Subclass this and implement the various `visit_X` methods which transform nodes of each type.
+    You can then instantiate the class and use it to implement an AST hook.
+
+    Its `visit_X` methods must return a value, which correspond to the transformed node. If the node
+    is contained in a parent node's list and its `visit_X` method returns None, it will be removed
+    from the list. This modification/removal is implemented via `generic_visit`, so you can override
+    it on a per-nodetype basis.
+
+    The `X` in `visit_X` is the node type's name, e.g. `visit_Enum`. See ``pycparser.c_ast`` or
+    ``pycparser._c_ast.cfg`` for all the available types of nodes, and
+    ``pycparser.c_ast.NodeVisitor`` to see the base visitor class.
     """
     def visit(self, node):
         method = 'visit_' + node.__class__.__name__
@@ -1825,7 +1832,7 @@ def modify_pattern(tokens, pattern):
     Parameters
     ----------
     tokens : sequence of Tokens
-        Token stream
+        Input token stream to process
     pattern : sequence of tuples
         Pattern to match, as a sequence of (keep, target) pairs. Targets are compared against
         tokens; when the first target is matched, we then try matching the rest in order. If the
@@ -1835,14 +1842,13 @@ def modify_pattern(tokens, pattern):
 
         A ``target`` can be either a string or a `TokenType`.
 
-        There is also some functionality for dealing with blocks enclosed in
-        curly braces {}.
+        There is also some functionality for dealing with blocks enclosed in curly braces {}. For
+        more advanced functionality, check out `ParseHelper`.
 
-        Passing a sequence of the type ``((keep_start, '{'), ('keep_end', '~~}~~'))``
-        Will look keep the opening ``{`` according to ``keep_start``.
-        ``keep_end`` is a two letter string, the first letter of which indicates
-        whether the contents of the block enclosed in brackets should be kept,
-        and the second of which indicates is the closing ``}`` should be kept.
+        Passing a sequence of the type ``((keep_start, '{'), ('keep_end', '~~}~~'))`` will keep the
+        opening ``{`` according to ``keep_start``. ``keep_end`` is a two letter string, where the
+        first letter indicates whether the contents of the block enclosed in braces should be kept,
+        and the second indicates if the closing ``}`` should be kept.
     """
     # Check that only the correct keywords are passed
     allowed_keywords = ('a', 'k', 'd', 'kd', 'kk', 'dk', 'dd')
@@ -1950,13 +1956,16 @@ def modify_pattern(tokens, pattern):
 
 
 def remove_pattern(tokens, pattern):
-    """Convenience function that works like modify_pattern, but you only specify targets"""
+    """Convenience function that works like `modify_pattern`, but you only specify targets"""
     pattern = [('d', target) for target in pattern]
     return modify_pattern(tokens, pattern)
 
 
 def add_line_directive_hook(tokens):
-    """Adds line directives to indicate where each token came from"""
+    """Adds line directives to indicate where each token came from
+
+    Enabled by default.
+    """
     out_tokens = []
     chunk = []
     expected_line = -1
@@ -2000,17 +2009,22 @@ def add_line_directive_hook(tokens):
 
 
 def declspec_hook(tokens):
-    """Removes all occurences of `__declspec(...)``"""
+    """Removes all occurences of `__declspec(...)`"""
     return remove_pattern(tokens, ['__declspec', '(', '~~)~~'])
 
 
 def cdecl_hook(tokens):
+    """Removes `cdecl`, `_cdecl`, and `__cdecl`
+
+    Enabled by default.
+    """
     for token in tokens:
         if token not in ('cdecl', '_cdecl', '__cdecl'):
             yield token
 
 
 def inline_hook(tokens):
+    """Removes `_inline`, `__inline`, and `__forceinline`"""
     for token in tokens:
         if token not in ('_inline', '__inline', '__forceinline'):
             yield token
@@ -2022,12 +2036,16 @@ def extern_c_hook(tokens):
 
 
 def enum_type_hook(tokens):
-    """Removes enum type, e.g. `enum myEnum : short {...};` becomes `enum myEnum {...};"""
+    """Removes enum type, e.g. `enum myEnum : short {...};` becomes `enum myEnum {...};`"""
     return modify_pattern(tokens, [('k', 'enum'), ('k', Token.IDENTIFIER), ('d', ':'),
                                    ('d', Token.IDENTIFIER)])
 
 
 class ParseHelper(object):
+    """Helper class for processing token streams
+
+    Allows you to easily read until specific tokens or the ends of blocks, etc.
+    """
     def __init__(self, tokens):
         self.tokens = tokens
         self.tok_it = iter(tokens)
@@ -2036,7 +2054,10 @@ class ParseHelper(object):
         self.peek_deque.append(next(self.tok_it))
 
     def pop(self):
-        """Pop and return next token, raises StopIteration"""
+        """Pop and return next token
+
+        Raises StopIteration if we're already at the end of the token stream.
+        """
         try:
             token = self.peek_deque.popleft()
         except IndexError:
@@ -2056,11 +2077,19 @@ class ParseHelper(object):
         return token
 
     def peek(self):
-        """Peek next token, returns None at end of sequence"""
+        """Peek at the next token
+
+        Returns None at the end of the token stream.
+        """
         return self.peek_deque[0] if self.peek_deque else None
 
     def peek_true_token(self):
-        """Peek next non-non-token, returns None at end of sequence"""
+        """Peek at next true token
+
+        "True" tokens are non-whitespace and non-comment tokens.
+
+        Returns None at the end of the token stream.
+        """
         for token in self.peek_deque:
             if token not in NON_TOKENS:
                 return token
@@ -2073,7 +2102,7 @@ class ParseHelper(object):
         return None
 
     def read_until(self, tokens, discard=False):
-        """Read until the given token; don't consume the given token
+        """Read until the given token, but do not consume it
 
         Raises StopIteration if we're already at the end of the token stream.
         """
@@ -2097,7 +2126,7 @@ class ParseHelper(object):
             self.pop()
 
     def read_to(self, tokens, discard=False):
-        """Read to and consume the given token
+        """Read to the given token and consume it
 
         Raises StopIteration if we're already at the end of the token stream.
         """
@@ -2120,6 +2149,19 @@ class ParseHelper(object):
                 return True if discard else buf
 
     def read_to_depth(self, depth, discard=False):
+        """Read until the specified nesting depth or the end of the token stream
+
+        If `discard` is False, returns a list of the tokens seen before either reaching the desired
+        depth or end-of-stream.
+
+        If `discard` is True, returns True on reaching the desired depth, and raises StopIteration
+        on end-of-stream.
+
+        Always raises StopIteration if we're already at the end of the token stream.
+
+        Seeing a `(`, `{`, or `[` increases the depth, and seeing a `)`, `}`, or `]` decreases it.
+        The current depth is available via the `depth` attribute.
+        """
         buf = []
 
         while True:
@@ -2138,7 +2180,7 @@ class ParseHelper(object):
 
 
 def asm_hook(tokens):
-    """Remove __asm constructs"""
+    """Remove `_asm` and `__asm` and their blocks"""
     ph = ParseHelper(tokens)
 
     while True:
@@ -2160,7 +2202,9 @@ def asm_hook(tokens):
 
 
 def stdcall_hook(tokens):
-    """Replace '__stdcall' and 'WINAPI' with 'volatile volatile const'
+    """Replace `__stdcall` and `WINAPI` with `volatile volatile const`
+
+    Enabled by default.
 
     This technique is stolen from `cffi`.
     """
@@ -2183,7 +2227,7 @@ def stdcall_hook(tokens):
 
 
 def vc_pragma_hook(tokens):
-    """Remove __pragma() usage"""
+    """Remove `__pragma(...)`"""
     ph = ParseHelper(tokens)
 
     while True:
@@ -2273,6 +2317,18 @@ def struct_func_hook(tokens):
 
             for token in buf:
                 yield token
+
+
+#
+# AST Hooks
+#
+
+def add_typedef_hook(tree, parse_func):
+    """Wraps enum/struct/union definitions in a typedef if they lack one
+
+    Useful if for C++ headers where the typedefs are implicit.
+    """
+    return CPPTypedefAdder().hook(tree, parse_func)
 
 
 class CPPTypedefAdder(TreeModifier):

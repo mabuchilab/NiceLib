@@ -1,10 +1,19 @@
-Writing Bindings with NiceLib
-=============================
+Creating Mid-Level Bindings
+===========================
 
 `NiceLib` is the base class that provides a nice interface for quickly defining mid-level library
 bindings. You define a subclass for each specific library (DLL) you wish to wrap.  `NiceLib`'s
 metaclass then converts your specification into a wrapped library. You use this subclass directly,
 without instantiating it.
+
+It's worth discussing what we mean by "mid-level" bindings. Mid-level bindings have a one-to-one
+correspondence between low-level functions and mid-level functions. The difference is that each
+mid-level function has a more Pythonic interface that lets the user mostly or entirely avoid working
+with `cffi` directly. In other words, the overall structure of the library stays the same, but each
+individual function's interface may change.
+
+These mid-level bindings can then be used to craft high-level bindings that might have a completely
+different structure than the underlying low-level library.
 
 Let's say we want to wrap a motor-control library and its header looks something like this:
 
@@ -23,7 +32,7 @@ Let's say we want to wrap a motor-control library and its header looks something
     int MotorGetSerial(HANDLE hMotor, char *recvBuf, uint bufSize);
 
 
-We could then wrap it like this::
+We would then write bindings like this::
 
     from nicelib import NiceLib, NiceObjectDef, load_lib
 
@@ -50,6 +59,7 @@ We could then wrap it like this::
 Then we can use the library like this::
 
     motor_ids = NiceMotor.GetDeviceList()
+
     for motor_id in motor_ids:
         motor = NiceMotor.Motor(motor_id)
         pos = motor.GetPosition()
@@ -64,22 +74,22 @@ settings, which you can read more about below.
 Settings
 --------
 Settings, also called flags, give you extra control over how a library is wrapped. Settings are
-scoped, meaning that you can specify them class-wide, NiceObject-wide, and per-function. To make a
-class-wide setting, give your class an attribute with one of the setting names, prefixed by an
-underscore. Pass per-NiceObject settings as keyword args to the NiceObjectDef constructor. For
-fine-grained, per-function control, you may append a dict to the end of the function's signature
-tuple. For example:
+scoped, meaning that you can specify them class-wide, NiceObject-wide, and per-function. For
+example:
 
-Class-level::
+**Class-level**:
+Give the class an attribute with the setting name prefixed by an underscore::
 
    class MyLib(NiceLib):
        _buflen = 128
 
-NiceObject-level::
+**NiceObject-level**: 
+Pass settings as keyword args to the `NiceObjectDef` constructor::
 
    MyObject = NiceObjectDef(buflen=128, ...)
 
-Function-level::
+**Function-level**:
+Append a dict to the end of the function's signature tuple::
 
    MyFunction = ('in', 'in', 'out', {'buflen': 128})
 
@@ -93,6 +103,8 @@ prefix
     tried in order for each signature until the appropraite function is found. The empty prefix
     ``''`` is always tried. Sometimes you may want to specify one library-wide prefix and a
     different per-object prefix, as done in the above example.
+
+    These prefixes also get stripped from macro names and enum constants, if applicable.
 
 ret
     A function or `str` specifying a handler function to handle the return values of each library
@@ -149,8 +161,12 @@ consists of a tuple defining the input-output signature of the underlying C func
 element of the tuple may be an optional ``dict`` specifying any per-function flags, like custom
 return value handling.
 
+It's important to note that the sig tuple is designed to closely match the signature of the C
+function, i.e. they have the same number of items (except for the optional flag dict). This makes it
+clearer what each element corresponds to.
+
 The basic idea behind signature specifications is to handle input and output in a more Pythonic
-manner---inputs are passed in via a function's arguments, while its outputs are returned as part of
+manner---inputs get passed in via a function's arguments, while its outputs get returned as part of
 the function's return values. Take the simple example from above::
 
     OpenMotor = ('in', 'out')
@@ -160,27 +176,30 @@ its second argument (``HANDLE *phMotor``) is used strictly as output---the funct
 number and returns a handle to a newly opened motor. Using this signature allows us to call the
 function more naturally as ``handle = OpenMotor(motorID)``.
 
-The possible signature values are:
+The available signature values are:
 
 'in'
-    The argument is an input and gets passed into the wrapped function.
+    The argument is an input and gets passed into the mid-level function.
 
 'out'
-    The argument is an output. It is not passed into the wrapped function, but is instead added to
-    the list of return values. NiceLib automatically allocates an appropriate data structure,
-    passes its address-pointer to the C function, uses the dereferenced result as the return value.
+    The argument is an output. It is not passed into the mid-level function, but is instead added to
+    the list of return values. NiceLib automatically allocates an appropriate data structure, passes
+    its address-pointer to the C function, uses the dereferenced result as the return value.
+
+    This can't be used for `void` pointers, since there's no way to know what to allocate, or what
+    type to return.
 
 'inout'
-    The argument is used as both input and output. The wrapped function takes it as an argument and
-    also returns it with the return values. You can pass in either a value or a pointer to the
-    value. For example, if the underlying C argument is an ``int *``, you can pass in an cffi int
+    The argument is used as both input and output. The mid-level function takes it as an argument
+    and also returns it with the return values. You can pass in either a value or a pointer to the
+    value. For example, if the underlying C argument is an ``int *``, you can pass in a `cffi` int
     pointer, which will be used directly, or (more typically) you can pass in a Python int, which
-    will be used as the initial value of a newly-created cffi int pointer.
+    will be used as the initial value of a newly-created `cffi` int pointer.
 
 'bufout'
     The argument is a pointer to a string buffer (a ``char**``). This is used for when the C
     library creates a string buffer and returns it to the user. NiceLib will automatically convert
-    the output to a Python str, or None if a null pointer was returned.
+    the output to a Python `bytes`, or None if a null pointer was returned.
 
     If the memory should be cleaned up by the user (as is usually the case), you may use the
     `free_buf` setting to specify the cleanup function.
@@ -192,12 +211,12 @@ The possible signature values are:
 
     This is used for the common case of a C function which takes both a string buffer and its
     length as inputs, so that it doesn't overrun the buffer. As such, `'buf'` requires a
-    corresponding `'len'` entry. The first `'buf'`/`'arr'` pairs with the first `'len'` and so
+    corresponding `'len'` entry. The first `'buf'`/`'arr'` is matched with the first `'len'` and so
     forth. If don't need to pass in a length parameter to the C-function, use `'buf[n]'` as
     described below.
 
     NiceLib will automatically create the buffer and pass it and the length parameter to the
-    C-function. You simply receive the string.
+    C-function. You simply receive the `bytes`.
 
 'buf[n]'
     The same as `'buf'`, but does not have a matching `'len'`. Because of this, the buffer length
@@ -220,8 +239,8 @@ The possible signature values are:
     buffer or array of length 32, regardless of what `buflen` is.
 
 'len=in'
-    Similar to `'len=n'`, except the resulting function accepts an extra ``int`` argument specifying
-    the size of buffer that should be allocated for that invocation.
+    Similar to `'len=n'`, except the mid-level function takes an input argument which is an
+    ``int`` specifying the size of buffer that should be allocated for that invocation.
 
 'ignore'
     Ignore the argument, passing in 0 or NULL, depending on the arg type. This is useful for

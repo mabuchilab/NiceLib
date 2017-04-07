@@ -8,7 +8,7 @@ NiceLib
 
 NiceLib is a package for rapidly developing "nice" Python bindings to C libraries, using ``cffi``.
 
-It lets you rapidly wrap a C function like this
+It lets you turn a C function like this
 
 .. code-block:: c
 
@@ -25,6 +25,27 @@ just by defining a signature like this ::
         my_c_function = ('in', 'in', 'arr', 'len', 'ignore')
 
 while giving you easy error handling and more.
+
+
+Installing
+----------
+
+NiceLib is available on PyPI::
+
+    $ pip install nicelib
+
+If you would like to use the development version, download and extract a zip of the source from our
+`GitHub page <https://github.com/mabuchilab/NiceLib>`_ or clone it using git. Now install::
+
+    $ cd /path/to/NiceLib
+    $ pip install .
+
+
+Feedback / Contributing
+-----------------------
+
+For contributing, reporting issues, and providing feedback, see our
+`GitHub page <https://github.com/mabuchilab/NiceLib>`_. Feedback is greatly appreciated!
 
 
 Introduction
@@ -60,7 +81,7 @@ check the return code and raise an exception if warranted, we can use `err_wrap`
 
     class NiceNI(NiceLib):
         ...
-        def _err_wrap(retval):
+        def _ret(retval):
             if retval != 0:
                 raise DAQError(retval)
 
@@ -73,7 +94,7 @@ NIDAQmx::
         ...
         CreateTask = ('in', 'out')
 
-        Task = NiceObjectDef(init=CreateTask, attrs={
+        Task = NiceObjectDef(init='CreateTask', attrs={
             'StartTask': ('in'),
             'ReadAnalogScalarF64': ('in', 'in', 'out', 'ignore'),
         })
@@ -132,6 +153,6 @@ User Guide
 .. toctree::
    :maxdepth: 2
 
-   api
    building
    wrapping
+   api

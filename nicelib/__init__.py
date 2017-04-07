@@ -71,6 +71,11 @@ def _load_or_build_lib(name, pkg):
 
 
 def load_lib(name, pkg):
+    """Load a low-level lib module, building it if required
+
+    If `name` is `foo`, tries to import a module named `_foolib`. If that fails, tries to import
+    `_build_foo` and call its `build()` function, which is supposed to generate `_foolib.py`.
+    """
     lib_module = None
     if arg_mode_is(None):
         lib_module = _load_or_build_lib(name, pkg)
