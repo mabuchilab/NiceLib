@@ -2326,7 +2326,7 @@ def struct_func_hook(tokens):
 def add_typedef_hook(tree, parse_func):
     """Wraps enum/struct/union definitions in a typedef if they lack one
 
-    Useful if for C++ headers where the typedefs are implicit.
+    Useful for C++ headers where the typedefs are implicit.
     """
     return CPPTypedefAdder().hook(tree, parse_func)
 

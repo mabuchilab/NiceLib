@@ -149,8 +149,8 @@ _ffilib
     FFI library opened with `dlopen()`. Required if not using `_info`.
 
 _defs
-    Object whose attributes are the Python-equivalent macros defined in the header file(s).
-    Optional.
+    ``dict`` containing the Python-equivalent macros defined in the header file(s). Optional and
+    only used if not using `_info`.
 
 
 Function Signatures

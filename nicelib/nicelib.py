@@ -836,13 +836,16 @@ class NiceLib(with_metaclass(LibMeta, object)):
 
     Attributes
     ----------
+    _info
+        A `LibInfo` object that contains access to the underlying library and macros. Required
+        (unless you are using the old-style `_ffi`, `_ffilib`, and `_defs` attributes)
     _ffi
-        FFI instance variable. Required.
+        FFI instance variable. Required if not using `_info`
     _ffilib
-        FFI library opened with `dlopen()`. Required.
+        FFI library opened with `dlopen()`. Required if not using `_info`.
     _defs
-        Dictionary containing the Python-equivalent macros defined in the header file(s).
-        Optional.
+        ``dict`` containing the Python-equivalent macros defined in the header file(s). Optional and
+        only used if not using `_info`.
     _prefix : str or sequence of strs, optional
         Prefix(es) to strip from the library function names. E.g. If the library has functions
         named like ``SDK_Func()``, you can set `_prefix` to ``'SDK_'``, and access them as
