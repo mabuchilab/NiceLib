@@ -1,8 +1,8 @@
 Change Log
 ==========
 
-Unreleased
-----------
+(0.3) - 2017-4-7
+----------------
 
 Added
 """""
@@ -11,6 +11,7 @@ Added
 - Experimental support for specifying units that ``len`` sig handler uses
 - Strip prefixes of enum constants too
 - Allow searching for a lib under multiple names/locations
+- New logo
 
 Changed
 """""""
