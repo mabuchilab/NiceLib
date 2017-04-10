@@ -655,7 +655,7 @@ class LibMeta(type):
                 else:
                     sig_tup = value
 
-                if sig_tup:
+                if sig_tup is not None:
                     flags = base_flags.copy()
                     if name in func_to_niceobj:
                         flags.update(func_to_niceobj[name].flags)
