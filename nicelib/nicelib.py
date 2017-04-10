@@ -9,6 +9,7 @@ from future.utils import with_metaclass
 import sys
 import warnings
 import pickle as pkl
+import logging as log
 from inspect import isfunction, getargspec
 from . import test_mode_is, _test_mode
 from .util import to_tuple
@@ -641,6 +642,7 @@ class LibMeta(type):
 
         for name, value in classdict.items():
             if (not name.startswith('_') and not isinstance(value, NiceObjectDef)):
+                log.debug("Handling NiceLib attr '%s'", name)
                 sig_tup = None
                 if isfunction(value):
                     if hasattr(value, 'sig'):
