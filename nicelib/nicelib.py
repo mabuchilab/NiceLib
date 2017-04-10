@@ -724,7 +724,11 @@ class LibMeta(type):
         # Add enum constant defs
         if ffi:
             for name in dir(lib):
-                attr = getattr(lib, name)
+                try:
+                    attr = getattr(lib, name)
+                except AttributeError:
+                    continue  # This could happen if multiple ffi libs are sharing headers
+
                 if not isinstance(attr, ffi.CData) or ffi.typeof(attr).kind != 'function':
                     for prefix in base_flags['prefix']:
                         if name.startswith(prefix):
