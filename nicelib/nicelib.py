@@ -142,12 +142,13 @@ class NiceClassMeta(type):
     def __new__(metacls, cls_name, niceobjdef, ffi, funcs, user_funcs):
         repr_strs = {}
         for func_name in niceobjdef.names:
-            func = funcs[func_name]
-            if hasattr(func, '_ffi_func'):
-                repr_str = _func_repr_str(ffi, funcs[func_name], niceobjdef.n_handles)
-            else:
-                repr_str = func.__doc__ or '{}(??) -> ??'.format(func_name)
-            repr_strs[func_name] = repr_str
+            if func_name in funcs:
+                func = funcs[func_name]
+                if hasattr(func, '_ffi_func'):
+                    repr_str = _func_repr_str(ffi, funcs[func_name], niceobjdef.n_handles)
+                else:
+                    repr_str = func.__doc__ or '{}(??) -> ??'.format(func_name)
+                repr_strs[func_name] = repr_str
 
         # Get init function
         try:
@@ -167,14 +168,15 @@ class NiceClassMeta(type):
 
             # Generate "bound methods"
             for func_name in niceobjdef.names:
-                lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles, cls_name,
-                                       self)
-                if func_name in user_funcs:
-                    wrapped_func = user_funcs[func_name]
-                    wrapped_func.orig = lib_func
-                    setattr(self, func_name, wrapped_func)
-                else:
-                    setattr(self, func_name, lib_func)
+                if func_name in funcs:
+                    lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles,
+                                           cls_name, self)
+                    if func_name in user_funcs:
+                        wrapped_func = user_funcs[func_name]
+                        wrapped_func.orig = lib_func
+                        setattr(self, func_name, wrapped_func)
+                    else:
+                        setattr(self, func_name, lib_func)
 
             if test_mode_is('record'):
                 Record.ensure_created()
@@ -688,9 +690,9 @@ class LibMeta(type):
                         if ffi_func is not None:
                             break
                     else:
-                        raise AttributeError("No lib function found with a name ending in '{}', wi"
-                                             "th any of these prefixes: {}".format(name,
-                                                                                   flags['prefix']))
+                        warnings.warn("No lib function found with a name ending in '{}', with "
+                                      "any of these prefixes: {}".format(name, flags['prefix']))
+                        continue
 
                     ret_handler = flags['ret']
                     if isinstance(ret_handler, basestring):
