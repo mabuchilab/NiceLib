@@ -1,8 +1,15 @@
 Change Log
 ==========
 
-Unreleased
-----------
+(0.3.1) - 2017-5-25
+-------------------
+
+Changes
+"""""""
+- Fix handling of lib paths
+- Account for nonexistent attributes in FFI libs
+- Fix handling of empty signature tuples
+- Change error for missing functions into a warning
 
 
 (0.3) - 2017-4-7
