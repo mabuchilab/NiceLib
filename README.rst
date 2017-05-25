@@ -22,12 +22,12 @@ For contributing, reporting issues, and providing feedback, see our
 Installing
 ----------
 
-NiceLib is available on PyPI:
+NiceLib is available on PyPI::
 
     $ pip install nicelib
 
 If you would like to use the development version, download and extract a zip of the source from our
-`GitHub page <https://github.com/mabuchilab/NiceLib>`_ or clone it using git. Now install:
+`GitHub page <https://github.com/mabuchilab/NiceLib>`_ or clone it using git. Now install::
 
     $ cd /path/to/NiceLib
     $ pip install .
