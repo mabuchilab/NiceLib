@@ -393,7 +393,7 @@ class Parser(object):
         elif name in self.func_macros:
             del self.func_macros[name]
         else:
-            log.info("#undef of nonexistent macro '{}'".format(name))
+            log.debug("#undef of nonexistent macro '{}'".format(name))
 
     def ordered_macro_items(self):
         all_items = list(self.obj_macros.items()) + list(self.func_macros.items())
@@ -737,14 +737,14 @@ class Parser(object):
         tokens = []
         for token in exp:
             if token.type is Token.IDENTIFIER:
-                log.info(PreprocessorWarning(token, "Unidentified identifier {} in expression"
-                                                    ", treating as 0...".format(token.string)))
+                log.debug(PreprocessorWarning(token, "Unidentified identifier {} in expression"
+                                                     ", treating as 0...".format(token.string)))
                 tokens.append(Token(Token.NUMBER, '0'))
             else:
                 tokens.append(token)
 
         py_src = c_to_py_src(' '.join(token.string for token in tokens))
-        log.info("py_src = '{}'".format(py_src))
+        log.debug("py_src = '{}'".format(py_src))
         return eval(py_src, {})
 
     def parse_ifdef(self):
@@ -830,7 +830,7 @@ class Parser(object):
                 preamble, body, postamble = self._split_body(tokens)
                 macro = FuncMacro(name_token, body, args, un_pythonable)
                 self.add_func_macro(macro)
-                log.info("Saving func-macro {} = {}".format(macro, body))
+                log.debug("Saving func-macro {} = {}".format(macro, body))
         else:
             # Object-like macro
             dont_ignore = (Token.WHITESPACE, Token.BLOCK_COMMENT, Token.LINE_COMMENT)
@@ -840,7 +840,7 @@ class Parser(object):
                 preamble, body, postamble = self._split_body(tokens)
                 macro = Macro(name_token, body)
                 self.add_obj_macro(macro)
-                log.info("Saving obj-macro {} = {}".format(macro, body))
+                log.debug("Saving obj-macro {} = {}".format(macro, body))
 
         # Output all the tokens we suppressed
         self.out_line.extend(tokens)
@@ -891,8 +891,8 @@ class Parser(object):
     def parse_error(self):
         tokens = self.pop_until_newline()
         if not self.skipping:
-            log.info("obj_macros = {}".format(self.obj_macros))
-            log.info("func_macros = {}".format(self.func_macros))
+            log.debug("obj_macros = {}".format(self.obj_macros))
+            log.debug("func_macros = {}".format(self.func_macros))
             message = ''.join(token.string for token in tokens)
             raise PreprocessorError(tokens[0], message)
         return False
@@ -916,7 +916,7 @@ class Parser(object):
         base_dir = os.path.split(token.fpath)[0]
 
         if os.path.normcase(hpath) in self.ignored_headers:
-            log.info("Explicitly ignored header '{}'".format(hpath))
+            log.debug("Explicitly ignored header '{}'".format(hpath))
             return False
 
         def search_for_file(dirs, relpath):
@@ -934,10 +934,10 @@ class Parser(object):
 
         if token.type is Token.HEADER_NAME:
             if self.ignore_system_headers:
-                log.info("Ignoring system header {}".format(hpath))
+                log.debug("Ignoring system header {}".format(hpath))
                 return False
 
-            log.info("System header {}".format(hpath))
+            log.debug("System header {}".format(hpath))
             # We include the local path too, which is not standard
             dirs = self.include_dirs + [base_dir]
             path = search_for_file(dirs, hpath)
@@ -946,7 +946,7 @@ class Parser(object):
             if not path:
                 raise PreprocessorError(token, 'System header "{}" not found'.format(hpath))
         else:
-            log.info("Local header {}".format(hpath))
+            log.debug("Local header {}".format(hpath))
             dirs = [base_dir] + self.include_dirs
             path = search_for_file(dirs, hpath)
             is_sys_header = False
@@ -956,10 +956,10 @@ class Parser(object):
 
         path = os.path.normcase(path)
         if path in self.pragma_once:
-            log.info("Skipping header due to '#pragma once'")
+            log.debug("Skipping header due to '#pragma once'")
             return False
 
-        log.info("Including header {}".format(path))
+        log.debug("Including header {!r}".format(path))
         with open(path, 'rU') as f:
             tokens = lexer.lex(f.read(), path, is_sys_header=is_sys_header)
             tokens.append(Token(Token.NEWLINE, '\n'))
@@ -1244,12 +1244,12 @@ class Generator(object):
 
     def generate(self):
         # HOOK: list of tokens
-        log.info("Applying token hooks")
+        log.debug("Applying token hooks")
         self.token_hooks += (stdcall_hook, cdecl_hook, add_line_directive_hook)  # Add builtin hooks
         tokens = self.tokens
 
         for hook in self.token_hooks:
-            log.info("Applying hook '{}'".format(hook.__name__))
+            log.debug("Applying hook '{}'".format(hook.__name__))
             tokens = hook(tokens)
 
         # Generate parseable chunks
@@ -1290,13 +1290,13 @@ class Generator(object):
         fake_types = '\n'.join('typedef int {};'.format(t) for t in common_types)
         self.parse(fake_types)
 
-        log.info("Parsing chunks")
+        log.debug("Parsing chunks")
         chunk_start_tok_num = 0
         for csource_chunk, from_sys_header, next_tok_num in get_ext_chunks(tokens):
             orig_chunk = csource_chunk
             csource_chunk = csource_chunk.replace('\f', ' ')
 
-            log.info("Parsing chunk '{}'".format(csource_chunk))
+            log.debug("Parsing chunk '{}'".format(csource_chunk))
             try:
                 chunk_tree = self.parse(csource_chunk)
             except plyparser.ParseError as e:
@@ -1325,9 +1325,9 @@ class Generator(object):
                     self.tree.ext.extend(chunk_tree.ext)
 
             chunk_start_tok_num = next_tok_num
-            log.info("Parsed to token {}/{}".format(next_tok_num-1, len(tokens)))
+            log.debug("Parsed to token {}/{}".format(next_tok_num-1, len(tokens)))
 
-        log.info("pycparser successfully re-parsed cleaned header")
+        log.debug("pycparser successfully re-parsed cleaned header")
 
         # Remove function defs and replace 'volatile volatile const'
         ffi = cffi.FFI()
@@ -1371,7 +1371,7 @@ class Generator(object):
             prefix = '__OMACRO_'
             args = ()
 
-        log.info("Generating body of macro {} "
+        log.debug("Generating body of macro {} "
                  "[{}:{}:{}]".format(macro.name, macro.fpath, macro.line, macro.col))
         log.debug("  body tokens are {}".format(macro.body))
 
@@ -1380,8 +1380,8 @@ class Generator(object):
             expanded = self.expander(macro.body)
             for token in expanded:
                 if token.type is Token.IDENTIFIER and token.string not in args:
-                    log.info("Identifier '{}' still in the macro body after expansion, ignoring "
-                             "this macro definition".format(token.string))
+                    log.debug("Identifier '{}' still in the macro body after expansion, ignoring "
+                              "this macro definition".format(token.string))
                     return None
             c_src = ''.join(token.string for token in expanded)
             func_src = "\nint " + prefix + macro.name + "(void){" + c_src + ";}"
@@ -1398,7 +1398,7 @@ class Generator(object):
                 warnings.warn("Un-pythonable macro {}".format(macro.name))
                 warnings.warn(str(e))
 
-        log.info("  generated to {}".format(py_src))
+        log.debug("  generated to {}".format(py_src))
         return py_src
 
     def parse(self, text, reset_file=False):
@@ -1453,7 +1453,7 @@ def c_to_py_ast(c_src):
 
 def c_to_py_src(c_src):
     """Convert C expression source str to a Python source str"""
-    log.info("Converting c-source '{}'".format(c_src))
+    log.debug("Converting c-source '{}'".format(c_src))
     expr_node = src_to_c_ast(c_src)
     return ''.join(to_py_src(expr_node))
 
