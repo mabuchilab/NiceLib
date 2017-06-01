@@ -5,20 +5,21 @@ from __future__ import print_function
 import sys
 import os
 import os.path
+import logging as log
 import cffi
 from .util import handle_header_path, handle_lib_name
 from .process import process_headers
 from .__about__ import __version__
 
 
-class DummyBuffer(object):
+class LogBuffer(object):
     def write(self, msg):
-        pass
+        log.info(msg.rstrip('\n'))
 
 
 def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
               ignore_system_headers=False, preamble=None, token_hooks=(), ast_hooks=(),
-              hook_groups=(), debug_file=None, logbuf=sys.stdout, load_dump_file=False,
+              hook_groups=(), debug_file=None, logbuf=None, load_dump_file=False,
               save_dump_file=False):
     """Build a low-level Python wrapper of a C lib
 
@@ -63,8 +64,9 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         File to write a partially-processed header to just before it is parsed by `pycparser`.
         Useful for debugging the preprocessor when `pycparser`'s parser chokes on its output.
     logbuf : writeable buffer
-        IO buffer to write() common log output to, ``sys.stdout`` by default. If None, this output
-        will be silenced.
+        IO buffer to write() common log output to. By default this output will logged using the
+        ``logging`` stdlib module, at the ``info`` log level. You can use ``sys.stdout`` to perform
+        ordinary printing.
     load_dump_file : bool
         Save the list of tokens resulting from preprocessing to 'token_dump.pkl'. See save_dump_file
         for more info.
@@ -84,7 +86,15 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     ``'{PROGRAMFILES}\\\\header.h'`` will be formatted with ``os.environ['PROGRAMFILES']``.
     """
     if logbuf is None:
-        logbuf = DummyBuffer()
+        logbuf = LogBuffer()
+        update_cb = None  # Don't do line-by-line update by default
+    else:
+        def update_cb(cur_line):
+            logbuf.write("Parsing line {}\r".format(cur_line))
+            try:
+                logbuf.flush()
+            except AttributeError:
+                pass
 
     logbuf.write("Module {} does not yet exist, building it now. "
                  "This may take a minute...\n".format(module_name))
@@ -101,13 +111,6 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     if os.path.isfile(filedir):
         filedir, _ = os.path.split(filedir)
     filedir = os.path.realpath(filedir)
-
-    def update_cb(cur_line):
-        logbuf.write("Parsing line {}\r".format(cur_line))
-        try:
-            logbuf.flush()
-        except AttributeError:
-            pass
 
     logbuf.write("Parsing and cleaning headers...\n")
     clean_header_str, macro_code = process_headers(header_paths, predef_path, update_cb=update_cb,
