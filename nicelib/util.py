@@ -27,8 +27,8 @@ def select_platform_value(platform_dict):
 
 
 def to_tuple(value):
-    """Convert value to a tuple, or if it is a string, wrap it in a tuple"""
-    return (value,) if isinstance(value, basestring) else tuple(value)
+    """Convert value to a tuple, or if it is a string or dict, wrap it in a tuple"""
+    return (value,) if isinstance(value, (basestring, dict)) else tuple(value)
 
 
 def handle_header_path(path):
@@ -48,21 +48,29 @@ def handle_header_path(path):
         else:
             raise ValueError("Cannot find library header")
 
-    header_dict = select_platform_value(path)
-    if 'header' not in header_dict:
-        raise KeyError("Header dict must contain key 'header'")
+    header_tup = to_tuple(select_platform_value(path))
+    for header_dict in header_tup:
+        if 'header' not in header_dict:
+            raise KeyError("Header dict must contain key 'header'")
 
-    header_names = to_tuple(header_dict['header'])
-    include_dirs = to_tuple(header_dict.get('path', ()))
+        header_names = to_tuple(header_dict['header'])
+        include_dirs = to_tuple(header_dict.get('path', ()))
 
-    headers = [find_header(h, include_dirs) for h in header_names]
+        try:
+            headers = [find_header(h, include_dirs) for h in header_names]
+        except:
+            continue
 
-    if 'predef' in header_dict:
-        predef_header = find_header(header_dict['predef'], include_dirs)
-    else:
-        predef_header = None
+        if 'predef' in header_dict:
+            try:
+                predef_header = find_header(header_dict['predef'], include_dirs)
+            except:
+                continue
+        else:
+            predef_header = None
 
-    return headers, predef_header
+        return headers, predef_header
+    raise ValueError("Could not find library header")
 
 
 def find_header(header_name, include_dirs):
