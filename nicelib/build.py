@@ -99,11 +99,11 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     logbuf.write("Module {} does not yet exist, building it now. "
                  "This may take a minute...\n".format(module_name))
 
+    lib_name = handle_lib_name(lib_name)
+
     logbuf.write("Searching for headers...\n")
     header_paths, predef_path = handle_header_path(header_info)
     logbuf.write("Found {}\n".format(header_paths))
-
-    lib_name = handle_lib_name(lib_name)
 
     if not (module_name.startswith('_') and module_name.endswith('lib')):
         raise TypeError("Module name must use the format '_*lib'")
