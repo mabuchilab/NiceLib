@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016 Nate Bogdanowicz
+# Copyright 2016-2017 Nate Bogdanowicz
 import os
 import os.path
 import sys
 from setuptools import setup, find_packages
 
-description = "Library with high-level drivers for lab equipment"
+description = ('A package for rapidly developing "nice" Python bindings to C libraries, '
+               'using `cffi`')
 classifiers = [
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
     'Programming Language :: Python :: 2',
     'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.3',
     'Programming Language :: Python :: 3.4',
     'Programming Language :: Python :: 3.5',
+    'Programming Language :: Python :: 3.6',
 ]
 
 # Load metadata from __about__.py
