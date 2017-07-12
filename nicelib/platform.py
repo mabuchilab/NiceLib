@@ -71,12 +71,14 @@ if COMPILER == 'GCC':
             #define __amd64__ 1
             #define __x86_64 1
             #define __x86_64__ 1
+            #define __GNUC__ 1
         """
     else:
         PREDEF_MACRO_STR += """
             #define i386 1
             #define __i386 1
             #define __i386__ 1
+            #define __GNUC__ 1
         """
 elif COMPILER == 'MSVC':
     # Ordered by precedence - should usually be longest match first
