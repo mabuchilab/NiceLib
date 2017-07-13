@@ -1038,7 +1038,10 @@ class FFICleaner(TreeModifier):
         # Now add type to FFI
         src = self.generator.visit(node) + ';'
         log.debug(src)
-        self.ffi.cdef(src)
+        try:
+            self.ffi.cdef(src, override=True)
+        except cffi.api.FFIError as e:
+            log.error(str(e))  # Ignore bad or unsupported types
         return node
 
     def visit_Enum(self, node):
