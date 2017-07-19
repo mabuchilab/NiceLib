@@ -11,6 +11,9 @@ import warnings
 import pickle as pkl
 import logging as log
 from inspect import isfunction, getargspec
+
+import cffi
+
 from . import test_mode_is, _test_mode
 from .util import to_tuple
 
@@ -608,7 +611,7 @@ class LibMeta(type):
                 attr = getattr(lib, name)
                 if ffi and isinstance(attr, ffi.CData) and ffi.typeof(attr).kind != 'function':
                     dir_lib.append(name)
-            except AttributeError:
+            except (AttributeError, cffi.FFIError):
                 pass  # Name may be from a separate library's header
 
         # Add default empty prefix
