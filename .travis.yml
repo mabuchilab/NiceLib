@@ -11,3 +11,12 @@ install:
 
 script:
   - py.test
+
+deploy:
+  provider: pypi
+  user: "natezb"
+  password:
+    secure: "uylMdP+HlZ4xqd8UzE0t8RmKjnXjaY+mrP0hQKiL0M+vvjjRSZXE2/NAaq06sgVVkN2u4eYb8UaSbHDxuJNCDqT1XSIfR0TOYB3xrPU36Nb/WpkYeYMKFJ0GfU3CDEKpWmFqRL78bxBWpBthzZ3gdmPUxmM6PyTxynuKsWWyU/KCyUvCfr8er/YKZTSUdxKjH5fBcuBcSe0+Zy5LQ0ztbAK2l9+IvZVtb++BxlbJbSVvqwLIlmOmdj+gn+XCDq1GTqp8kOuRD6I8yTXQFEthArcNIFPW2RVcfkMc1zBtQsIp5+xKOfsy5S3+2T02S/l5y2E38TgrypBSzTdaptrJXBzshT7QCUiNgz7uMd5BLwfU2iWi+jcMYcZC1hKcSpP/okpcw9LhaNbfP9vQM1Nqx+FFV9OpcVuF1RMvaJ4ArUUp3nBfAjpYOSdSxP32Kp9+OO5SbTn1lkKxyONJXkW7z8zFT6Uk3PU4XPmaCvAAea+fR+Eve3CtQP7fDuzXxslDD8VnAVJf1BgJdmKVbgOBHaI8tLokZsTDnbsAm9x8ANC7SOYJdmrxd7MttL48l0QTkT3Uoj8wP6S9Kjfd/qGgnsWiRpOb97mX1ZCUV1LpN1cHTCev1vAhYrUl1758V0rSgfLYFme71GJpkN3YAqOjsdPQHIHq8c/amHtCTnIy/hc="
+  distributions: "sdist bdist_wheel"
+  on:
+    tags: true
