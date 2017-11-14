@@ -1,8 +1,18 @@
 Change Log
 ==========
 
-Unreleased
-----------
+(0.4) - 2017-11-13
+------------------
+
+Added
+"""""
+- Support for searching for heaaders from multiple possible sets
+- Automatic PyPI deployment via TravisCI
+
+Changed
+"""""""
+- ``build_lib()`` is now silent by default
+- Ignore bad or unsupported types during header processing
 
 
 (0.3.1) - 2017-5-25
