@@ -437,10 +437,10 @@ class NiceObjectDef(object):
         self.doc = new_doc
 
     def __str__(self):
-        return str(self.names)
+        return "<NiceObjectDef values={}>".format(repr(self.names))
 
     def __repr__(self):
-        return repr(self.names)
+        return "<NiceObjectDef values={}>".format(repr(self.names))
 
 
 _contingent_libs = []
