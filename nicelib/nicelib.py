@@ -8,13 +8,11 @@ from future.utils import with_metaclass
 
 import sys
 import warnings
-import pickle as pkl
 import logging as log
 from inspect import isfunction, getargspec
 
 import cffi
 
-from . import test_mode_is, _test_mode
 from .util import to_tuple
 
 __all__ = ['NiceLib', 'NiceObjectDef']
@@ -43,98 +41,6 @@ class StateNode(object):
             if args[0] == name:
                 return True
         return False
-
-
-class Record(object):
-    record = None
-    rec_fpath = None
-
-    def __init__(self):
-        if self.record:
-            raise Exception("record already exists")
-
-        self.__class__.record = self
-        self.root = StateNode()
-        self.cur_state = self.root
-        self.niceobjs = {}
-
-    def add_niceobject(self, cls_name, handles):
-        handles = tuple(self.encode_arg(h) for h in handles)
-        obj = MockNiceObject(cls_name, handles)
-
-    def get_attr(self, name):
-        if name in self.cur_state.attrs:
-            return self.cur_state.attrs[name]
-        elif self.cur_state.has_func(name):
-            return LibFunction(None, '', )
-        elif name in self.niceobjs:
-            return self.niceobjs[name]
-
-        self.cur_state.show()
-        raise AttributeError(name)
-
-    def get_niceobj_attr(self, name):
-        pass
-
-    def reset(self):
-        self.cur_state = self.root
-
-    def add_func_call(self, func_name, handles, args, result):
-        new_state = StateNode(result)
-
-        handles = self.encode_args(handles)
-        args = self.encode_args(args)
-        key = ('func', func_name, handles, args)
-
-        self.cur_state.children[key] = new_state
-        self.cur_state = new_state
-
-        if '.' in func_name:
-            obj_name = func_name.split('.')[0]
-            #classdict = {}
-            #obj_class = type(obj_name, (object,), classdict)
-            self.niceobjs[obj_name] = MockNiceObjectClass(obj_name)
-
-    def add_attr_access(self, name, value):
-        self.cur_state.add_attr_access(name, value)
-
-    @staticmethod
-    def encode_args(args):
-        return tuple(Record.encode_arg(arg) for arg in args)
-
-    @staticmethod
-    def encode_arg(arg):
-        if 'CData' in str(type(arg)):
-            return MockCData(arg)
-        else:
-            return arg
-
-    def show(self):
-        print('Record:')
-        self.root.show(indent=2)
-
-    @classmethod
-    def load(cls):
-        if cls.rec_fpath is None:
-            raise ValueError("Record.rec_fpath not set, can't load record file!")
-
-        with open(cls.rec_fpath, 'rb') as f:
-            cls.record = pkl.load(f)
-
-    def save(self, fname):
-        with open(fname, 'wb') as f:
-            pkl.dump(self, f)
-
-    @classmethod
-    def ensure_created(cls):
-        if cls.record is None:
-            if test_mode_is('replay'):
-                Record.load()
-            elif test_mode_is('record', 'run'):
-                print("Creating new record")
-                cls.record = cls()
-            else:
-                raise Exception("Unknown mode '{}'".format(_test_mode.mode))
 
 
 class NiceObject(object):
@@ -181,42 +87,8 @@ class NiceClassMeta(type):
                     else:
                         setattr(self, func_name, lib_func)
 
-            if test_mode_is('record'):
-                Record.ensure_created()
-                Record.record.add_niceobject(cls_name, handles)
-
         niceobj_dict = {'__init__': __init__, '__doc__': niceobjdef.doc}
         return type(cls_name, (NiceObject,), niceobj_dict)
-
-
-class MockNiceObjectClass(object):
-    def __init__(self, name):
-        self.name = name
-
-    def __call__(self, *args, **kwds):
-        return MockNiceObject(self.name)
-
-
-class MockNiceObject(object):
-    def __init__(self, clsname, handles):
-        self.clsname = clsname
-        self.handles = handles
-
-    def __getattr__(self, name):
-        if test_mode_is('replay'):
-            if not name.startswith('__'):
-                print("Getting '{}'".format(name))
-                Record.ensure_created()
-                return Record.record.get_niceobj_attr('{}.{}'.format(self.clsname, name))
-        raise AttributeError(name)
-
-
-class MockCData(object):
-    def __init__(self, cdata):
-        self.str = str(cdata)
-
-    def __repr__(self):
-        return self.str
 
 
 def _wrap_inarg(ffi, argtype, arg):
@@ -576,8 +448,6 @@ _contingent_libs = []
 
 class LibMeta(type):
     def __new__(metacls, clsname, bases, classdict):
-        if test_mode_is('replay'):
-            return metacls.__new_replay__(clsname, bases, classdict)
         mro_lookup = metacls._create_mro_lookup(classdict, bases)
 
         # Deprecation warnings
@@ -749,8 +619,7 @@ class LibMeta(type):
         classdict['_dir_lib'] = dir_lib
         cls = super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
-        if test_mode_is('run'):
-            _contingent_libs.append(cls)
+        _contingent_libs.append(cls)
 
         return cls
 
@@ -761,16 +630,7 @@ class LibMeta(type):
         return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
     def __getattr__(self, name):
-        if test_mode_is('replay'):
-            Record.ensure_created()
-            value = Record.record.get_attr(name)
-        else:
-            value = getattr(self._ffilib, name)
-            if test_mode_is('record'):
-                Record.ensure_created()
-                Record.record.add_attr_access(name, value)
-
-        return value
+        return getattr(self._ffilib, name)
 
     def __dir__(self):
         return list(self.__dict__.keys()) + self._dir_lib
@@ -821,16 +681,7 @@ class LibFunction(object):
         self._niceobj = niceobj
 
     def __call__(self, *args):
-        result = self._func(*(self._handles + args), niceobj=self._niceobj)
-
-        if test_mode_is('record', 'replay'):
-            Record.ensure_created()
-            if test_mode_is('record'):
-                Record.record.add_func_call(self.__name__, self._handles, args, result)
-            else:  # replay
-                raise NotImplementedError
-
-        return result
+        return self._func(*(self._handles + args), niceobj=self._niceobj)
 
     def __str__(self):
         return self._repr
