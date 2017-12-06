@@ -5,11 +5,14 @@ from __future__ import print_function
 import sys
 import os
 import os.path
-import logging as log
+import logging
 import cffi
 from .util import handle_header_path, handle_lib_name
 from .process import process_headers
 from .__about__ import __version__
+
+
+log = logging.getLogger(__name__)
 
 
 class LogBuffer(object):

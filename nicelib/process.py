@@ -12,7 +12,7 @@ import os.path
 from io import open  # Needed for opening as unicode, might be slow on Python 2
 import copy
 import warnings
-import logging as log
+import logging
 import pickle as pkl
 from enum import Enum
 from collections import OrderedDict, namedtuple, defaultdict, Sequence, deque
@@ -28,6 +28,7 @@ from .util import handle_header_path
 if PY2:
     range = xrange
 
+log = logging.getLogger(__name__)
 cparser = c_parser.CParser()
 
 TokenType = Enum('TokenType', 'DEFINED IDENTIFIER NUMBER STRING_CONST CHAR_CONST HEADER_NAME '

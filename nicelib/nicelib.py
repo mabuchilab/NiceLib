@@ -8,7 +8,7 @@ from future.utils import with_metaclass
 
 import sys
 import warnings
-import logging as log
+import logging
 from inspect import isfunction, getargspec
 
 import cffi
@@ -17,6 +17,7 @@ from .util import to_tuple
 
 __all__ = ['NiceLib', 'NiceObjectDef']
 FLAGS = ('prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
+log = logging.getLogger(__name__)
 
 
 class StateNode(object):
