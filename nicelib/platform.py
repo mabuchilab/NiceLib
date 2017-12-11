@@ -7,10 +7,11 @@
 import os
 import sys
 import glob
-import itertools
+import logging
 from fnmatch import fnmatch
 
 __all__ = ['PREDEF_MACRO_STR', 'INCLUDE_DIRS']
+log = logging.getLogger(__name__)
 
 is_64bit = sys.maxsize > 2**32
 
@@ -107,5 +108,22 @@ elif COMPILER == 'MSVC':
             #define _M_AMD64
         """
 
+
+def fill_and_glob_dirs(dir_templates):
+    dirs = []
+    for dir_template in dir_templates:
+        try:
+            filled_dir = dir_template.format(**os.environ)
+        except KeyError as e:
+            # Log instead of warn b/c this gets run every time nicelib is imported, and we trust
+            # the INCLUDE_DIRS defined in this file. If this function ever gets used by other
+            # code, it might be worthwhile to add a 'warn_missing' option
+            log.info("os.environ does not provide key '%s'", e.args[0])
+            continue
+
+        dirs.extend(glob.glob(filled_dir))
+    return dirs
+
+
 # Glob the include dirs into a flattened list
-INCLUDE_DIRS = list(itertools.chain(*(glob.glob(d.format(**os.environ)) for d in INCLUDE_DIRS)))
+INCLUDE_DIRS = fill_and_glob_dirs(INCLUDE_DIRS)

@@ -5,6 +5,7 @@ from past.builtins import basestring
 import sys
 import os
 import os.path
+import warnings
 from fnmatch import fnmatch
 from ctypes.util import find_library
 
@@ -83,8 +84,8 @@ def find_header(header_name, include_dirs):
     """
     try:
         header_name = header_name.format(**os.environ)
-    except KeyError:
-        pass
+    except KeyError as e:
+        warnings.warn("os.environ does not provide key '{}'".format(e.args[0]))
 
     if os.path.isabs(header_name):
         if os.path.exists(header_name):
@@ -93,8 +94,8 @@ def find_header(header_name, include_dirs):
         for include_dir in include_dirs:
             try:
                 include_dir = include_dir.format(**os.environ)
-            except KeyError:
-                pass
+            except KeyError as e:
+                warnings.warn("os.environ does not provide key '{}'".format(e.args[0]))
 
             if not os.path.isabs(include_dir):
                 raise Exception("Header include paths must be absolute")
