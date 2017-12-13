@@ -22,18 +22,26 @@ class LibInfo(object):
         return getattr(self._ffilib, name)
 
 
-def load_lib(name, pkg):
+def load_lib(name, pkg, builder=None, kwargs={}):
     """Load a low-level lib module, building it if required
 
-    If `name` is `foo`, tries to import a module named `_foolib`. If that fails, tries to import
-    `_build_foo` and call its `build()` function, which is supposed to generate `_foolib.py`.
+    If `name` is `foo`, tries to import a module named `_foolib`. If the module can't be located,
+    `load_lib` tries to build it.
+
+    `builder` is the name of the module whose `build()` function is used to generate `_foolib.py`.
+    By default, it is assumed to be `_build_foo` (where 'foo' is the value of `name`).
+
+    `kwargs`, if given, is a dict of keyword args that is passed to `build()`.
     """
+    lib_name = '._{}lib'.format(name)
     try:
-        lib_module = import_module('._{}lib'.format(name), pkg)
+        lib_module = import_module(lib_name, pkg)
     except ImportError:
-        build_module = import_module('._build_{}'.format(name), pkg)
-        build_module.build()
-        lib_module = import_module('._{}lib'.format(name), pkg)
+        if builder is None:
+            builder = '._build_{}'.format(name)
+        build_module = import_module(builder, pkg)
+        build_module.build(**kwargs)
+        lib_module = import_module(lib_name, pkg)
 
     return LibInfo(lib_module)
 
