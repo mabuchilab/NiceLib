@@ -1677,6 +1677,27 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
     macro_rc : str
         Extracted macros expressed as Python source code.
     """
+    header_paths = to_str_seq(header_paths)
+    source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
+    return process_source(source,
+                          predef_path=predef_path,
+                          update_cb=update_cb,
+                          ignored_headers=ignored_headers,
+                          ignore_system_headers=ignore_system_headers,
+                          debug_file=debug_file,
+                          preamble=preamble,
+                          token_hooks=token_hooks,
+                          ast_hooks=ast_hooks,
+                          hook_groups=hook_groups,
+                          return_ast=return_ast,
+                          load_dump_file=load_dump_file,
+                          save_dump_file=save_dump_file)
+
+
+def process_source(source, predef_path=None, update_cb=None, ignored_headers=(),
+                   ignore_system_headers=False, debug_file=None, preamble=None, token_hooks=(),
+                   ast_hooks=(), hook_groups=(), return_ast=False, load_dump_file=False,
+                   save_dump_file=False):
     try:
         iter(token_hooks)
     except:
@@ -1689,9 +1710,6 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         macros = []
         macro_expand = None
     else:
-        header_paths = to_str_seq(header_paths)
-        source = '\n'.join('#include "{}"'.format(path) for path in header_paths)
-
         if preamble:
             source = preamble + '\n' + source
 
