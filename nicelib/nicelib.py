@@ -482,8 +482,9 @@ class LibMeta(type):
                 attr = getattr(lib, name)
                 if ffi and isinstance(attr, ffi.CData) and ffi.typeof(attr).kind != 'function':
                     dir_lib.append(name)
-            except (AttributeError, cffi.FFIError):
-                pass  # Name may be from a separate library's header
+            except Exception as e:
+                # The error types cffi uses seem to keep changing, so just catch all of them
+                log.info("Name '%s' found in headers, but not this dll: %s", name, e)
 
         # Add default empty prefix
         base_flags['prefix'] = to_tuple(base_flags['prefix'])
@@ -604,7 +605,9 @@ class LibMeta(type):
             for name in dir(lib):
                 try:
                     attr = getattr(lib, name)
-                except AttributeError:
+                except:
+                    # The error types cffi uses seem to keep changing, so just catch all of them
+                    log.info("Name '%s' found in headers, but not this dll", name)
                     continue  # This could happen if multiple ffi libs are sharing headers
 
                 if not isinstance(attr, ffi.CData) or ffi.typeof(attr).kind != 'function':
