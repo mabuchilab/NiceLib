@@ -11,8 +11,6 @@ import warnings
 import logging
 from inspect import isfunction, getargspec
 
-import cffi
-
 from .util import to_tuple
 
 __all__ = ['NiceLib', 'NiceObjectDef']
