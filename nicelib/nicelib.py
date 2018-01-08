@@ -288,6 +288,7 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret, struct_maker, buflen,
             if info == 'inout':
                 inarg = inargs.pop(0)
                 try:
+                    # FIXME: This could misbehave if the user passes a typename string (e.g. 'int')
                     inarg_type = ffi.typeof(inarg)
                 except TypeError:
                     inarg_type = type(inarg)
@@ -296,6 +297,9 @@ def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret, struct_maker, buflen,
                     arg = inarg  # Pass straight through
                 elif argtype.kind == 'pointer' and argtype.item.kind == 'struct':
                     arg = struct_maker(argtype, inarg)
+                elif (argtype.cname == 'void *' and isinstance(inarg, ffi.CData) and
+                      inarg_type.kind in ('pointer', 'array')):
+                    arg = ffi.cast(argtype, inarg)
                 else:
                     try:
                         arg = ffi.new(argtype, inarg)
