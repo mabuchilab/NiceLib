@@ -406,7 +406,8 @@ class NiceObjectDef(object):
             self.names = set(attrs.keys())
 
         if 'ret_wrap' in flags:
-            warnings.warn("The 'ret_wrap' flag has been renamed to 'ret', please update your code")
+            warnings.warn("The 'ret_wrap' flag has been renamed to 'ret', please update your code:",
+                          stacklevel=2)
             flags['ret'] = flags.pop('ret_wrap')
 
         bad_kwds = [k for k in flags if k not in FLAGS]
@@ -457,12 +458,12 @@ class LibMeta(type):
         if '_err_wrap' in classdict:
             classdict['_ret'] = classdict.pop('_err_wrap')
             warnings.warn("Your class defines _err_wrap, which has been renamed to _ret, "
-                          "please update your code")
+                          "please update your code:", stacklevel=2)
 
         if '_ret_wrap' in classdict:
             classdict['_ret'] = classdict.pop('_ret_wrap')
             warnings.warn("Your class defines _ret_wrap, which has been renamed to _ret, "
-                          "please update your code")
+                          "please update your code:", stacklevel=2)
 
         if '_info' in classdict:
             info = classdict['_info']
@@ -550,7 +551,7 @@ class LibMeta(type):
                         # Temporarily allow 'ret_wrap' for backwards compatibility
                         if 'ret_wrap' in func_flags:
                             warnings.warn("The 'ret_wrap' flag has been renamed to 'ret', please "
-                                          "update your code")
+                                          "update your code:", stacklevel=2)
                             func_flags['ret'] = func_flags.pop('ret_wrap')
 
                         flags.update(func_flags)
