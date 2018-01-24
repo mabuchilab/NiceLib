@@ -18,30 +18,6 @@ FLAGS = ('prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
 log = logging.getLogger(__name__)
 
 
-class StateNode(object):
-    def __init__(self, result=None):
-        self.result = result
-        self.children = {}
-        self.attrs = {}
-
-    def add_attr_access(self, name, value):
-        self.attrs[name] = value
-
-    def show(self, buf=sys.stdout, indent=0):
-        prefix = ' ' * indent
-        print(prefix + repr(self.attrs))
-
-        for args, node in self.children.items():
-            print(prefix + str(args[0]) + str(args[1:]))
-            node.show(buf, indent + 2)
-
-    def has_func(self, name):
-        for args in self.children:
-            if args[0] == name:
-                return True
-        return False
-
-
 class NiceObject(object):
     pass
 
