@@ -795,7 +795,7 @@ class LibMeta(type):
 
         # Unpack NiceObjectDef sigs into the classdict
         niceobjectdefs = {}  # name: NiceObjectDef
-        func_to_niceobj = {}
+        func_to_niceobjdef = {}
         for name, value in list(classdict.items()):
             if isinstance(value, NiceObjectDef):
                 niceobjdef = value
@@ -804,7 +804,7 @@ class LibMeta(type):
                 else:
                     for attr_name, attr_val in niceobjdef.attrs.items():
                         classdict[attr_name] = attr_val
-                        func_to_niceobj[attr_name] = niceobjdef
+                        func_to_niceobjdef[attr_name] = niceobjdef
                 niceobjectdefs[name] = niceobjdef
 
         funcs = {}
@@ -820,70 +820,76 @@ class LibMeta(type):
                 ret_handlers[name[5:]] = value
 
         for name, value in classdict.items():
-            if (not name.startswith('_') and not isinstance(value, NiceObjectDef)):
-                log.debug("Handling NiceLib attr '%s'", name)
-                sig_tup = None
-                if isfunction(value):
-                    if hasattr(value, 'sig'):
-                        sig_tup = value.sig
-                        user_funcs[name] = value
-                    else:
-                        func = value
-                        flags = {}
-                        repr_str = func.__doc__ or "{}(??) -> ??".format(name)
+            if name.startswith('_') or isinstance(value, NiceObjectDef):
+                continue
+            log.debug("Handling NiceLib attr '%s'", name)
+            sig_tup = None
+            if isfunction(value):
+                if hasattr(value, 'sig'):
+                    sig_tup = value.sig
+                    user_funcs[name] = value
                 else:
-                    sig_tup = value
+                    func = value
+                    flags = {}
+                    repr_str = func.__doc__ or "{}(??) -> ??".format(name)
+            else:
+                sig_tup = value
 
-                if sig_tup is not None:
-                    flags = base_flags.copy()
-                    if name in func_to_niceobj:
-                        flags.update(func_to_niceobj[name].flags)
+            if sig_tup is not None:
+                flags = base_flags.copy()
+                if name in func_to_niceobjdef:
+                    flags.update(func_to_niceobjdef[name].flags)
 
-                    # Allow non-tuple, e.g. ('in') or ({'ret':'ignore'})
-                    if not isinstance(sig_tup, tuple):
-                        sig_tup = (sig_tup,)
+                # Allow non-tuple, e.g. ('in') or ({'ret':'ignore'})
+                if not isinstance(sig_tup, tuple):
+                    sig_tup = (sig_tup,)
 
-                    # Pop off the flags dict
-                    if sig_tup and isinstance(sig_tup[-1], dict):
-                        func_flags = sig_tup[-1]
+                # Pop off the flags dict
+                if sig_tup and isinstance(sig_tup[-1], dict):
+                    func_flags = sig_tup[-1]
 
-                        # Temporarily allow 'ret_wrap' for backwards compatibility
-                        if 'ret_wrap' in func_flags:
-                            warnings.warn("The 'ret_wrap' flag has been renamed to 'ret', please "
-                                          "update your code:", stacklevel=2)
-                            func_flags['ret'] = func_flags.pop('ret_wrap')
+                    # Temporarily allow 'ret_wrap' for backwards compatibility
+                    if 'ret_wrap' in func_flags:
+                        warnings.warn("The 'ret_wrap' flag has been renamed to 'ret', please "
+                                        "update your code:", stacklevel=2)
+                        func_flags['ret'] = func_flags.pop('ret_wrap')
 
-                        flags.update(func_flags)
-                        sig_tup = sig_tup[:-1]
+                    flags.update(func_flags)
+                    sig_tup = sig_tup[:-1]
 
-                    flags['prefix'] = to_tuple(flags['prefix'])
-                    if '' not in flags['prefix']:
-                        flags['prefix'] += ('',)
+                flags['prefix'] = to_tuple(flags['prefix'])
+                if '' not in flags['prefix']:
+                    flags['prefix'] += ('',)
 
-                    # Try prefixes until we find the lib function
-                    for prefix in flags['prefix']:
-                        func_name = prefix + name
-                        ffi_func = getattr(lib, func_name, None)
-                        if ffi_func is not None:
-                            break
-                    else:
-                        warnings.warn("No lib function found with a name ending in '{}', with "
-                                      "any of these prefixes: {}".format(name, flags['prefix']))
-                        continue
+                sig = Sig(*sig_tup, **flags)
 
-                    ret_handler = flags['ret']
-                    if isinstance(ret_handler, basestring):
-                        flags['ret'] = ret_handlers[flags['ret']]
+                # Try prefixes until we find the lib function
+                for prefix in flags['prefix']:
+                    func_name = prefix + name
+                    ffi_func = getattr(lib, func_name, None)
+                    if ffi_func is not None:
+                        break
+                else:
+                    warnings.warn("No lib function found with a name ending in '{}', with "
+                                   "any of these prefixes: {}".format(name, flags['prefix']))
+                    continue
 
-                    func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, **flags)
-                    repr_str = _func_repr_str(ffi, func)
+                ret_handler = flags['ret']
+                if isinstance(ret_handler, basestring):
+                    flags['ret'] = ret_handlers[flags['ret']]
 
-                # Save for use by niceobjs
-                funcs[name] = func
-                func_flags[name] = flags
+                sig.assign_cffi_func(ffi, ffi_func, name, flags)
+                func = sig.call_func
+                repr_str = ''
+                #func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, **flags)
+                #repr_str = _func_repr_str(ffi, func)
 
-                # HACK to get nice repr
-                classdict[name] = LibFunction(func, repr_str)
+            # Save for use by niceobjs
+            funcs[name] = func
+            func_flags[name] = flags
+
+            # HACK to get nice repr
+            classdict[name] = LibFunction(func, repr_str)
 
         # Create NiceObject classes
         for cls_name, niceobjdef in niceobjectdefs.items():
