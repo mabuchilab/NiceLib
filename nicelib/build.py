@@ -115,14 +115,18 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     filedir = os.path.realpath(filedir)
 
     logbuf.write("Parsing and cleaning headers...\n")
-    clean_header_str, macro_code = process_headers(header_paths, predef_path, update_cb=update_cb,
-                                                   ignored_headers=ignored_headers,
-                                                   ignore_system_headers=ignore_system_headers,
-                                                   preamble=preamble, token_hooks=token_hooks,
-                                                   ast_hooks=ast_hooks, hook_groups=hook_groups,
-                                                   debug_file=debug_file,
-                                                   load_dump_file=load_dump_file,
-                                                   save_dump_file=save_dump_file)
+    retval = process_headers(header_paths, predef_path,
+                             update_cb=update_cb,
+                             ignored_headers=ignored_headers,
+                             ignore_system_headers=ignore_system_headers,
+                             preamble=preamble,
+                             token_hooks=token_hooks,
+                             ast_hooks=ast_hooks,
+                             hook_groups=hook_groups,
+                             debug_file=debug_file,
+                             load_dump_file=load_dump_file,
+                             save_dump_file=save_dump_file)
+    clean_header_str, macro_code, argnames = retval
 
     logbuf.write("Compiling cffi module...\n")
     ffi = cffi.FFI()
@@ -137,5 +141,6 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         f.write("build_version = '{}'\n".format(__version__))
         f.write("lib = ffi.dlopen({!r})\n".format(lib_name))
         f.write(macro_code)
+        f.write('argnames = {!r}\n'.format(argnames))
 
     logbuf.write("Done building {}\n".format(module_name))

@@ -1193,6 +1193,29 @@ class FFICleaner(TreeModifier):
         return self.generic_visit(node)
 
 
+class ArgNameGrabber(c_ast.NodeVisitor):
+    def __init__(self):
+        self.argnames = {}
+
+    def visit_Decl(self, node):
+        if isinstance(node.type, c_ast.FuncDecl):
+            argnames = self.visit(node.type)
+            self.argnames[node.name] = argnames
+
+    def visit_FuncDecl(self, node):
+        return ['...' if isinstance(param, c_ast.EllipsisParam) else self.visit(param.type)
+                for param in node.args.params]
+
+    def visit_TypeDecl(self, node):
+        return node.declname
+
+    def visit_ArrayDecl(self, node):
+        return self.visit(node.type)
+
+    def visit_PtrDecl(self, node):
+        return self.visit(node.type)
+
+
 class Generator(object):
     def __init__(self, tokens, macros, macro_expand, token_hooks=(), string_hooks=(), ast_hooks=(),
                  debug_file=None):
@@ -1338,6 +1361,11 @@ class Generator(object):
         cleaner = FFICleaner(ffi)
         self.tree = cleaner.visit(self.tree)
 
+        # Grab function arg names
+        argname_grabber = ArgNameGrabber()
+        argname_grabber.visit(self.tree)
+        argnames = argname_grabber.argnames
+
         # Generate cleaned C source
         generator = c_generator.CGenerator()
         header_src = generator.visit(self.tree)
@@ -1365,7 +1393,7 @@ class Generator(object):
                 else:
                     macro_src.write("defs['{}'] = {}\n".format(macro.name, py_src))
 
-        return header_src, macro_src.getvalue(), self.tree
+        return header_src, macro_src.getvalue(), self.tree, argnames
 
     def gen_py_src(self, macro):
         if isinstance(macro, FuncMacro):
@@ -1737,12 +1765,12 @@ def process_source(source, predef_path=None, update_cb=None, ignored_headers=(),
                     token_hooks=token_hooks,
                     ast_hooks=ast_hooks,
                     debug_file=debug_file)
-    header_src, macro_src, tree = gen.generate()
+    header_src, macro_src, tree, argnames = gen.generate()
 
     if return_ast:
-        return header_src, macro_src, tree
+        return header_src, macro_src, tree, argnames
     else:
-        return header_src, macro_src
+        return header_src, macro_src, argnames
 
 
 def generate_bindings(header_info, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
