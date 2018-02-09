@@ -12,7 +12,7 @@ import warnings
 import logging
 from inspect import isfunction, getargspec
 
-from .util import to_tuple
+from .util import to_tuple, ChainMap
 
 __all__ = ['NiceLib', 'NiceObjectDef']
 FLAGS = ('prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
@@ -43,17 +43,35 @@ def c_to_numpy_array(ffi, c_arr, size):
 
 
 class Sig(object):
-    def __init__(self, *args, **kwds):
-        self.arg_strs = args
+    @classmethod
+    def from_tuple(cls, sig_tup):
+        # Allow non-tuple, e.g. ('in') or ({'ret':'ignore'})
+        if not isinstance(sig_tup, tuple):
+            sig_tup = (sig_tup,)
+
+        if sig_tup and isinstance(sig_tup[-1], dict):
+            sig_flags = sig_tup[-1]
+            sig_tup = sig_tup[:-1]
+        else:
+            sig_flags = {}
+
+        return cls(*sig_tup, **sig_flags)
+
+    def __init__(self, *arg_strs, **flags):
+        self.arg_strs = arg_strs
+        self.sig_flags = flags
         self._make_arg_handlers()
+
+    def __repr__(self):
+        return "<Sig({})>".format(', '.join(repr(s) for s in self.arg_strs))
+
+    def set_default_flags(self, flags_list):
+        self.flags = ChainMap(self.sig_flags, *flags_list)
 
     def _make_arg_handlers(self):
         log.info('Making handlers for signature {}'.format(self.arg_strs))
         for handler_class in ARG_HANDLERS:
             handler_class.start_sig_definition()
-
-        self.handlers = [self._make_arg_handler(arg_str, i)
-                         for i, arg_str in enumerate(self.arg_strs)]
 
         self.handlers = []
         self.sig_handlers = []
@@ -81,62 +99,51 @@ class Sig(object):
 
     def _make_arg_handler(self, arg_str, arg_index):
         for handler_class in ARG_HANDLERS:
-            handler = handler_class.create(arg_str, arg_index)
+            handler = handler_class.create(self, arg_str, arg_index)
             if handler:
                 return handler
         raise ValueError("Unrecognized argtype string '{}'".format(arg_str))
 
-    def assign_cffi_func(self, ffi, cffi_func, funcname, flags):
+    def bind_argtypes(self, ffi, func_name, c_argtypes, ret_handler):
         self.ffi = ffi
-        self.cffi_func = cffi_func
-        self.flags = flags
-        self.funcname = funcname
+        self.ret_handler = ret_handler
+        self.c_argtypes = c_argtypes
 
-        cffi_functype = ffi.typeof(cffi_func)
-        cffi_argtypes = cffi_functype.args
-        if cffi_functype.ellipsis:
-            cffi_argtypes = cffi_argtypes + ('...',)
-
-        if len(self.arg_strs) != len(cffi_argtypes):
+        if len(self.arg_strs) != len(c_argtypes):
             raise TypeError("{}() takes {} args, but your signature specifies "
-                            "{}".format(funcname, len(cffi_argtypes), len(self.arg_strs)))
+                            "{}".format(func_name, len(c_argtypes), len(self.arg_strs)))
 
-        for handler, cffi_argtype in zip(self.handlers, cffi_argtypes):
-            handler.cffi_argtype = cffi_argtype
-            handler.flags = self.flags
+        self.used_ret_handler_args = set(getargspec(ret_handler).args[1:])
 
-        self.used_ret_handler_args = set(getargspec(flags['ret']).args[1:])
+        for sig_index, (handler, c_argtype) in enumerate(zip(self.handlers, c_argtypes)):
+            if not hasattr(handler, 'c_argtypes'):
+                handler.c_argtypes = (c_argtype,)
+            else:
+                handler.c_argtypes += (c_argtype,)
 
-    def call_func(self, *args, **kwds):
-        if len(args) != self.num_inargs:
-            raise TypeError("{}() takes {} arguments ({} given)".format(self.funcname,
-                                                                        self.num_inargs, len(args)))
-        cffi_args = []
+    def make_c_args(self, args):
+        c_args = []
         arg_index = 0
         for arg_index, handler in enumerate(self.sig_handlers):
             inarg_indices = self.handler_inargs[handler]
             inargs = [args[i] for i in inarg_indices]
             log.info("Making cffi arg for %s", handler)
-            cffi_args.append(handler.make_cffi_arg(self.ffi, arg_index, inargs))
+            c_args.append(handler.make_cffi_arg(self.ffi, arg_index, inargs))
+        return c_args
 
-        retval = self.cffi_func(*cffi_args)
-
+    def get_outputs(self, c_args, retval, ret_handler_args):
         out_vals = []
-        for sig_index, (handler, cffi_arg) in enumerate(zip(self.sig_handlers, cffi_args)):
-            out_vals.extend(handler.get_outputs(self.ffi, sig_index, cffi_arg))
+        for sig_index, (handler, c_arg) in enumerate(zip(self.sig_handlers, c_args)):
+            out_vals.extend(handler.get_outputs(self.ffi, sig_index, c_arg))
 
-        ret = self.flags['ret']
-        ret_handler_args = {}
-        ret_handler_args['niceobj'] = kwds.pop('niceobj', None)
-        ret_handler_args['funcname'] = self.funcname
-        if ret:
+        if self.ret_handler:
             try:
                 ret_handler_kwds = {arg: ret_handler_args[arg]
                                     for arg in self.used_ret_handler_args}
             except KeyError as e:
                 raise KeyError("Unknown arg '{}' in arglist of ret-handling function "
-                               "'{}'".format(e.args[0], ret.__name__))
-            retval = ret(retval, **ret_handler_kwds)
+                               "'{}'".format(e.args[0], self.ret_handler.__name__))
+            retval = self.ret_handler(retval, **ret_handler_kwds)
 
         if retval is not None:
             out_vals.append(retval)
@@ -161,10 +168,11 @@ class ArgHandler(object):
         pass
 
     @classmethod
-    def create(cls, arg_str, arg_index):
+    def create(cls, sig, arg_str, arg_index):
         raise NotImplementedError
 
-    def __init__(self, arg_str, arg_index):
+    def __init__(self, sig, arg_str, arg_index):
+        self.sig = sig
         self.arg_str = arg_str
         self.arg_index = arg_index
 
@@ -184,17 +192,17 @@ class ArgHandler(object):
 @register_arg_handler
 class InArgHandler(ArgHandler):
     @classmethod
-    def create(cls, arg_str, arg_index):
+    def create(cls, sig, arg_str, arg_index):
         if arg_str != 'in':
             return None
-        return cls(arg_str, arg_index)
+        return cls(sig, arg_str, arg_index)
 
     def num_inputs_used(self, arg_index):
         return 1
 
     def make_cffi_arg(self, ffi, arg_index, arg_values):
         arg_value, = arg_values
-        return _wrap_inarg(ffi, self.cffi_argtype, arg_value)
+        return _wrap_inarg(ffi, self.c_argtypes[0], arg_value)
 
     def get_outputs(self, ffi, arg_index, cffi_arg):
         return ()
@@ -203,23 +211,19 @@ class InArgHandler(ArgHandler):
 @register_arg_handler
 class OutArgHandler(ArgHandler):
     @classmethod
-    def create(cls, arg_str, arg_index):
+    def create(cls, sig, arg_str, arg_index):
         if arg_str != 'out':
             return None
-        return cls(arg_str, arg_index)
-
-    def __init__(self, arg_str, arg_index):
-        self.arg_str = arg_str
-        self.arg_index = arg_index
+        return cls(sig, arg_str, arg_index)
 
     def num_inputs_used(self, arg_index):
         return 0
 
     def make_cffi_arg(self, ffi, arg_index, arg_values):
-        if self.cffi_argtype.kind == 'pointer' and self.cffi_argtype.item.kind == 'struct':
-            arg = self.flags['struct_maker'](self.cffi_argtype)
+        if self.c_argtypes[0].kind == 'pointer' and self.c_argtypes[0].item.kind == 'struct':
+            arg = self.sig.flags['struct_maker'](self.c_argtypes[0])
         else:
-            arg = ffi.new(self.cffi_argtype)
+            arg = ffi.new(self.c_argtypes[0])
         return arg
 
     def get_outputs(self, ffi, arg_index, cffi_arg):
@@ -229,14 +233,17 @@ class OutArgHandler(ArgHandler):
 @register_arg_handler
 class IgnoreArgHandler(ArgHandler):
     @classmethod
-    def create(cls, arg_str, arg_index):
+    def create(cls, sig, arg_str, arg_index):
         if arg_str == 'ignore':
-            return cls(arg_str, arg_index)
+            return cls(sig, arg_str, arg_index)
         else:
             return None
 
     def num_inputs_used(self, arg_index):
         return 0
+
+    def make_cffi_arg(self, ffi, arg_index, arg_values):
+        return ffi.new(self.c_argtypes[0].cname + '*')[0]
 
     def get_outputs(self, ffi, arg_index, cffi_arg):
         return ()
@@ -258,11 +265,11 @@ class ArrayArgHandler(ArgHandler):
         cls.unmatched_arrays = None
 
     @classmethod
-    def create(cls, arg_str, arg_index):
+    def create(cls, sig, arg_str, arg_index):
         m = cls.RE_ARR.match(arg_str)
         if m:
             len_num = None if m.group(2) is None else int(m.group(2))
-            handler = cls(arg_str, arg_index, is_buf=False, fixed_len=len_num)
+            handler = cls(sig, arg_str, arg_index, is_buf=False, fixed_len=len_num)
             if len_num is None:
                 cls.unmatched_arrays.append(handler)
             return handler
@@ -270,7 +277,7 @@ class ArrayArgHandler(ArgHandler):
         m = cls.RE_BUF.match(arg_str)
         if m:
             len_num = None if m.group(2) is None else int(m.group(2))
-            handler = cls(arg_str, arg_index, is_buf=True, fixed_len=len_num)
+            handler = cls(sig, arg_str, arg_index, is_buf=True, fixed_len=len_num)
             if len_num is None:
                 cls.unmatched_arrays.append(handler)
             return handler
@@ -298,8 +305,8 @@ class ArrayArgHandler(ArgHandler):
             return int(self.get_len)
         raise ValueError('Invalid arg_index')
 
-    def __init__(self, arg_str, arg_index, is_buf, fixed_len, get_len=False):
-        ArrayArgHandler.__init__(self, arg_str, arg_index)
+    def __init__(self, sig, arg_str, arg_index, is_buf, fixed_len, get_len=False):
+        ArgHandler.__init__(self, sig, arg_str, arg_index)
         self.is_buf = is_buf
         self.fixed_len = fixed_len
         self.get_len = get_len
@@ -309,11 +316,11 @@ class ArrayArgHandler(ArgHandler):
     def len(self):
         if self.fixed_len:
             return self.fixed_len
-        return self.flags['buflen']
+        return self.sig.flags['buflen']
         # TODO: Figure out what to do for get_len
 
     def _get_arr_output(self, ffi, cffi_arg):
-        if self.flags['use_numpy']:
+        if self.sig.flags['use_numpy']:
             return c_to_numpy_array(ffi, cffi_arg, self.len())
         else:
             return cffi_arg
@@ -332,7 +339,7 @@ class ArrayArgHandler(ArgHandler):
             if self.is_buf:
                 return ffi.new('char[]', self.len())
             else:
-                return ffi.new('{}[]'.format(self.cffi_argtype.item.cname), self.len())
+                return ffi.new('{}[]'.format(self.c_argtypes[0].item.cname), self.len())
 
         elif arg_index == self.len_argindex:
             return self.len()
@@ -342,50 +349,61 @@ class ArrayArgHandler(ArgHandler):
 
 
 class NiceObject(object):
-    pass
+    _init_func = None
+    _n_handles = None
+
+    def __init__(self, *args):
+        handles = self._init_func(*args) if self._init_func else args
+        if not isinstance(handles, tuple):
+            handles = (handles,)
+        self._handles = handles
+
+        if len(handles) != self._n_handles:
+            raise TypeError("__init__() takes exactly {} arguments "
+                            "({} given)".format(self._n_handles, len(handles)))
+
+        ## Generate "bound methods"
+        #for func_name in niceobjdef.names:
+        #    if func_name in funcs:
+        #        lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles,
+        #                                cls_name, self)
+        #        if func_name in user_funcs:
+        #            wrapped_func = user_funcs[func_name]
+        #            wrapped_func.orig = lib_func
+        #            setattr(self, func_name, wrapped_func)
+        #        else:
+        #            setattr(self, func_name, lib_func)
+
+
+class LibMethod(object):
+    def __init__(self, niceobj, func):
+        self._niceobj = niceobj
+        self._func = func
+
+    def __call__(self, *args):
+        return self._func(*(self._niceobj._handles + args), niceobj=self._niceobj)
 
 
 class NiceClassMeta(type):
-    def __new__(metacls, cls_name, niceobjdef, ffi, funcs, user_funcs):
-        repr_strs = {}
-        for func_name in niceobjdef.names:
-            if func_name in funcs:
-                func = funcs[func_name]
-                if hasattr(func, '_ffi_func'):
-                    repr_str = _func_repr_str(ffi, funcs[func_name], niceobjdef.n_handles)
-                else:
-                    repr_str = func.__doc__ or '{}(??) -> ??'.format(func_name)
-                repr_strs[func_name] = repr_str
-
-        # Get init function
+    def __new__(metacls, cls_name, niceobjdef, parent_lib):
         try:
-            init_func = funcs[niceobjdef.init] if niceobjdef.init else None
+            init_func = parent_lib._libfuncs[niceobjdef.init] if niceobjdef.init else None
         except KeyError:
             raise ValueError("Could not find function '{}'".format(niceobjdef.init))
 
-        def __init__(self, *args):
-            handles = init_func(*args) if init_func else args
-            if not isinstance(handles, tuple):
-                handles = (handles,)
-            self._handles = handles
-
-            if len(handles) != niceobjdef.n_handles:
-                raise TypeError("__init__() takes exactly {} arguments "
-                                "({} given)".format(niceobjdef.n_handles, len(handles)))
-
-            # Generate "bound methods"
-            for func_name in niceobjdef.names:
-                if func_name in funcs:
-                    lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles,
-                                           cls_name, self)
-                    if func_name in user_funcs:
-                        wrapped_func = user_funcs[func_name]
-                        wrapped_func.orig = lib_func
-                        setattr(self, func_name, wrapped_func)
-                    else:
-                        setattr(self, func_name, lib_func)
-
-        niceobj_dict = {'__init__': __init__, '__doc__': niceobjdef.doc}
+        niceobj_dict = {
+            '_init_func': init_func,
+            '_n_handles': niceobjdef.n_handles,
+            '__doc__': niceobjdef.doc
+        }
+        for attr_name, attr_value in niceobjdef.attrs.items():
+            if isinstance(attr_value, Sig):
+                sig = attr_value
+            else:
+                sig = Sig.from_tuple(attr_value)
+            sig.set_default_flags((niceobjdef.flags, parent_lib._base_flags))
+            libfunc = parent_lib._create_libfunction(attr_name, sig)
+            niceobj_dict[attr_name] = libfunc
         return type(cls_name, (NiceObject,), niceobj_dict)
 
 
@@ -458,235 +476,235 @@ def _wrap_inarg(ffi, argtype, arg):
         return arg
 
 
-def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret, struct_maker, buflen,
-                  use_numpy, free_buf):
-    default_buflen = buflen
-    ret_handler_args = set(getargspec(ret).args[1:])
-
-    def bufout_wrap(buf_ptr):
-        """buf_ptr is a char**"""
-        if buf_ptr[0] == ffi.NULL:
-            return None
-
-        string = ffi.string(buf_ptr[0])
-        if free_buf:
-            free_buf(buf_ptr[0])
-        return string
-
-    def c_to_numpy_array(c_arr, size):
-        import numpy as np
-        arrtype = ffi.typeof(c_arr)
-        cname = arrtype.item.cname
-        if cname.startswith(('int', 'long', 'short', 'char', 'signed')):
-            prefix = 'i'
-        elif cname.startswith('unsigned'):
-            prefix = 'u'
-        elif cname.startswith(('float', 'double')):
-            prefix = 'f'
-        else:
-            raise TypeError("Unknown type {}".format(cname))
-
-        dtype = np.dtype(prefix + str(ffi.sizeof(arrtype.item)))
-        return np.frombuffer(ffi.buffer(c_arr), dtype=dtype)
-
-    arr_out_wrapper = c_to_numpy_array if use_numpy else (lambda arr, size: arr)
-
-    functype = ffi.typeof(func)
-    argtypes = functype.args
-    # Cast bytes to str
-    sig_tup = tuple(str(sig) if isinstance(sig, bytes) else sig for sig in sig_tup)
-    n_expected_inargs = sum('in' in a for a in sig_tup if isinstance(a, str))
-
-    if functype.ellipsis:
-        argtypes = argtypes + ('...',)
-
-    if len(sig_tup) != len(argtypes):
-        raise TypeError("{}() takes {} args, but your signature specifies "
-                        "{}".format(fname, len(argtypes), len(sig_tup)))
-
-    def wrapped(*inargs, **kwds):
-        inargs = list(inargs)
-        available_args = {}
-        available_args['niceobj'] = kwds.pop('niceobj', None)
-        available_args['funcname'] = fname
-
-        if not functype.ellipsis and len(inargs) != n_expected_inargs:
-            message = '{}() takes '.format(fname)
-            if n_expected_inargs == 0:
-                message += 'no arguments'
-            elif n_expected_inargs == 1:
-                message += '1 argument'
-            else:
-                message += '{} arguments'.format(n_expected_inargs)
-
-            message += ' ({} given)'.format(len(inargs))
-
-            raise TypeError(message)
-
-        # First pass to get buf/arr info
-        buflens, lens, solo_buflens, buftypes = [], [], [], []
-        n_paired_bufs = 0
-        inarg_idx = 0
-        for sig, argtype in zip(sig_tup, argtypes):
-            if argtype == '...':
-                continue
-
-            elif sig in ('buf', 'arr'):
-                n_paired_bufs += 1
-                buftypes.append(argtype.item)
-
-            elif sig.startswith(('buf[', 'arr[')):
-                try:
-                    assert sig[3] == '[' and sig[-1] == ']'
-                    num = int(sig[4:-1])
-                    assert num > 0
-                except (AssertionError, ValueError):
-                    raise ValueError("Bad sig element '{}'".format(sig))
-                solo_buflens.append(num)
-
-            elif sig.startswith('len'):
-                sig, _, size_type = sig.partition(':')
-
-                if len(sig) == 3:
-                    num = default_buflen
-                else:
-                    try:
-                        assert sig[3] == '='
-                        if sig[4:] == 'in':
-                            num = inargs[inarg_idx]
-                        else:
-                            num = int(sig[4:])
-                    except (AssertionError, ValueError):
-                        raise ValueError("Bad sig element '{}'".format(sig))
-                lens.append(num)
-                buflens.append(num)
-
-            if 'in' in sig:
-                inarg_idx += 1
-
-        if len(lens) != n_paired_bufs:
-            raise ValueError("Number of paired buf/arr sig elements does not match number of "
-                             "len sig elements")
-
-        outargs = []
-        args = []
-        bufs = []
-        # Possible sig entries:
-        # - in
-        # - out
-        # - inout
-        # - buf[n]  (c-string buffer)
-        # - arr[n]  (array)
-        # - len=n   (length of buf/arr)
-        # - retlen??(returned length)
-        # - ignore  (reserved arg, pass in 0/NULL)
-        for info, argtype in zip(sig_tup, argtypes):
-            if argtype == '...':
-                info, argtype = info(*args)
-
-            if info == 'inout':
-                inarg = inargs.pop(0)
-                try:
-                    # FIXME: This could misbehave if the user passes a typename string (e.g. 'int')
-                    inarg_type = ffi.typeof(inarg)
-                except TypeError:
-                    inarg_type = type(inarg)
-
-                if argtype == inarg_type:
-                    arg = inarg  # Pass straight through
-                elif argtype.kind == 'pointer' and argtype.item.kind == 'struct':
-                    arg = struct_maker(argtype, inarg)
-                elif (argtype.cname == 'void *' and isinstance(inarg, ffi.CData) and
-                      inarg_type.kind in ('pointer', 'array')):
-                    arg = ffi.cast(argtype, inarg)
-                else:
-                    try:
-                        arg = ffi.new(argtype, inarg)
-                    except TypeError:
-                        raise TypeError("Cannot convert {} to required type"
-                                        "{}".format(inarg, argtype))
-
-                if argtype.kind == 'pointer' and argtype.item.cname == 'void':
-                    # Don't dereference void pointers directly
-                    outargs.append((arg, lambda o: o))
-                else:
-                    outargs.append((arg, lambda o: o[0]))
-            elif info == 'in':
-                arg = inargs.pop(0)
-                arg = _wrap_inarg(ffi, argtype, arg)
-            elif info == 'out':
-                if argtype.kind == 'pointer' and argtype.item.kind == 'struct':
-                    arg = struct_maker(argtype)
-                else:
-                    arg = ffi.new(argtype)
-                outargs.append((arg, lambda o: o[0]))
-            elif info == 'bufout':
-                if not (argtype.kind == 'pointer' and argtype.item.kind == 'pointer' and
-                        argtype.item.item.kind == 'primitive'):
-                    raise TypeError("'bufout' applies only to type 'char**'")
-                arg = ffi.new(argtype)
-                outargs.append((arg, bufout_wrap))
-            elif info.startswith('buf'):
-                buflen = (buflens if len(info) == 3 else solo_buflens).pop(0)
-                arg = ffi.new('char[]', buflen)
-                outargs.append((arg, lambda o: ffi.string(o)))
-                bufs.append(arg)
-            elif info.startswith('arr'):
-                buflen = (buflens if len(info) == 3 else solo_buflens).pop(0)
-                arg = ffi.new('{}[]'.format(argtype.item.cname), buflen)
-                outargs.append((arg, lambda arr: arr_out_wrapper(arr, buflen)))
-                bufs.append(arg)
-            elif info.startswith('len'):
-                info, _, size_type = info.partition(':')
-                if info == 'len=in':
-                    inargs.pop(0)  # We've already used this earlier
-                buftype = buftypes.pop(0)
-
-                # Adjust len if sig has an explicit type
-                if not size_type:
-                    meas_size = ffi.sizeof(buftype)
-                elif size_type == 'byte':
-                    meas_size = 1
-                else:
-                    meas_size = ffi.sizeof(size_type)
-
-                arg = lens.pop(0) * ffi.sizeof(buftype) // meas_size
-            elif info == 'ignore':
-                arg = ffi.new(argtype.cname + '*')[0]
-            else:
-                raise Exception("Unrecognized arg info '{}'".format(info))
-
-            if isinstance(arg, str):
-                arg = arg.encode('ascii')
-            args.append(arg)
-
-        available_args['funcargs'] = args
-
-        retval = func(*args)
-        out_vals = [f(a) for a, f in outargs]
-
-        if ret:
-            try:
-                kwds = {arg: available_args[arg] for arg in ret_handler_args}
-            except KeyError as e:
-                raise KeyError("Unknown arg '{}' in arglist of ret-handling function "
-                               "'{}'".format(e.args[0], ret.__name__))
-            retval = ret(retval, **kwds)
-
-        if retval is not None:
-            out_vals.append(retval)
-
-        if not out_vals:
-            return None
-        elif len(out_vals) == 1:
-            return out_vals[0]
-        else:
-            return tuple(out_vals)
-
-    wrapped.__name__ = fname
-    wrapped._ffi_func = func
-    wrapped._sig_tup = sig_tup
-    return wrapped
+#def _cffi_wrapper(ffi, func, fname, sig_tup, prefix, ret, struct_maker, buflen,
+#                  use_numpy, free_buf):
+#    default_buflen = buflen
+#    ret_handler_args = set(getargspec(ret).args[1:])
+#
+#    def bufout_wrap(buf_ptr):
+#        """buf_ptr is a char**"""
+#        if buf_ptr[0] == ffi.NULL:
+#            return None
+#
+#        string = ffi.string(buf_ptr[0])
+#        if free_buf:
+#            free_buf(buf_ptr[0])
+#        return string
+#
+#    def c_to_numpy_array(c_arr, size):
+#        import numpy as np
+#        arrtype = ffi.typeof(c_arr)
+#        cname = arrtype.item.cname
+#        if cname.startswith(('int', 'long', 'short', 'char', 'signed')):
+#            prefix = 'i'
+#        elif cname.startswith('unsigned'):
+#            prefix = 'u'
+#        elif cname.startswith(('float', 'double')):
+#            prefix = 'f'
+#        else:
+#            raise TypeError("Unknown type {}".format(cname))
+#
+#        dtype = np.dtype(prefix + str(ffi.sizeof(arrtype.item)))
+#        return np.frombuffer(ffi.buffer(c_arr), dtype=dtype)
+#
+#    arr_out_wrapper = c_to_numpy_array if use_numpy else (lambda arr, size: arr)
+#
+#    functype = ffi.typeof(func)
+#    argtypes = functype.args
+#    # Cast bytes to str
+#    sig_tup = tuple(str(sig) if isinstance(sig, bytes) else sig for sig in sig_tup)
+#    n_expected_inargs = sum('in' in a for a in sig_tup if isinstance(a, str))
+#
+#    if functype.ellipsis:
+#        argtypes = argtypes + ('...',)
+#
+#    if len(sig_tup) != len(argtypes):
+#        raise TypeError("{}() takes {} args, but your signature specifies "
+#                        "{}".format(fname, len(argtypes), len(sig_tup)))
+#
+#    def wrapped(*inargs, **kwds):
+#        inargs = list(inargs)
+#        available_args = {}
+#        available_args['niceobj'] = kwds.pop('niceobj', None)
+#        available_args['funcname'] = fname
+#
+#        if not functype.ellipsis and len(inargs) != n_expected_inargs:
+#            message = '{}() takes '.format(fname)
+#            if n_expected_inargs == 0:
+#                message += 'no arguments'
+#            elif n_expected_inargs == 1:
+#                message += '1 argument'
+#            else:
+#                message += '{} arguments'.format(n_expected_inargs)
+#
+#            message += ' ({} given)'.format(len(inargs))
+#
+#            raise TypeError(message)
+#
+#        # First pass to get buf/arr info
+#        buflens, lens, solo_buflens, buftypes = [], [], [], []
+#        n_paired_bufs = 0
+#        inarg_idx = 0
+#        for sig, argtype in zip(sig_tup, argtypes):
+#            if argtype == '...':
+#                continue
+#
+#            elif sig in ('buf', 'arr'):
+#                n_paired_bufs += 1
+#                buftypes.append(argtype.item)
+#
+#            elif sig.startswith(('buf[', 'arr[')):
+#                try:
+#                    assert sig[3] == '[' and sig[-1] == ']'
+#                    num = int(sig[4:-1])
+#                    assert num > 0
+#                except (AssertionError, ValueError):
+#                    raise ValueError("Bad sig element '{}'".format(sig))
+#                solo_buflens.append(num)
+#
+#            elif sig.startswith('len'):
+#                sig, _, size_type = sig.partition(':')
+#
+#                if len(sig) == 3:
+#                    num = default_buflen
+#                else:
+#                    try:
+#                        assert sig[3] == '='
+#                        if sig[4:] == 'in':
+#                            num = inargs[inarg_idx]
+#                        else:
+#                            num = int(sig[4:])
+#                    except (AssertionError, ValueError):
+#                        raise ValueError("Bad sig element '{}'".format(sig))
+#                lens.append(num)
+#                buflens.append(num)
+#
+#            if 'in' in sig:
+#                inarg_idx += 1
+#
+#        if len(lens) != n_paired_bufs:
+#            raise ValueError("Number of paired buf/arr sig elements does not match number of "
+#                             "len sig elements")
+#
+#        outargs = []
+#        args = []
+#        bufs = []
+#        # Possible sig entries:
+#        # - in
+#        # - out
+#        # - inout
+#        # - buf[n]  (c-string buffer)
+#        # - arr[n]  (array)
+#        # - len=n   (length of buf/arr)
+#        # - retlen??(returned length)
+#        # - ignore  (reserved arg, pass in 0/NULL)
+#        for info, argtype in zip(sig_tup, argtypes):
+#            if argtype == '...':
+#                info, argtype = info(*args)
+#
+#            if info == 'inout':
+#                inarg = inargs.pop(0)
+#                try:
+#                    # FIXME: This could misbehave if the user passes a typename string (e.g. 'int')
+#                    inarg_type = ffi.typeof(inarg)
+#                except TypeError:
+#                    inarg_type = type(inarg)
+#
+#                if argtype == inarg_type:
+#                    arg = inarg  # Pass straight through
+#                elif argtype.kind == 'pointer' and argtype.item.kind == 'struct':
+#                    arg = struct_maker(argtype, inarg)
+#                elif (argtype.cname == 'void *' and isinstance(inarg, ffi.CData) and
+#                      inarg_type.kind in ('pointer', 'array')):
+#                    arg = ffi.cast(argtype, inarg)
+#                else:
+#                    try:
+#                        arg = ffi.new(argtype, inarg)
+#                    except TypeError:
+#                        raise TypeError("Cannot convert {} to required type"
+#                                        "{}".format(inarg, argtype))
+#
+#                if argtype.kind == 'pointer' and argtype.item.cname == 'void':
+#                    # Don't dereference void pointers directly
+#                    outargs.append((arg, lambda o: o))
+#                else:
+#                    outargs.append((arg, lambda o: o[0]))
+#            elif info == 'in':
+#                arg = inargs.pop(0)
+#                arg = _wrap_inarg(ffi, argtype, arg)
+#            elif info == 'out':
+#                if argtype.kind == 'pointer' and argtype.item.kind == 'struct':
+#                    arg = struct_maker(argtype)
+#                else:
+#                    arg = ffi.new(argtype)
+#                outargs.append((arg, lambda o: o[0]))
+#            elif info == 'bufout':
+#                if not (argtype.kind == 'pointer' and argtype.item.kind == 'pointer' and
+#                        argtype.item.item.kind == 'primitive'):
+#                    raise TypeError("'bufout' applies only to type 'char**'")
+#                arg = ffi.new(argtype)
+#                outargs.append((arg, bufout_wrap))
+#            elif info.startswith('buf'):
+#                buflen = (buflens if len(info) == 3 else solo_buflens).pop(0)
+#                arg = ffi.new('char[]', buflen)
+#                outargs.append((arg, lambda o: ffi.string(o)))
+#                bufs.append(arg)
+#            elif info.startswith('arr'):
+#                buflen = (buflens if len(info) == 3 else solo_buflens).pop(0)
+#                arg = ffi.new('{}[]'.format(argtype.item.cname), buflen)
+#                outargs.append((arg, lambda arr: arr_out_wrapper(arr, buflen)))
+#                bufs.append(arg)
+#            elif info.startswith('len'):
+#                info, _, size_type = info.partition(':')
+#                if info == 'len=in':
+#                    inargs.pop(0)  # We've already used this earlier
+#                buftype = buftypes.pop(0)
+#
+#                # Adjust len if sig has an explicit type
+#                if not size_type:
+#                    meas_size = ffi.sizeof(buftype)
+#                elif size_type == 'byte':
+#                    meas_size = 1
+#                else:
+#                    meas_size = ffi.sizeof(size_type)
+#
+#                arg = lens.pop(0) * ffi.sizeof(buftype) // meas_size
+#            elif info == 'ignore':
+#                arg = ffi.new(argtype.cname + '*')[0]
+#            else:
+#                raise Exception("Unrecognized arg info '{}'".format(info))
+#
+#            if isinstance(arg, str):
+#                arg = arg.encode('ascii')
+#            args.append(arg)
+#
+#        available_args['funcargs'] = args
+#
+#        retval = func(*args)
+#        out_vals = [f(a) for a, f in outargs]
+#
+#        if ret:
+#            try:
+#                kwds = {arg: available_args[arg] for arg in ret_handler_args}
+#            except KeyError as e:
+#                raise KeyError("Unknown arg '{}' in arglist of ret-handling function "
+#                               "'{}'".format(e.args[0], ret.__name__))
+#            retval = ret(retval, **kwds)
+#
+#        if retval is not None:
+#            out_vals.append(retval)
+#
+#        if not out_vals:
+#            return None
+#        elif len(out_vals) == 1:
+#            return out_vals[0]
+#        else:
+#            return tuple(out_vals)
+#
+#    wrapped.__name__ = fname
+#    wrapped._ffi_func = func
+#    wrapped._sig_tup = sig_tup
+#    return wrapped
 
 
 # WARNING uses some stack frame hackery; should probably make use of this syntax optional
@@ -746,224 +764,182 @@ class NiceObjectDef(object):
         return "<NiceObjectDef values={}>".format(repr(self.names))
 
 
-_contingent_libs = []
-
-
 class LibMeta(type):
-    def __new__(metacls, clsname, bases, classdict):
-        mro_lookup = metacls._create_mro_lookup(classdict, bases)
+    def __new__(metacls, clsname, bases, orig_classdict):
+        classdict = {}
+        niceobjectdefs = {}  # name: NiceObjectDef
+        sigs = {}
 
-        # Deprecation warnings
-        if '_err_wrap' in classdict:
-            classdict['_ret'] = classdict.pop('_err_wrap')
+        for name, value in orig_classdict.items():
+            log.info("Processing attr '{}'...".format(name))
+            if isinstance(value, NiceObjectDef):
+                if value.attrs is None:
+                    value.names.remove(name)  # Remove self (context manager syntax)
+                niceobjectdefs[name] = value
+
+            elif isfunction(value):
+                if hasattr(value, 'sig'):
+                    sigs[name] = value.sig
+                else:
+                    # Ordinary function (includes ret-handlers)
+                    classdict[name] = staticmethod(value)
+
+            elif isinstance(value, Sig):
+                sigs[name] = value
+
+            elif not name.startswith('_'):
+                sigs[name] = Sig.from_tuple(value)
+
+            else:
+                classdict[name] = value
+
+        classdict.update(_niceobjectdefs=niceobjectdefs, _sigs=sigs)
+        print('classdict: {}'.format(classdict))
+        return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
+
+    def __init__(cls, clsname, bases, classdict):
+        print('bases: {}'.format(bases))
+        if bases == (object,):
+            return  # Base class
+
+        cls._handle_deprecated_attributes()
+        if '_info' in cls.__dict__:
+            cls._ffi = cls._info._ffi
+            cls._ffilib = cls._info._ffilib
+            cls._defs = cls._info._defs
+        else:
+            cls._ffilib = cls._lib
+            del cls._lib
+
+        cls._handle_base_flags()
+        cls._add_dir_ffilib()
+        cls._add_ret_handlers()
+        cls._create_libfunctions()
+        cls._create_niceobject_classes()
+        cls._add_enum_constant_defs()
+        cls._add_macro_defs()
+
+    def _handle_deprecated_attributes(cls):
+        # FIXME: remove __dict__.pop()
+        if '_err_wrap' in cls.__dict__:
+            cls._ret = cls.__dict__.pop('_err_wrap')
             warnings.warn("Your class defines _err_wrap, which has been renamed to _ret, "
                           "please update your code:", stacklevel=2)
 
-        if '_ret_wrap' in classdict:
-            classdict['_ret'] = classdict.pop('_ret_wrap')
+        if '_ret_wrap' in cls.__dict__:
+            cls._ret = cls.__dict__.pop('_ret_wrap')
             warnings.warn("Your class defines _ret_wrap, which has been renamed to _ret, "
                           "please update your code:", stacklevel=2)
 
-        if '_info' in classdict:
-            info = classdict['_info']
-            classdict['_ffi'] = info._ffi
-            classdict['_ffilib'] = info._ffilib
-            classdict['_defs'] = info._defs
+    def _add_ret_handlers(cls):
+        cls._ret_handlers = {}
+        for attr_name in dir(cls):
+            if attr_name.startswith('_ret_'):
+                cls._ret_handlers[attr_name[5:]] = getattr(cls, attr_name)
 
-        ffi = classdict['_ffi']
-        lib = classdict['_ffilib']
-        defs = mro_lookup('_defs')
+    def _handle_base_flags(cls):
+        cls._base_flags = {flag_name: getattr(cls, '_' + flag_name) for flag_name in FLAGS}
 
-        base_flags = {name: mro_lookup('_' + name) for name in FLAGS}
-        if ffi and not base_flags['struct_maker']:
-            base_flags['struct_maker'] = ffi.new
+        if cls._ffi and not cls._base_flags['struct_maker']:
+            cls._base_flags['struct_maker'] = cls._ffi.new
 
-        dir_lib = []
-        for name in dir(lib):
+        # Add default empty prefix
+        cls._base_flags['prefix'] = to_tuple(cls._base_flags['prefix'])
+        if '' not in cls._base_flags['prefix']:
+            cls._base_flags['prefix'] += ('',)
+
+    def _add_dir_ffilib(cls):
+        cls._dir_ffilib = []
+        for name in dir(cls._ffilib):
             try:
-                attr = getattr(lib, name)
-                if ffi and isinstance(attr, ffi.CData) and ffi.typeof(attr).kind != 'function':
-                    dir_lib.append(name)
+                attr = getattr(cls._ffilib, name)
+                if (cls._ffi and isinstance(attr, cls._ffi.CData) and
+                        cls._ffi.typeof(attr).kind != 'function'):
+                    cls._dir_ffilib.append(name)
             except Exception as e:
                 # The error types cffi uses seem to keep changing, so just catch all of them
                 log.info("Name '%s' found in headers, but not this dll: %s", name, e)
-
-        # Add default empty prefix
-        base_flags['prefix'] = to_tuple(base_flags['prefix'])
-        if '' not in base_flags['prefix']:
-            base_flags['prefix'] += ('',)
-
-        # Unpack NiceObjectDef sigs into the classdict
-        niceobjectdefs = {}  # name: NiceObjectDef
-        func_to_niceobjdef = {}
-        for name, value in list(classdict.items()):
-            if isinstance(value, NiceObjectDef):
-                niceobjdef = value
-                if niceobjdef.attrs is None:
-                    niceobjdef.names.remove(name)  # Remove self
-                else:
-                    for attr_name, attr_val in niceobjdef.attrs.items():
-                        classdict[attr_name] = attr_val
-                        func_to_niceobjdef[attr_name] = niceobjdef
-                niceobjectdefs[name] = niceobjdef
-
-        funcs = {}
-        func_flags = {}
-        user_funcs = {}
-        ret_handlers = {
-            'return': mro_lookup('_ret_return'),
-            'ignore': mro_lookup('_ret_ignore')
-        }
-
-        for name, value in classdict.items():
-            if name.startswith('_ret_') and isfunction(value):
-                ret_handlers[name[5:]] = value
-
-        for name, value in classdict.items():
-            if name.startswith('_') or isinstance(value, NiceObjectDef):
-                continue
             log.debug("Handling NiceLib attr '%s'", name)
-            sig_tup = None
-            if isfunction(value):
-                if hasattr(value, 'sig'):
-                    sig_tup = value.sig
-                    user_funcs[name] = value
+
+    def _create_libfunctions(cls):
+        cls._libfuncs = {}
+        for shortname, sig in cls._sigs.items():
+            sig.set_default_flags([cls._base_flags])
+            libfunc = cls._create_libfunction(shortname, sig)
+            if libfunc:
+                setattr(cls, shortname, libfunc)
+                cls._libfuncs[shortname] = libfunc
+
+    def _create_libfunction(cls, shortname, sig):
+        # Designed to be called by NiceLib and NiceClassMeta
+        prefixes = sig.flags.get('prefix', ())
+        try:
+            cffi_func, _ = cls._find_cffi_func(shortname, prefixes)
+        except ValueError:
+            return None
+
+        c_functype = cls._ffi.typeof(cffi_func)
+        c_argtypes = c_functype.args
+        if c_functype.ellipsis:
+            c_argtypes = c_argtypes + ('...',)
+
+        ret_handler = sig.flags['ret']
+        if isinstance(ret_handler, basestring):
+            ret_handler = cls._ret_handlers[ret_handler]
+
+        sig.bind_argtypes(cls._ffi, shortname, c_argtypes, ret_handler)
+
+        return LibFunction(shortname, sig, cffi_func)
+
+    def _find_cffi_func(cls, shortname, prefixes):
+        for prefix in prefixes:
+            func_name = prefix + shortname
+            try:
+                return getattr(cls._ffilib, func_name), func_name
+            except AttributeError:
+                pass
+        raise ValueError("No lib function found with a name ending in '{}', with "
+                         "any of these prefixes: {}".format(shortname, prefixes))
+
+    def _create_niceobject_classes(cls):
+        for niceobj_cls_name, niceobjdef in cls._niceobjectdefs.items():
+            niceobj_cls = NiceClassMeta(niceobj_cls_name, niceobjdef, cls)
+            setattr(cls, niceobj_cls_name, niceobj_cls)
+
+    def _add_enum_constant_defs(cls):
+        prefixes = cls._base_flags['prefix']
+        for name in dir(cls._ffilib):
+            try:
+                attr = getattr(cls._ffilib, name)
+            except:
+                # The error types cffi uses seem to keep changing, so just catch all of them
+                log.info("Name '%s' found in headers, but not this dll", name)
+                continue  # This could happen if multiple ffi libs are sharing headers
+
+            if not isinstance(attr, cls._ffi.CData) or cls._ffi.typeof(attr).kind != 'function':
+                prefix, shortname = unprefix(name, prefixes)
+                if shortname in cls.__dict__:
+                    warnings.warn("Conflicting name {}, ignoring".format(shortname))
                 else:
-                    func = value
-                    flags = {}
-                    repr_str = func.__doc__ or "{}(??) -> ??".format(name)
+                    setattr(cls, shortname, attr)
+
+    def _add_macro_defs(cls):
+        prefixes = cls._base_flags['prefix']
+        for full_name, attr in cls._defs.items():
+            prefix, name = unprefix(full_name, prefixes)
+            if name in cls.__dict__:
+                warnings.warn("Conflicting name {}, ignoring".format(name))
             else:
-                sig_tup = value
+                macro = staticmethod(attr) if callable(attr) else attr
+                setattr(cls, name, macro)
 
-            if sig_tup is not None:
-                flags = base_flags.copy()
-                if name in func_to_niceobjdef:
-                    flags.update(func_to_niceobjdef[name].flags)
-
-                # Allow non-tuple, e.g. ('in') or ({'ret':'ignore'})
-                if not isinstance(sig_tup, tuple):
-                    sig_tup = (sig_tup,)
-
-                # Pop off the flags dict
-                if sig_tup and isinstance(sig_tup[-1], dict):
-                    func_flags = sig_tup[-1]
-
-                    # Temporarily allow 'ret_wrap' for backwards compatibility
-                    if 'ret_wrap' in func_flags:
-                        warnings.warn("The 'ret_wrap' flag has been renamed to 'ret', please "
-                                        "update your code:", stacklevel=2)
-                        func_flags['ret'] = func_flags.pop('ret_wrap')
-
-                    flags.update(func_flags)
-                    sig_tup = sig_tup[:-1]
-
-                flags['prefix'] = to_tuple(flags['prefix'])
-                if '' not in flags['prefix']:
-                    flags['prefix'] += ('',)
-
-                sig = Sig(*sig_tup, **flags)
-
-                # Try prefixes until we find the lib function
-                for prefix in flags['prefix']:
-                    func_name = prefix + name
-                    ffi_func = getattr(lib, func_name, None)
-                    if ffi_func is not None:
-                        break
-                else:
-                    warnings.warn("No lib function found with a name ending in '{}', with "
-                                   "any of these prefixes: {}".format(name, flags['prefix']))
-                    continue
-
-                ret_handler = flags['ret']
-                if isinstance(ret_handler, basestring):
-                    flags['ret'] = ret_handlers[flags['ret']]
-
-                sig.assign_cffi_func(ffi, ffi_func, name, flags)
-                func = sig.call_func
-                repr_str = ''
-                #func = _cffi_wrapper(ffi, ffi_func, name, sig_tup, **flags)
-                #repr_str = _func_repr_str(ffi, func)
-
-            # Save for use by niceobjs
-            funcs[name] = func
-            func_flags[name] = flags
-
-            # HACK to get nice repr
-            classdict[name] = LibFunction(func, repr_str)
-
-        # Create NiceObject classes
-        for cls_name, niceobjdef in niceobjectdefs.items():
-            # Need to use a separate function so we have a per-class closure
-            classdict[cls_name] = NiceClassMeta(cls_name, niceobjdef, ffi, funcs, user_funcs)
-
-        # Add macro defs
-        if defs:
-            for name, attr in defs.items():
-                for prefix in base_flags['prefix']:
-                    if name.startswith(prefix):
-                        shortname = name[len(prefix):]
-                        if shortname in classdict:
-                            warnings.warn("Conflicting name {}, ignoring".format(shortname))
-                        else:
-                            classdict[shortname] = staticmethod(attr) if callable(attr) else attr
-                        break
-
-        # Add enum constant defs
-        if ffi:
-            for name in dir(lib):
-                try:
-                    attr = getattr(lib, name)
-                except:
-                    # The error types cffi uses seem to keep changing, so just catch all of them
-                    log.info("Name '%s' found in headers, but not this dll", name)
-                    continue  # This could happen if multiple ffi libs are sharing headers
-
-                if not isinstance(attr, ffi.CData) or ffi.typeof(attr).kind != 'function':
-                    for prefix in base_flags['prefix']:
-                        if name.startswith(prefix):
-                            shortname = name[len(prefix):]
-                            if shortname in classdict:
-                                warnings.warn("Conflicting name {}, ignoring".format(shortname))
-                            else:
-                                classdict[shortname] = attr
-                            break
-
-        classdict['_dir_lib'] = dir_lib
-        cls = super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
-
-        _contingent_libs.append(cls)
-
-        return cls
-
-    @classmethod
-    def __new_replay__(metacls, clsname, bases, orig_classdict):
-        print("In __new_replay__()")
-        classdict = {}
-        return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
-
-    def __getattr__(self, name):
-        return getattr(self._ffilib, name)
+    def __getattr__(cls, name):
+        if name in cls._dir_ffilib:
+            return getattr(cls._ffilib, name)
+        raise AttributeError("{} has no attribute named '{}'".format(cls.__name__, name))
 
     def __dir__(self):
-        return list(self.__dict__.keys()) + self._dir_lib
-
-    @staticmethod
-    def _create_mro_lookup(classdict, bases):
-        """Generate a lookup function that will search the base classes for an attribute. This
-        only searches the mro of the first base, which is OK since you should probably inherit only
-        from NiceLib anyway. If there's a use case where multiple inheritance becomes useful, we
-        can add the proper mro algorithm here, but that seems unlikely. In fact, even this seems
-        like overkill...
-        """
-        dicts = (classdict,) + tuple(C.__dict__ for C in bases[0].__mro__)
-        def lookup(name):
-            for d in dicts:
-                try:
-                    return d[name]
-                except KeyError:
-                    pass
-            raise KeyError(name)
-        return lookup
+        return list(self.__dict__.keys()) + self._dir_ffilib
 
 
 def _func_repr_str(ffi, func, n_handles=0):
@@ -984,7 +960,7 @@ def _func_repr_str(ffi, func, n_handles=0):
     return repr_str
 
 
-class LibFunction(object):
+class OldLibFunction(object):
     def __init__(self, func, repr_str, handles=(), niceobj_name=None, niceobj=None):
         self.__name__ = niceobj_name + '.' + func.__name__ if niceobj_name else func.__name__
         self._func = func
@@ -1000,6 +976,40 @@ class LibFunction(object):
 
     def __repr__(self):
         return self._repr
+
+
+def unprefix(name, prefixes):
+    for prefix in prefixes:
+        if name.startswith(prefix):
+            return prefix, name[len(prefix):]
+    return '', name
+
+
+class LibFunction(object):
+    def __init__(self, name, sig, c_func):
+        self.sig = sig
+        self.name = name
+        self.c_func = c_func
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        else:
+            return LibMethod(instance, self)
+
+    def __call__(self, *args, **kwds):
+        if len(args) != self.sig.num_inargs:
+            raise TypeError("{}() takes {} arguments ({} given)"
+                            "".format(self.name, self.sig.num_inargs, len(args)))
+
+        ret_handler_args = {
+            'niceobj': kwds.pop('niceobj', None),
+            'funcname': self.name,
+        }
+
+        c_args = self.sig.make_c_args(args)
+        retval = self.c_func(*c_args)
+        return self.sig.get_outputs(c_args, retval, ret_handler_args)
 
 
 class NiceLib(with_metaclass(LibMeta, object)):
