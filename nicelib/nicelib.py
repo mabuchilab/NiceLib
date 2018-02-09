@@ -104,10 +104,11 @@ class Sig(object):
                 return handler
         raise ValueError("Unrecognized argtype string '{}'".format(arg_str))
 
-    def bind_argtypes(self, ffi, func_name, c_argtypes, ret_handler):
+    def bind_argtypes(self, ffi, func_name, c_argtypes, ret_handler, c_argnames):
         self.ffi = ffi
         self.ret_handler = ret_handler
         self.c_argtypes = c_argtypes
+        self.c_argnames = c_argnames
 
         if len(self.arg_strs) != len(c_argtypes):
             raise TypeError("{}() takes {} args, but your signature specifies "
@@ -120,6 +121,14 @@ class Sig(object):
                 handler.c_argtypes = (c_argtype,)
             else:
                 handler.c_argtypes += (c_argtype,)
+
+        self.argnames = None
+        if self.c_argnames is not None:
+            self.argnames = []
+            for sig_index, (handler, c_argname) in enumerate(zip(self.sig_handlers, c_argnames)):
+                # TODO Handle case of multiple inputs, or only allow one
+                if handler.num_inputs_used(sig_index) > 0:
+                    self.argnames.append(c_argname)
 
     def make_c_args(self, args):
         c_args = []
@@ -872,7 +881,7 @@ class LibMeta(type):
         # Designed to be called by NiceLib and NiceClassMeta
         prefixes = sig.flags.get('prefix', ())
         try:
-            cffi_func, _ = cls._find_cffi_func(shortname, prefixes)
+            cffi_func, c_func_name = cls._find_cffi_func(shortname, prefixes)
         except ValueError:
             return None
 
@@ -885,9 +894,14 @@ class LibMeta(type):
         if isinstance(ret_handler, basestring):
             ret_handler = cls._ret_handlers[ret_handler]
 
-        sig.bind_argtypes(cls._ffi, shortname, c_argtypes, ret_handler)
+        if hasattr(cls, '_info'):
+            arg_names = cls._info._argnames.get(c_func_name)
+        else:
+            arg_names = None
 
-        return LibFunction(shortname, sig, cffi_func)
+        sig.bind_argtypes(cls._ffi, shortname, c_argtypes, ret_handler, arg_names)
+
+        return LibFunction(shortname, c_func_name, sig, cffi_func)
 
     def _find_cffi_func(cls, shortname, prefixes):
         for prefix in prefixes:
@@ -984,10 +998,24 @@ def unprefix(name, prefixes):
 
 
 class LibFunction(object):
-    def __init__(self, name, sig, c_func):
+    def __init__(self, name, c_name, sig, c_func):
         self.sig = sig
         self.name = name
+        self.c_name = c_name
         self.c_func = c_func
+
+        if self.sig.argnames is not None:
+            arg_strs = self.sig.argnames
+        else:
+            arg_strs = ['arg{}'.format(i) for i, _ in enumerate()]
+        sig_str = '{}({})'.format(name, ', '.join(arg_strs))
+
+        if self.sig.c_argnames:
+            c_arg_strs = [t.cname + ' ' + n for t, n in zip(sig.c_argtypes, sig.c_argnames)]
+        else:
+            c_arg_strs = [t.cname for t in sig.c_argtypes]
+        c_sig_str = 'Wrapping {}({})'.format(c_name, ', '.join(c_arg_strs))
+        self.__doc__ = sig_str + '\n' + c_sig_str
 
     def __get__(self, instance, owner):
         if instance is None:
