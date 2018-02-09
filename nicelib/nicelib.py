@@ -11,6 +11,7 @@ import sys
 import warnings
 import logging
 from inspect import isfunction, getargspec
+from collections import deque
 
 from .util import to_tuple, ChainMap
 
@@ -23,6 +24,7 @@ ARG_HANDLERS = []
 
 def register_arg_handler(arg_handler):
     ARG_HANDLERS.append(arg_handler)
+    return arg_handler
 
 
 def c_to_numpy_array(ffi, c_arr, size):
@@ -73,33 +75,18 @@ class Sig(object):
         for handler_class in ARG_HANDLERS:
             handler_class.start_sig_definition()
 
-        self.handlers = []
-        self.sig_handlers = []
-        for c_index, arg_str in enumerate(self.arg_strs):
-            handler = self._make_arg_handler(arg_str, c_index)
-            if handler in self.handlers:
-                handler.c_indices += (c_index,)
-            else:
-                handler.c_indices = (c_index,)
-                self.handlers.append(handler)
-            self.sig_handlers.append(handler)
+        self.handlers = [self._make_arg_handler(arg_str) for arg_str in self.arg_strs]
 
         for handler_class in ARG_HANDLERS:
             handler_class.end_sig_definition()
 
-        self.handler_inargs = {}
-        inarg_index = 0
-        for sig_index, handler in enumerate(self.sig_handlers):
-            num_inputs = handler.num_inputs_used(sig_index)
-            new_indices = tuple(range(inarg_index, inarg_index+num_inputs))
-            self.handler_inargs[handler] = self.handler_inargs.get(handler, ()) + new_indices
-            inarg_index += num_inputs
-        log.info('handler_inargs: %s', self.handler_inargs)
-        self.num_inargs = inarg_index
+        self.in_handlers = [h for h in self.handlers if h.takes_input]
+        self.out_handlers = [h for h in self.handlers if h.makes_output]
+        self.num_inargs = len(self.in_handlers)
 
-    def _make_arg_handler(self, arg_str, arg_index):
+    def _make_arg_handler(self, arg_str):
         for handler_class in ARG_HANDLERS:
-            handler = handler_class.create(self, arg_str, arg_index)
+            handler = handler_class.create(self, arg_str)
             if handler:
                 return handler
         raise ValueError("Unrecognized argtype string '{}'".format(arg_str))
@@ -116,34 +103,31 @@ class Sig(object):
 
         self.used_ret_handler_args = set(getargspec(ret_handler).args[1:])
 
-        for sig_index, (handler, c_argtype) in enumerate(zip(self.handlers, c_argtypes)):
-            if not hasattr(handler, 'c_argtypes'):
-                handler.c_argtypes = (c_argtype,)
-            else:
-                handler.c_argtypes += (c_argtype,)
-
-        self.argnames = None
-        if self.c_argnames is not None:
-            self.argnames = []
-            for sig_index, (handler, c_argname) in enumerate(zip(self.sig_handlers, c_argnames)):
-                # TODO Handle case of multiple inputs, or only allow one
-                if handler.num_inputs_used(sig_index) > 0:
-                    self.argnames.append(c_argname)
+        self.argnames = []
+        self.retnames = []
+        for handler, c_argtype, c_argname in zip(self.handlers, c_argtypes, c_argnames):
+            handler.c_argtype = c_argtype
+            handler.c_argname = c_argname
+            if handler.takes_input:
+                self.argnames.append(c_argname)
+            if handler.makes_output:
+                self.retnames.append(c_argname)
 
     def make_c_args(self, args):
+        py_args = deque(args)
         c_args = []
-        arg_index = 0
-        for arg_index, handler in enumerate(self.sig_handlers):
-            inarg_indices = self.handler_inargs[handler]
-            inargs = [args[i] for i in inarg_indices]
+        for handler in self.handlers:
             log.info("Making cffi arg for %s", handler)
-            c_args.append(handler.make_cffi_arg(self.ffi, arg_index, inargs))
-        return c_args
+            py_arg = py_args.popleft() if handler.takes_input else None
+            c_args.append(handler.make_c_arg(self.ffi, py_arg))
 
-    def get_outputs(self, c_args, retval, ret_handler_args):
-        out_vals = []
-        for sig_index, (handler, c_arg) in enumerate(zip(self.sig_handlers, c_args)):
-            out_vals.extend(handler.get_outputs(self.ffi, sig_index, c_arg))
+        # Do second pass to clean up callables; beware that cdata can be callable though
+        return [a() if (not isinstance(a, self.ffi.CData) and callable(a)) else a for a in c_args]
+
+    def extract_outputs(self, c_args, retval, ret_handler_args):
+        out_vals = [handler.extract_output(self.ffi, c_arg)
+                    for handler, c_arg in zip(self.handlers, c_args)
+                    if handler.makes_output]
 
         if self.ret_handler:
             try:
@@ -177,92 +161,134 @@ class ArgHandler(object):
         pass
 
     @classmethod
-    def create(cls, sig, arg_str, arg_index):
+    def create(cls, sig, arg_str):
         raise NotImplementedError
 
-    def __init__(self, sig, arg_str, arg_index):
+    def __init__(self, sig, arg_str):
         self.sig = sig
         self.arg_str = arg_str
-        self.arg_index = arg_index
 
     def __repr__(self):
         return "<{}>".format(self.__class__.__name__)
 
-    def num_inputs_used(self, arg_index):
+    def num_inputs_used(self):
         raise NotImplementedError
 
-    def make_cffi_arg(self, ffi, arg_index, arg_values):
+    def make_c_arg(self, ffi, arg_value):
         raise NotImplementedError
 
-    def get_outputs(self, ffi, arg_index, cffi_arg):
+    def extract_output(self, ffi, cffi_arg):
         raise NotImplementedError
 
 
 @register_arg_handler
 class InArgHandler(ArgHandler):
+    takes_input = True
+    makes_output = False
+
     @classmethod
-    def create(cls, sig, arg_str, arg_index):
+    def create(cls, sig, arg_str):
         if arg_str != 'in':
             return None
-        return cls(sig, arg_str, arg_index)
+        return cls(sig, arg_str)
 
-    def num_inputs_used(self, arg_index):
-        return 1
-
-    def make_cffi_arg(self, ffi, arg_index, arg_values):
-        arg_value, = arg_values
-        return _wrap_inarg(ffi, self.c_argtypes[0], arg_value)
-
-    def get_outputs(self, ffi, arg_index, cffi_arg):
-        return ()
+    def make_c_arg(self, ffi, arg_value):
+        return _wrap_inarg(ffi, self.c_argtype, arg_value)
 
 
 @register_arg_handler
 class OutArgHandler(ArgHandler):
+    takes_input = False
+    makes_output = True
+
     @classmethod
-    def create(cls, sig, arg_str, arg_index):
+    def create(cls, sig, arg_str):
         if arg_str != 'out':
             return None
-        return cls(sig, arg_str, arg_index)
+        return cls(sig, arg_str)
 
-    def num_inputs_used(self, arg_index):
+    def num_inputs_used(self):
         return 0
 
-    def make_cffi_arg(self, ffi, arg_index, arg_values):
-        if self.c_argtypes[0].kind == 'pointer' and self.c_argtypes[0].item.kind == 'struct':
-            arg = self.sig.flags['struct_maker'](self.c_argtypes[0])
+    def make_c_arg(self, ffi, arg_value):
+        if self.c_argtype.kind == 'pointer' and self.c_argtype.item.kind == 'struct':
+            arg = self.sig.flags['struct_maker'](self.c_argtype)
         else:
-            arg = ffi.new(self.c_argtypes[0])
+            arg = ffi.new(self.c_argtype)
         return arg
 
-    def get_outputs(self, ffi, arg_index, cffi_arg):
-        return (cffi_arg[0],)
+    def extract_output(self, ffi, cffi_arg):
+        return cffi_arg[0]
 
 
 @register_arg_handler
 class IgnoreArgHandler(ArgHandler):
+    takes_input = False
+    makes_output = False
+
     @classmethod
-    def create(cls, sig, arg_str, arg_index):
+    def create(cls, sig, arg_str):
         if arg_str == 'ignore':
-            return cls(sig, arg_str, arg_index)
+            return cls(sig, arg_str)
         else:
             return None
 
-    def num_inputs_used(self, arg_index):
+    def num_inputs_used(self):
         return 0
 
-    def make_cffi_arg(self, ffi, arg_index, arg_values):
-        return ffi.new(self.c_argtypes[0].cname + '*')[0]
+    def make_c_arg(self, ffi, arg_value):
+        return ffi.new(self.c_argtype.cname + '*')[0]
 
-    def get_outputs(self, ffi, arg_index, cffi_arg):
-        return ()
+
+@register_arg_handler
+class ArrayLenArgHandler(ArgHandler):
+    RE_LEN = re.compile(r'len(=([0-9]+|in))?')
+
+    @property
+    def takes_input(self):
+        return self.get_len
+
+    makes_output = False
+
+    @classmethod
+    def create(cls, sig, arg_str):
+        m = cls.RE_LEN.match(arg_str)
+        if m:
+            len_handler = cls(sig, arg_str)
+            arr_handler = ArrayArgHandler.unmatched_arrays.pop(0)
+            len_handler.arr_handler = arr_handler
+            arr_handler.len_handler = len_handler
+
+            len_param = m.group(2)
+
+            len_handler.get_len = False
+            len_handler.fixed_len = None
+            if len_param == 'in':
+                len_handler.get_len = True
+            elif len_param is not None:
+                len_handler.fixed_len = int(len_param)
+
+            return len_handler
+        else:
+            return None
+
+    def make_c_arg(self, ffi, arg_value):
+        # Save len for later use by ArrayArgHandler
+        if self.get_len:
+            self.len = arg_value
+        elif self.fixed_len:
+            self.len = self.fixed_len
+        else:
+            self.len = self.sig.flags['buflen']
+        return self.len
 
 
 @register_arg_handler
 class ArrayArgHandler(ArgHandler):
-    RE_ARR = re.compile(r'arr(\[([0-9]+)\])?$')
-    RE_BUF = re.compile(r'buf(\[([0-9]+)\])?$')
-    RE_LEN = re.compile(r'len(=([0-9]+|in))?')
+    RE_ARR = re.compile(r'(arr|buf)(\[([0-9]+)\])?$')
+
+    takes_input = False
+    makes_output = True
 
     @classmethod
     def start_sig_definition(cls):
@@ -274,59 +300,22 @@ class ArrayArgHandler(ArgHandler):
         cls.unmatched_arrays = None
 
     @classmethod
-    def create(cls, sig, arg_str, arg_index):
+    def create(cls, sig, arg_str):
         m = cls.RE_ARR.match(arg_str)
         if m:
-            len_num = None if m.group(2) is None else int(m.group(2))
-            handler = cls(sig, arg_str, arg_index, is_buf=False, fixed_len=len_num)
+            is_buf = (m.group(1) == 'buf')
+            len_num = None if m.group(3) is None else int(m.group(3))
+            handler = cls(sig, arg_str, is_buf, len_num)
             if len_num is None:
                 cls.unmatched_arrays.append(handler)
             return handler
+        return None
 
-        m = cls.RE_BUF.match(arg_str)
-        if m:
-            len_num = None if m.group(2) is None else int(m.group(2))
-            handler = cls(sig, arg_str, arg_index, is_buf=True, fixed_len=len_num)
-            if len_num is None:
-                cls.unmatched_arrays.append(handler)
-            return handler
-
-        m = cls.RE_LEN.match(arg_str)
-        if m:
-            handler = cls.unmatched_arrays.pop(0)
-            if m.group(2) is None:
-                pass
-            elif m.group(2) == 'in':
-                handler.get_len = True
-            else:
-                handler.fixed_len = int(m.group(2))
-
-            handler.len_argindex = arg_index
-            return handler
-
-        else:
-            return None
-
-    def num_inputs_used(self, arg_index):
-        if arg_index == self.arr_argindex:
-            return 0
-        elif arg_index == self.len_argindex:
-            return int(self.get_len)
-        raise ValueError('Invalid arg_index')
-
-    def __init__(self, sig, arg_str, arg_index, is_buf, fixed_len, get_len=False):
-        ArgHandler.__init__(self, sig, arg_str, arg_index)
+    def __init__(self, sig, arg_str, is_buf, given_len):
+        ArgHandler.__init__(self, sig, arg_str)
         self.is_buf = is_buf
-        self.fixed_len = fixed_len
-        self.get_len = get_len
-        self.arr_argindex = arg_index
-        self.len_argindex = None
-
-    def len(self):
-        if self.fixed_len:
-            return self.fixed_len
-        return self.sig.flags['buflen']
-        # TODO: Figure out what to do for get_len
+        self.given_len = given_len
+        self.len_handler = None
 
     def _get_arr_output(self, ffi, cffi_arg):
         if self.sig.flags['use_numpy']:
@@ -334,27 +323,23 @@ class ArrayArgHandler(ArgHandler):
         else:
             return cffi_arg
 
-    def get_outputs(self, ffi, arg_index, cffi_arg):
-        if arg_index == self.arr_argindex:
-            if self.is_buf:
-                return (ffi.string(cffi_arg),)
-            else:
-                return (self._get_arr_output(ffi, cffi_arg),)
+    def extract_output(self, ffi, cffi_arg):
+        if self.is_buf:
+            return ffi.string(cffi_arg)
         else:
-            return ()
+            return self._get_arr_output(ffi, cffi_arg)
 
-    def make_cffi_arg(self, ffi, arg_index, arg_values):
-        if arg_index == self.arr_argindex:
-            if self.is_buf:
-                return ffi.new('char[]', self.len())
-            else:
-                return ffi.new('{}[]'.format(self.c_argtypes[0].item.cname), self.len())
-
-        elif arg_index == self.len_argindex:
-            return self.len()
-
+    def len(self):
+        if self.given_len:
+            return self.given_len
         else:
-            raise ValueError('Invalid arg_index')
+            return self.len_handler.len
+
+    def make_c_arg(self, ffi, arg_value):
+        if self.is_buf:
+            return lambda: ffi.new('char[]', self.len())
+        else:
+            return lambda: ffi.new('{}[]'.format(self.c_argtype.item.cname), self.len())
 
 
 class NiceObject(object):
@@ -881,11 +866,11 @@ class LibMeta(type):
         # Designed to be called by NiceLib and NiceClassMeta
         prefixes = sig.flags.get('prefix', ())
         try:
-            cffi_func, c_func_name = cls._find_cffi_func(shortname, prefixes)
+            c_func, c_func_name = cls._find_c_func(shortname, prefixes)
         except ValueError:
             return None
 
-        c_functype = cls._ffi.typeof(cffi_func)
+        c_functype = cls._ffi.typeof(c_func)
         c_argtypes = c_functype.args
         if c_functype.ellipsis:
             c_argtypes = c_argtypes + ('...',)
@@ -901,9 +886,9 @@ class LibMeta(type):
 
         sig.bind_argtypes(cls._ffi, shortname, c_argtypes, ret_handler, arg_names)
 
-        return LibFunction(shortname, c_func_name, sig, cffi_func)
+        return LibFunction(shortname, c_func_name, sig, c_func)
 
-    def _find_cffi_func(cls, shortname, prefixes):
+    def _find_c_func(cls, shortname, prefixes):
         for prefix in prefixes:
             func_name = prefix + shortname
             try:
@@ -1035,7 +1020,7 @@ class LibFunction(object):
 
         c_args = self.sig.make_c_args(args)
         retval = self.c_func(*c_args)
-        return self.sig.get_outputs(c_args, retval, ret_handler_args)
+        return self.sig.extract_outputs(c_args, retval, ret_handler_args)
 
 
 class NiceLib(with_metaclass(LibMeta, object)):
