@@ -794,11 +794,9 @@ class LibMeta(type):
                 classdict[name] = value
 
         classdict.update(_niceobjectdefs=niceobjectdefs, _sigs=sigs)
-        print('classdict: {}'.format(classdict))
         return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
     def __init__(cls, clsname, bases, classdict):
-        print('bases: {}'.format(bases))
         if bases == (object,):
             return  # Base class
 
