@@ -212,7 +212,7 @@ The available signature values are:
     This is used for the common case of a C function which takes both a string buffer and its
     length as inputs, so that it doesn't overrun the buffer. As such, `'buf'` requires a
     corresponding `'len'` entry. The first `'buf'`/`'arr'` is matched with the first `'len'` and so
-    forth. If don't need to pass in a length parameter to the C-function, use `'buf[n]'` as
+    forth. If you don't need to pass in a length parameter to the C-function, use `'buf[n]'` as
     described below.
 
     NiceLib will automatically create the buffer and pass it and the length parameter to the
