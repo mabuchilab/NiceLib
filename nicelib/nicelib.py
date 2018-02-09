@@ -67,6 +67,21 @@ class Sig(object):
     def __repr__(self):
         return "<Sig({})>".format(', '.join(repr(s) for s in self.arg_strs))
 
+    def args_c_str(self):
+        return ', '.join(h.arg_c_str for h in self.handlers)
+
+    def args_py_str(self, skipargs=0):
+        return ', '.join(h.arg_py_str for h in self.handlers[skipargs:] if h.takes_input)
+
+    def rets_py_str(self):
+        n_outputs = len(self.out_handlers)
+        if n_outputs == 0:
+            return 'None'
+        elif n_outputs == 1:
+            return self.out_handlers[0].arg_py_str
+        else:
+            return '(' + ', '.join(h.arg_py_str for h in self.out_handlers) + ')'
+
     def set_default_flags(self, flags_list):
         self.flags = ChainMap(self.sig_flags, *flags_list)
 
@@ -170,6 +185,17 @@ class ArgHandler(object):
 
     def __repr__(self):
         return "<{}>".format(self.__class__.__name__)
+
+    @property
+    def arg_c_str(self):
+        arg_str = self.c_argtype.cname
+        if self.c_argname:
+            arg_str += ' ' + self.c_argname
+        return arg_str
+
+    @property
+    def arg_py_str(self):
+        return self.c_argname or 'arg'
 
     def num_inputs_used(self):
         raise NotImplementedError
@@ -370,12 +396,27 @@ class NiceObject(object):
 
 
 class LibMethod(object):
-    def __init__(self, niceobj, func):
+    def __init__(self, niceobj, libfunc):
         self._niceobj = niceobj
-        self._func = func
+        self._libfunc = libfunc
+
+        nh = niceobj._n_handles
+        sig_str = '{}({}) -> {}'.format(libfunc.name, libfunc.sig.args_py_str(nh),
+                                        libfunc.sig.rets_py_str())
+        c_sig_str = '{}({})'.format(libfunc.c_name, libfunc.sig.args_c_str())
+        self.__doc__ = sig_str + '\n\nOriginal C Function: ' + c_sig_str
+
+        if sys.version_info >= (3,3):
+            self._assign_signature()
+
+    def _assign_signature(self):
+        from inspect import Parameter, Signature
+        params = [Parameter(h.c_argname, Parameter.POSITIONAL_OR_KEYWORD)
+                  for h in self._libfunc.sig.in_handlers[self._niceobj._n_handles:]]
+        self.__signature__ = Signature(params)
 
     def __call__(self, *args):
-        return self._func(*(self._niceobj._handles + args), niceobj=self._niceobj)
+        return self._libfunc(*(self._niceobj._handles + args), niceobj=self._niceobj)
 
 
 class NiceClassMeta(type):
@@ -989,18 +1030,18 @@ class LibFunction(object):
         self.c_name = c_name
         self.c_func = c_func
 
-        if self.sig.argnames is not None:
-            arg_strs = self.sig.argnames
-        else:
-            arg_strs = ['arg{}'.format(i) for i, _ in enumerate()]
-        sig_str = '{}({})'.format(name, ', '.join(arg_strs))
+        sig_str = '{}({}) -> {}'.format(name, sig.args_py_str(), sig.rets_py_str())
+        c_sig_str = '{}({})'.format(c_name, sig.args_c_str())
+        self.__doc__ = sig_str + '\n\nOriginal C Function: ' + c_sig_str
 
-        if self.sig.c_argnames:
-            c_arg_strs = [t.cname + ' ' + n for t, n in zip(sig.c_argtypes, sig.c_argnames)]
-        else:
-            c_arg_strs = [t.cname for t in sig.c_argtypes]
-        c_sig_str = 'Wrapping {}({})'.format(c_name, ', '.join(c_arg_strs))
-        self.__doc__ = sig_str + '\n' + c_sig_str
+        if sys.version_info >= (3,3):
+            self._assign_signature()
+
+    def _assign_signature(self):
+        from inspect import Parameter, Signature
+        params = [Parameter(h.c_argname, Parameter.POSITIONAL_OR_KEYWORD)
+                  for h in self.sig.in_handlers]
+        self.__signature__ = Signature(params)
 
     def __get__(self, instance, owner):
         if instance is None:
