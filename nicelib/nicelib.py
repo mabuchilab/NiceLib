@@ -430,7 +430,33 @@ class BufOutArgHandler(ArgHandler):
         return string
 
 
-class NiceObject(object):
+class NiceClassMeta(type):
+    def __new__(metacls, clsname, bases, classdict):
+        if bases == (object,):
+            return type(clsname, bases, classdict)  # Base class
+
+    @classmethod
+    def from_niceobjectdef(metacls, cls_name, niceobjdef, parent_lib):
+        try:
+            init_func = parent_lib._libfuncs[niceobjdef.init] if niceobjdef.init else None
+        except KeyError:
+            raise ValueError("Could not find function '{}'".format(niceobjdef.init))
+
+        niceobj_dict = {
+            '_init_func': init_func,
+            '_n_handles': niceobjdef.n_handles,
+            '__doc__': niceobjdef.doc
+        }
+        for attr_name, attr_value in niceobjdef.attrs.items():
+            sig = (attr_value if isinstance(attr_value, Sig) else
+                   Sig.from_tuple(attr_value))
+            sig.set_default_flags((niceobjdef.flags, parent_lib._base_flags))
+            libfunc = parent_lib._create_libfunction(attr_name, sig)
+            niceobj_dict[attr_name] = libfunc
+        return type(cls_name, (NiceObject,), niceobj_dict)
+
+
+class NiceObject(with_metaclass(NiceClassMeta, object)):
     _init_func = None
     _n_handles = None
 
@@ -467,29 +493,6 @@ class LibMethod(object):
 
     def __call__(self, *args):
         return self._libfunc(*(self._niceobj._handles + args), niceobj=self._niceobj)
-
-
-class NiceClassMeta(type):
-    def __new__(metacls, cls_name, niceobjdef, parent_lib):
-        try:
-            init_func = parent_lib._libfuncs[niceobjdef.init] if niceobjdef.init else None
-        except KeyError:
-            raise ValueError("Could not find function '{}'".format(niceobjdef.init))
-
-        niceobj_dict = {
-            '_init_func': init_func,
-            '_n_handles': niceobjdef.n_handles,
-            '__doc__': niceobjdef.doc
-        }
-        for attr_name, attr_value in niceobjdef.attrs.items():
-            if isinstance(attr_value, Sig):
-                sig = attr_value
-            else:
-                sig = Sig.from_tuple(attr_value)
-            sig.set_default_flags((niceobjdef.flags, parent_lib._base_flags))
-            libfunc = parent_lib._create_libfunction(attr_name, sig)
-            niceobj_dict[attr_name] = libfunc
-        return type(cls_name, (NiceObject,), niceobj_dict)
 
 
 def _wrap_inarg(ffi, argtype, arg):
@@ -618,6 +621,7 @@ class LibMeta(type):
     def __new__(metacls, clsname, bases, orig_classdict):
         classdict = {}
         niceobjectdefs = {}  # name: NiceObjectDef
+        niceclasses = {}
         sigs = {}
 
         for name, value in orig_classdict.items():
@@ -626,6 +630,9 @@ class LibMeta(type):
                 if value.attrs is None:
                     value.names.remove(name)  # Remove self (context manager syntax)
                 niceobjectdefs[name] = value
+
+            elif issubclass(value, NiceObject):
+                niceclasses[name] = value
 
             elif isfunction(value):
                 if hasattr(value, 'sig'):
@@ -643,7 +650,8 @@ class LibMeta(type):
             else:
                 classdict[name] = value
 
-        classdict.update(_niceobjectdefs=niceobjectdefs, _sigs=sigs)
+        # Add these last to prevent user overwriting them
+        classdict.update(_niceobjectdefs=niceobjectdefs, _niceclasses=niceclasses, _sigs=sigs)
         return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
     def __init__(cls, clsname, bases, classdict):
@@ -755,8 +763,11 @@ class LibMeta(type):
 
     def _create_niceobject_classes(cls):
         for niceobj_cls_name, niceobjdef in cls._niceobjectdefs.items():
-            niceobj_cls = NiceClassMeta(niceobj_cls_name, niceobjdef, cls)
+            niceobj_cls = NiceClassMeta.from_niceobjectdef(niceobj_cls_name, niceobjdef, cls)
             setattr(cls, niceobj_cls_name, niceobj_cls)
+
+        for niceobj_cls_name, niceclass in cls._niceclasses.items():
+            pass
 
     def _add_enum_constant_defs(cls):
         prefixes = cls._base_flags['prefix']
