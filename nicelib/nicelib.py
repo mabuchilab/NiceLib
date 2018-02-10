@@ -669,6 +669,7 @@ class LibMeta(type):
         return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
     def __init__(cls, clsname, bases, classdict):
+        cls._dir_ffilib = []  # Required by base class
         if bases == (object,):
             return  # Base class
 
@@ -719,7 +720,6 @@ class LibMeta(type):
             cls._base_flags['prefix'] += ('',)
 
     def _add_dir_ffilib(cls):
-        cls._dir_ffilib = []
         for name in dir(cls._ffilib):
             try:
                 attr = getattr(cls._ffilib, name)
