@@ -458,6 +458,9 @@ class NiceObjectMeta(type):
                    Sig.from_tuple(attr_value))
             sig.set_default_flags((niceobjdef.flags, parent_lib._base_flags))
             libfunc = parent_lib._create_libfunction(attr_name, sig)
+            if not libfunc:
+                log.warn("Function '%s' could not be found using prefixes %r",
+                         attr_name, sig.flags['prefix'])
             niceobj_dict[attr_name] = libfunc
         return type(cls_name, (NiceObject,), niceobj_dict)
 
@@ -625,6 +628,7 @@ class NiceObjectDef(object):
 
 class LibMeta(type):
     def __new__(metacls, clsname, bases, orig_classdict):
+        log.info('Creating class %s...', clsname)
         classdict = {}
         niceobjectdefs = {}  # name: NiceObjectDef
         niceclasses = {}
@@ -655,6 +659,10 @@ class LibMeta(type):
 
             else:
                 classdict[name] = value
+
+        log.info('Found NiceObjectDefs: %r', niceobjectdefs)
+        log.info('Found NiceObject subclasses: %s', niceclasses)
+        log.info('Found root sigs: %s', sigs)
 
         # Add these last to prevent user overwriting them
         classdict.update(_niceobjectdefs=niceobjectdefs, _niceclasses=niceclasses, _sigs=sigs)
