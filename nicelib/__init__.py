@@ -35,12 +35,13 @@ def load_lib(name, pkg, builder=None, kwargs={}):
 
     `kwargs`, if given, is a dict of keyword args that is passed to `build()`.
     """
-    lib_name = '._{}lib'.format(name)
+    prefix = '.' if pkg else ''
+    lib_name = prefix + '_{}lib'.format(name)
     try:
         lib_module = import_module(lib_name, pkg)
     except ImportError:
         if builder is None:
-            builder = '._build_{}'.format(name)
+            builder = prefix + '_build_{}'.format(name)
         build_module = import_module(builder, pkg)
         build_module.build(**kwargs)
         lib_module = import_module(lib_name, pkg)
