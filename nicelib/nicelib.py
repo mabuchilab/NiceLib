@@ -436,7 +436,7 @@ class BufOutArgHandler(ArgHandler):
         return string
 
 
-class NiceClassMeta(type):
+class NiceObjectMeta(type):
     def __new__(metacls, clsname, bases, classdict):
         if bases == (object,):
             return type(clsname, bases, classdict)  # Base class
@@ -462,7 +462,7 @@ class NiceClassMeta(type):
         return type(cls_name, (NiceObject,), niceobj_dict)
 
 
-class NiceObject(with_metaclass(NiceClassMeta, object)):
+class NiceObject(with_metaclass(NiceObjectMeta, object)):
     _init_func = None
     _n_handles = None
 
@@ -733,7 +733,7 @@ class LibMeta(type):
                 cls._libfuncs[shortname] = libfunc
 
     def _create_libfunction(cls, shortname, sig):
-        # Designed to be called by NiceLib and NiceClassMeta
+        # Designed to be called by NiceLib and NiceObjectMeta
         prefixes = sig.flags.get('prefix', ())
         try:
             c_func, c_func_name = cls._find_c_func(shortname, prefixes)
@@ -769,7 +769,7 @@ class LibMeta(type):
 
     def _create_niceobject_classes(cls):
         for niceobj_cls_name, niceobjdef in cls._niceobjectdefs.items():
-            niceobj_cls = NiceClassMeta.from_niceobjectdef(niceobj_cls_name, niceobjdef, cls)
+            niceobj_cls = NiceObjectMeta.from_niceobjectdef(niceobj_cls_name, niceobjdef, cls)
             setattr(cls, niceobj_cls_name, niceobj_cls)
 
         for niceobj_cls_name, niceclass in cls._niceclasses.items():
