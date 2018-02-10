@@ -108,13 +108,20 @@ class Sig(object):
 
     def bind_argtypes(self, ffi, func_name, c_argtypes, ret_handler, c_argnames):
         self.ffi = ffi
-        self.ret_handler = ret_handler
+        self.func_name = func_name
         self.c_argtypes = c_argtypes
+        self.ret_handler = ret_handler
         self.c_argnames = c_argnames
+        self.variadic = (c_argtypes and c_argtypes[-1] == '...')
 
-        if len(self.arg_strs) != len(c_argtypes):
-            raise TypeError("{}() takes {} args, but your signature specifies "
-                            "{}".format(func_name, len(c_argtypes), len(self.arg_strs)))
+        if self.variadic:
+            if len(self.arg_strs) < len(c_argtypes) - 1:
+                raise TypeError("{}() takes at least {} args, but your signature specifies "
+                                "{}".format(func_name, len(c_argtypes)-1, len(self.arg_strs)))
+        else:
+            if len(self.arg_strs) != len(c_argtypes):
+                raise TypeError("{}() takes {} args, but your signature specifies "
+                                "{}".format(func_name, len(c_argtypes), len(self.arg_strs)))
 
         self.used_ret_handler_args = set(getargspec(ret_handler).args[1:])
 
@@ -1094,6 +1101,8 @@ class LibFunction(object):
             return LibMethod(instance, self)
 
     def __call__(self, *args, **kwds):
+        check_num_args(self.name, len(args), self.sig.num_inargs, self.sig.variadic)
+
         if len(args) != self.sig.num_inargs:
             raise TypeError("{}() takes {} arguments ({} given)"
                             "".format(self.name, self.sig.num_inargs, len(args)))
@@ -1106,6 +1115,27 @@ class LibFunction(object):
         c_args = self.sig.make_c_args(args)
         retval = self.c_func(*c_args)
         return self.sig.extract_outputs(c_args, retval, ret_handler_args)
+
+
+def check_num_args(func_name, num_args, num_req_args, is_variadic):
+    message = None
+    if is_variadic:
+        if num_args < num_req_args - 1:
+            message = '{}() takes at least '.format(func_name)
+    else:
+        if num_args != num_req_args:
+            message = '{}() takes '.format(func_name)
+
+    if message:
+        if num_req_args == 0:
+            message += 'no arguments'
+        elif num_req_args == 1:
+            message += '1 argument'
+        else:
+            message += '{} arguments'.format(num_req_args)
+
+        message += ' ({} given)'.format(num_args)
+        raise TypeError(message)
 
 
 class NiceLib(with_metaclass(LibMeta, object)):
