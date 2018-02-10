@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016-2017 Nate Bogdanowicz
+# Copyright 2016-2018 Nate Bogdanowicz
 from past.builtins import basestring
-from future.utils import PY2
 
 import sys
 import os
@@ -13,7 +12,7 @@ from contextlib import contextmanager
 
 is_64bit = sys.maxsize > 2**32
 
-if PY2:
+if sys.version_info < (3, 3):
     from chainmap import ChainMap
 else:
     from collections import ChainMap

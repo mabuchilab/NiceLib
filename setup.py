@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016-2017 Nate Bogdanowicz
+# Copyright 2016-2018 Nate Bogdanowicz
 import os
 import os.path
-import sys
 from setuptools import setup, find_packages
 
 description = ('A package for rapidly developing "nice" Python bindings to C libraries, '
@@ -23,10 +22,13 @@ about = {}
 with open(os.path.join(base_dir, 'nicelib', '__about__.py')) as f:
     exec(f.read(), about)
 
-install_requires = ['cffi>=1.5', 'pycparser', 'future']
-
-if sys.version_info < (3, 4):
-    install_requires.append('enum34>=1.0.4')
+install_requires = [
+    'cffi>=1.5',
+    'pycparser',
+    'future',
+    'chainmap;python_version<"3.3"',
+    'enum34>=1.0.4;python_version<"3.4"',
+]
 
 if __name__ == '__main__':
     setup(
