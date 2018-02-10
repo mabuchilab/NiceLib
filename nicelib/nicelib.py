@@ -248,6 +248,44 @@ class OutArgHandler(ArgHandler):
 
 
 @register_arg_handler
+class InOutArgHandler(ArgHandler):
+    takes_input = True
+    makes_output = True
+
+    @classmethod
+    def create(cls, sig, arg_str):
+        if arg_str == 'inout':
+            return cls(sig, arg_str)
+
+    def make_c_arg(self, ffi, arg_value):
+        inarg_type = (ffi.typeof(arg_value) if isinstance(arg_value, ffi.cdata) else
+                      type(arg_value))
+
+        if inarg_type == self.c_argtype:
+            return arg_value  # Pass straight through
+
+        if self.c_argtype.kind == 'pointer' and self.c_argtype.item.kind == 'struct':
+            struct_maker = self.sig.flags['struct_maker']
+            return struct_maker(self.c_argtype, arg_value)
+
+        if (self.c_argtype.cname == 'void *' and isinstance(arg_value, ffi.CData) and
+                inarg_type.kind in ('pointer', 'array')):
+            return ffi.cast(self.c_argtype, arg_value)
+
+        try:
+            return ffi.new(self.c_argtype, arg_value)
+        except TypeError:
+            raise TypeError("Cannot convert {} to required type {}"
+                            "".format(arg_value, self.c_argtype))
+
+    def extract_output(self, ffi, c_arg):
+        if self.c_argtype.cname == 'void *':
+            return c_arg  # Don't dereference void pointers directly
+        else:
+            return c_arg[0]
+
+
+@register_arg_handler
 class IgnoreArgHandler(ArgHandler):
     takes_input = False
     makes_output = False
