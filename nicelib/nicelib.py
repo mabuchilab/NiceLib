@@ -359,6 +359,9 @@ class ArrayArgHandler(ArgHandler):
 
     @classmethod
     def end_sig_definition(cls):
+        if cls.unmatched_arrays:
+            raise ValueError("Number of paired buf/arr sig elements does not match number of "
+                             "len sig elements")
         cls.unmatched_arrays = None
 
     @classmethod
