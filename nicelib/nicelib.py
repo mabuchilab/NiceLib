@@ -13,7 +13,7 @@ import logging
 from inspect import isfunction, getargspec
 from collections import deque
 
-from .util import to_tuple, ChainMap
+from .util import to_tuple, ChainMap, suppress
 
 __all__ = ['NiceLib', 'NiceObjectDef']
 FLAGS = ('prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
@@ -545,15 +545,11 @@ def _wrap_inarg(ffi, argtype, arg):
             return ffi.new('char[]', arg)
 
         else:
-            try:
+            with suppress(TypeError):
                 return ffi.new(argtype, arg)
-            except TypeError:
-                pass
 
-            try:
+            with suppress(TypeError):
                 return ffi.cast(argtype, arg)
-            except TypeError:
-                pass
 
         raise TypeError("A value castable to (or a valid initializer for) '{}' is required, "
                         "got '{}'".format(argtype, arg))
@@ -982,10 +978,9 @@ class LibMeta(type):
     def _find_c_func(cls, shortname, prefixes):
         for prefix in prefixes:
             func_name = prefix + shortname
-            try:
+            with suppress(AttributeError):
                 return getattr(cls._ffilib, func_name), func_name
-            except AttributeError:
-                pass
+
         raise ValueError("No lib function found with a name ending in '{}', with "
                          "any of these prefixes: {}".format(shortname, prefixes))
 
