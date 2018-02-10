@@ -9,6 +9,7 @@ import os.path
 import warnings
 from fnmatch import fnmatch
 from ctypes.util import find_library
+from contextlib import contextmanager
 
 is_64bit = sys.maxsize > 2**32
 
@@ -36,6 +37,16 @@ def select_platform_value(platform_dict):
 def to_tuple(value):
     """Convert value to a tuple, or if it is a string or dict, wrap it in a tuple"""
     return (value,) if isinstance(value, (basestring, dict)) else tuple(value)
+
+
+# For Python 2 support
+@contextmanager
+def suppress(*exceptions):
+    """Context manager to suppress specified exceptions"""
+    try:
+        yield
+    except exceptions:
+        pass
 
 
 def handle_header_path(path):
