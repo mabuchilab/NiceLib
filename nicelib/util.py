@@ -5,11 +5,13 @@ from past.builtins import basestring
 import sys
 import os
 import os.path
+import logging
 import warnings
 from fnmatch import fnmatch
 from ctypes.util import find_library
 from contextlib import contextmanager
 
+log = logging.getLogger(__name__)
 is_64bit = sys.maxsize > 2**32
 
 if sys.version_info < (3, 3):
@@ -48,7 +50,7 @@ def suppress(*exceptions):
         pass
 
 
-def handle_header_path(path):
+def handle_header_path(path, basedir):
     """Find the paths to the specified headers and verify they exist
 
     `path` may take a few forms. It may be just a string, in which case it specifies the absolute
@@ -71,7 +73,10 @@ def handle_header_path(path):
             raise KeyError("Header dict must contain key 'header'")
 
         header_names = to_tuple(header_dict['header'])
-        include_dirs = to_tuple(header_dict.get('path', ()))
+        include_dirs = to_tuple(header_dict.get('path', ('.',)))
+        include_dirs = tuple(d if os.path.isabs(d) else os.path.join(basedir, d)
+                             for d in include_dirs)
+        log.info('Looking for {} in {}'.format(header_names, include_dirs))
 
         try:
             headers = [find_header(h, include_dirs) for h in header_names]
@@ -123,7 +128,7 @@ def find_header(header_name, include_dirs):
     raise Exception("Cannot find header '{}'".format(header_name))
 
 
-def handle_lib_name(lib_name):
+def handle_lib_name(lib_name, basedir):
     """Find the path to the library
 
     `lib_name` can be specified directly as a string (or sequence of strings), or within a
@@ -134,6 +139,13 @@ def handle_lib_name(lib_name):
     else:
         lib_names = to_tuple(lib_name)
 
+    # First try local directory
+    for try_name in lib_names:
+        path = os.path.join(basedir, try_name)
+        if os.path.exists(path):
+            return path
+
+    # Then try system directory
     for try_name in lib_names:
         path = find_library(try_name)
         if path:
