@@ -132,7 +132,7 @@ class Sig(object):
         py_args = deque(args)
         c_args = []
         for handler in self.handlers:
-            log.info("Making cffi arg for %s", handler)
+            log.info("Making C arg for %s", handler)
             py_arg = py_args.popleft() if handler.takes_input else None
             c_args.append(handler.make_c_arg(self.ffi, py_arg))
 
@@ -197,13 +197,10 @@ class ArgHandler(object):
     def arg_py_str(self):
         return self.c_argname or 'arg'
 
-    def num_inputs_used(self):
-        raise NotImplementedError
-
     def make_c_arg(self, ffi, arg_value):
         raise NotImplementedError
 
-    def extract_output(self, ffi, cffi_arg):
+    def extract_output(self, ffi, c_arg):
         raise NotImplementedError
 
 
@@ -233,9 +230,6 @@ class OutArgHandler(ArgHandler):
             return None
         return cls(sig, arg_str)
 
-    def num_inputs_used(self):
-        return 0
-
     def make_c_arg(self, ffi, arg_value):
         if self.c_argtype.kind == 'pointer' and self.c_argtype.item.kind == 'struct':
             arg = self.sig.flags['struct_maker'](self.c_argtype)
@@ -243,8 +237,8 @@ class OutArgHandler(ArgHandler):
             arg = ffi.new(self.c_argtype)
         return arg
 
-    def extract_output(self, ffi, cffi_arg):
-        return cffi_arg[0]
+    def extract_output(self, ffi, c_arg):
+        return c_arg[0]
 
 
 @register_arg_handler
@@ -296,9 +290,6 @@ class IgnoreArgHandler(ArgHandler):
             return cls(sig, arg_str)
         else:
             return None
-
-    def num_inputs_used(self):
-        return 0
 
     def make_c_arg(self, ffi, arg_value):
         return ffi.new(self.c_argtype.cname + '*')[0]
@@ -381,17 +372,17 @@ class ArrayArgHandler(ArgHandler):
         self.given_len = given_len
         self.len_handler = None
 
-    def _get_arr_output(self, ffi, cffi_arg):
+    def _get_arr_output(self, ffi, c_arg):
         if self.sig.flags['use_numpy']:
-            return c_to_numpy_array(ffi, cffi_arg, self.len())
+            return c_to_numpy_array(ffi, c_arg, self.len())
         else:
-            return cffi_arg
+            return c_arg
 
-    def extract_output(self, ffi, cffi_arg):
+    def extract_output(self, ffi, c_arg):
         if self.is_buf:
-            return ffi.string(cffi_arg)
+            return ffi.string(c_arg)
         else:
-            return self._get_arr_output(ffi, cffi_arg)
+            return self._get_arr_output(ffi, c_arg)
 
     def len(self):
         if self.given_len:
@@ -419,18 +410,6 @@ class NiceObject(object):
         if len(handles) != self._n_handles:
             raise TypeError("__init__() takes exactly {} arguments "
                             "({} given)".format(self._n_handles, len(handles)))
-
-        ## Generate "bound methods"
-        #for func_name in niceobjdef.names:
-        #    if func_name in funcs:
-        #        lib_func = LibFunction(funcs[func_name], repr_strs[func_name], handles,
-        #                                cls_name, self)
-        #        if func_name in user_funcs:
-        #            wrapped_func = user_funcs[func_name]
-        #            wrapped_func.orig = lib_func
-        #            setattr(self, func_name, wrapped_func)
-        #        else:
-        #            setattr(self, func_name, lib_func)
 
 
 class LibMethod(object):
