@@ -397,6 +397,33 @@ class ArrayArgHandler(ArgHandler):
             return lambda: ffi.new('{}[]'.format(self.c_argtype.item.cname), self.len())
 
 
+@register_arg_handler
+class BufOutArgHandler(ArgHandler):
+    takes_input = False
+    makes_output = True
+
+    @classmethod
+    def create(cls, sig, arg_str):
+        if arg_str == 'bufout':
+            return cls(sig, arg_str)
+
+    def make_c_arg(self, ffi, arg_value):
+        if not (self.c_argtype.kind == 'pointer' and self.c_argtype.item.kind == 'pointer' and
+                self.c_argtype.item.item.kind == 'primitive'):
+            raise TypeError("'bufout' applies only to type 'char**'")
+        return ffi.new(self.c_argtype)
+
+    def extract_output(self, ffi, c_arg):
+        if c_arg[0] == ffi.NULL:
+            return None
+        string = ffi.string(c_arg[0])
+
+        free_buf = self.sig.args['free_buf']
+        if free_buf:
+            free_buf(c_arg[0])
+        return string
+
+
 class NiceObject(object):
     _init_func = None
     _n_handles = None
