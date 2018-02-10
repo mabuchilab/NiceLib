@@ -637,7 +637,7 @@ class LibMeta(type):
                     value.names.remove(name)  # Remove self (context manager syntax)
                 niceobjectdefs[name] = value
 
-            elif issubclass(value, NiceObject):
+            elif isinstance(value, type) and issubclass(value, NiceObject):
                 niceclasses[name] = value
 
             elif isfunction(value):
