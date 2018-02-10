@@ -26,7 +26,7 @@ install_requires = [
     'cffi>=1.5',
     'pycparser',
     'future',
-    'chainmap;python_version<"3.3"',
+    'chainmap>=1.0.2;python_version<"3.3"',
     'enum34>=1.0.4;python_version<"3.4"',
 ]
 
