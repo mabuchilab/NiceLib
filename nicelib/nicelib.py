@@ -62,6 +62,7 @@ class Sig(object):
     def __init__(self, *arg_strs, **flags):
         self.arg_strs = arg_strs
         self.sig_flags = flags
+        self._num_default_args = 0
         self._make_arg_handlers()
 
     def __repr__(self):
@@ -127,13 +128,18 @@ class Sig(object):
 
         self.argnames = []
         self.retnames = []
+        c_argnames = c_argnames or [None] * len(c_argtypes)
         for handler, c_argtype, c_argname in zip(self.handlers, c_argtypes, c_argnames):
             handler.c_argtype = c_argtype
-            handler.c_argname = c_argname
+            handler.c_argname = c_argname or self._next_default_argname()
             if handler.takes_input:
                 self.argnames.append(c_argname)
             if handler.makes_output:
                 self.retnames.append(c_argname)
+
+    def _next_default_argname(self):
+        self._num_default_args += 1
+        return 'arg{}'.format(self._num_default_args)
 
     def make_c_args(self, args):
         py_args = deque(args)
