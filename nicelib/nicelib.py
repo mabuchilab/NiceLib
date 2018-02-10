@@ -811,9 +811,11 @@ class LibMeta(type):
                 setattr(cls, name, macro)
 
     def __getattr__(cls, name):
-        if name in cls._dir_ffilib:
+        log.debug("Getting attr '%s' from %s...", name, cls)
+        try:
             return getattr(cls._ffilib, name)
-        raise AttributeError("{} has no attribute named '{}'".format(cls.__name__, name))
+        except Exception:
+            raise AttributeError("{} has no attribute named '{}'".format(cls.__name__, name))
 
     def __dir__(self):
         return list(self.__dict__.keys()) + self._dir_ffilib
