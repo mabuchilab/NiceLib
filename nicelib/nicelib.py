@@ -379,17 +379,13 @@ class ArrayArgHandler(ArgHandler):
         self.given_len = given_len
         self.len_handler = None
 
-    def _get_arr_output(self, ffi, c_arg):
-        if self.sig.flags['use_numpy']:
-            return c_to_numpy_array(ffi, c_arg, self.len())
-        else:
-            return c_arg
-
     def extract_output(self, ffi, c_arg):
         if self.is_buf:
             return ffi.string(c_arg)
+        elif self.sig.flags['use_numpy']:
+            return c_to_numpy_array(ffi, c_arg, self.len())
         else:
-            return self._get_arr_output(ffi, c_arg)
+            return c_arg
 
     def len(self):
         if self.given_len:
@@ -1047,24 +1043,6 @@ def _func_repr_str(ffi, func, n_handles=0):
 
     repr_str = "{}({}) -> {}".format(func.__name__, ', '.join(in_args), ', '.join(out_args))
     return repr_str
-
-
-class OldLibFunction(object):
-    def __init__(self, func, repr_str, handles=(), niceobj_name=None, niceobj=None):
-        self.__name__ = niceobj_name + '.' + func.__name__ if niceobj_name else func.__name__
-        self._func = func
-        self._repr = repr_str
-        self._handles = handles
-        self._niceobj = niceobj
-
-    def __call__(self, *args):
-        return self._func(*(self._handles + args), niceobj=self._niceobj)
-
-    def __str__(self):
-        return self._repr
-
-    def __repr__(self):
-        return self._repr
 
 
 def unprefix(name, prefixes):
