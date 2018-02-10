@@ -1203,11 +1203,17 @@ class ArgNameGrabber(c_ast.NodeVisitor):
             self.argnames[node.name] = argnames
 
     def visit_FuncDecl(self, node):
-        if node.args:
-            return ['...' if isinstance(param, c_ast.EllipsisParam) else self.visit(param.type)
-                    for param in node.args.params]
-        else:
-            return []
+        if node.args is None:
+            return None  # Undefined parameter list ()
+        params = node.args.params
+
+        if (len(params) == 1 and isinstance(params[0], c_ast.Typename) and
+                isinstance(params[0].type, c_ast.TypeDecl) and
+                params[0].type.type.names == ['void']):
+            return []  # Empty parameter list (void)
+
+        return ['...' if isinstance(param, c_ast.EllipsisParam) else self.visit(param.type)
+                for param in node.args.params]
 
     def visit_TypeDecl(self, node):
         return node.declname
