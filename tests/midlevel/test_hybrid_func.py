@@ -6,7 +6,10 @@ class NiceFoo(NiceLib):
     _info = load_lib('foo', pkg=None, dir=__file__)
     _ret = ret_return
 
-    add = Sig('in', 'in')
+    @Sig('in', 'in')
+    def add(a, b):
+        return NiceFoo.add.libfunc(a, b)
+
     create_item = Sig()
 
     class Item(NiceObject):
