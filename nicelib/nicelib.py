@@ -18,8 +18,10 @@ from .util import to_tuple, ChainMap, suppress
 log = logging.getLogger(__name__)
 
 __all__ = ['NiceLib', 'NiceObjectDef']
-FLAGS = ('prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
-UNDER_FLAGS = tuple('_{}_'.format(f) for f in FLAGS)
+FLAGS = {'prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf'}
+UNDER_FLAGS = {'_{}_'.format(f) for f in FLAGS}
+USINGLE_FLAGS = {'_'+f for f in FLAGS}
+COMBINED_FLAGS = UNDER_FLAGS | USINGLE_FLAGS
 ARG_HANDLERS = []
 
 
@@ -125,8 +127,6 @@ class Sig(object):
                 raise TypeError("{}() takes {} args, but your signature specifies "
                                 "{}".format(func_name, len(c_argtypes), len(self.arg_strs)))
 
-        self.used_ret_handler_args = set(getargspec(ret_handler).args[1:])
-
         self.argnames = []
         self.retnames = []
         c_argnames = c_argnames or [None] * len(c_argtypes)
@@ -153,19 +153,13 @@ class Sig(object):
         # Do second pass to clean up callables; beware that cdata can be callable though
         return [a() if (not isinstance(a, self.ffi.CData) and callable(a)) else a for a in c_args]
 
-    def extract_outputs(self, c_args, retval, ret_handler_args):
+    def extract_outputs(self, c_args, retval, ret_handler_kwargs):
         out_vals = [handler.extract_output(self.ffi, c_arg)
                     for handler, c_arg in zip(self.handlers, c_args)
                     if handler.makes_output]
 
         if self.ret_handler:
-            try:
-                ret_handler_kwds = {arg: ret_handler_args[arg]
-                                    for arg in self.used_ret_handler_args}
-            except KeyError as e:
-                raise KeyError("Unknown arg '{}' in arglist of ret-handling function "
-                               "'{}'".format(e.args[0], self.ret_handler.__name__))
-            retval = self.ret_handler(retval, **ret_handler_kwds)
+            retval = self.ret_handler.handle(retval, ret_handler_kwargs)
 
         if retval is not None:
             out_vals.append(retval)
@@ -437,6 +431,43 @@ class BufOutArgHandler(ArgHandler):
         return string
 
 
+class RetHandler(object):
+    def __init__(self, func=None, name=None, num_retvals=None):
+        self.__name__ = name
+        self.num_retvals = num_retvals
+        if func:
+            self(func)
+
+    def __call__(self, func):
+        self._func = func
+        if hasattr(func, '__name__') and not self.__name__:
+            self.__name__ = func.__name__
+
+        self.kwargs = set(getargspec(func).args[1:])
+        return self
+
+    def __repr__(self):
+        return '<RetHandler(name={!r})>'.format(self.__name__)
+
+    def handle(self, retval, available_kwargs):
+        try:
+            kwargs = {arg:available_kwargs[arg] for arg in self.kwargs}
+        except KeyError as e:
+            raise KeyError("Unknown arg '{}' in arglist of ret-handling function "
+                           "'{}'".format(e.args[0], self.ret_handler.__name__))
+        return self._func(retval, **kwargs)
+
+
+@RetHandler(num_retvals=1)
+def ret_return(retval):
+    return retval
+
+
+@RetHandler(num_retvals=0)
+def ret_ignore(retval):
+    pass
+
+
 class NiceObjectMeta(type):
     def __new__(metacls, clsname, bases, classdict):
         if bases == (object,):
@@ -652,14 +683,26 @@ class NiceObjectDef(object):
 class LibMeta(type):
     def __new__(metacls, clsname, bases, orig_classdict):
         log.info('Creating class %s...', clsname)
+        flags = {
+            'prefix': '',
+            'struct_maker': None,  # ffi.new
+            'buflen': 512,
+            'use_numpy': False,
+            'free_buf': None,
+            'ret': ret_return,
+        }
         classdict = {}
         niceobjectdefs = {}  # name: NiceObjectDef
         niceclasses = {}
         sigs = {}
+        rethandlers = {}
 
         for name, value in orig_classdict.items():
             log.info("Processing attr '{}'...".format(name))
-            if isinstance(value, NiceObjectDef):
+            if name in COMBINED_FLAGS:
+                flags[name.strip('_')] = value
+
+            elif isinstance(value, NiceObjectDef):
                 if value.attrs is None:
                     value.names.remove(name)  # Remove self (context manager syntax)
                 niceobjectdefs[name] = value
@@ -667,9 +710,15 @@ class LibMeta(type):
             elif isinstance(value, type) and issubclass(value, NiceObject):
                 niceclasses[name] = value
 
+            elif isinstance(value, RetHandler):
+                rethandlers[name] = value
+
             elif isfunction(value):
                 if hasattr(value, 'sig'):
                     sigs[name] = value.sig
+                elif name.startswith('_ret_') and name != '_ret_':
+                    # For backwards compatibility
+                    rethandlers[name] = RetHandler(func=value, name=name[5:])
                 else:
                     # Ordinary function (includes ret-handlers)
                     classdict[name] = staticmethod(value)
@@ -688,7 +737,9 @@ class LibMeta(type):
         log.info('Found root sigs: %s', sigs)
 
         # Add these last to prevent user overwriting them
-        classdict.update(_niceobjectdefs=niceobjectdefs, _niceclasses=niceclasses, _sigs=sigs)
+        classdict.update(_niceobjectdefs=niceobjectdefs, _niceclasses=niceclasses, _sigs=sigs,
+                         _rethandlers=rethandlers, _base_flags=flags)
+        log.info('classdict: %r', classdict)
         return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
     def __init__(cls, clsname, bases, classdict):
@@ -714,25 +765,32 @@ class LibMeta(type):
         cls._add_macro_defs()
 
     def _handle_deprecated_attributes(cls):
-        # FIXME: remove __dict__.pop()
         if '_err_wrap' in cls.__dict__:
-            cls._ret = cls.__dict__.pop('_err_wrap')
+            cls._base_flags['ret'] = cls._err_wrap
+            del cls._err_wrap
             warnings.warn("Your class defines _err_wrap, which has been renamed to _ret, "
                           "please update your code:", stacklevel=2)
 
         if '_ret_wrap' in cls.__dict__:
-            cls._ret = cls.__dict__.pop('_ret_wrap')
+            cls._base_flags['ret'] = cls._ret_wrap
+            del cls._ret_wrap
             warnings.warn("Your class defines _ret_wrap, which has been renamed to _ret, "
                           "please update your code:", stacklevel=2)
 
     def _add_ret_handlers(cls):
-        cls._ret_handlers = {}
-        for attr_name in dir(cls):
-            if attr_name.startswith('_ret_'):
-                cls._ret_handlers[attr_name[5:]] = getattr(cls, attr_name)
+        log.info('Adding return handlers...')
+        ret_handlers = {}
+        all_attrs = list(ChainMap(*(c.__dict__ for c in cls.mro())).items())
+        for name, value in all_attrs:
+            if isinstance(value, RetHandler):
+                ret_handlers[name[5:]] = value
+        cls._ret_handlers = ret_handlers  # Assign only after finding all _ret_-prefixed names
+        log.info('ret_handlers: %s', cls._ret_handlers)
 
     def _handle_base_flags(cls):
-        cls._base_flags = {flag_name: getattr(cls, '_' + flag_name) for flag_name in FLAGS}
+        ret = cls._base_flags.get('ret')
+        if isinstance(ret, basestring):
+            cls._base_flags['ret'] = RetHandler(ret)
 
         if cls._ffi and not cls._base_flags['struct_maker']:
             cls._base_flags['struct_maker'] = cls._ffi.new
@@ -985,16 +1043,12 @@ class NiceLib(with_metaclass(LibMeta, object)):
     _ffi = None  # MUST be filled in by subclass
     _ffilib = None  # MUST be filled in by subclass
     _defs = None
-    _prefix = ''
-    _struct_maker = None  # ffi.new
-    _buflen = 512
-    _use_numpy = False
-    _free_buf = None
-    _ret = 'return'
 
+    @RetHandler(num_retvals=1)
     def _ret_return(retval):
         return retval
 
+    @RetHandler(num_retvals=0)
     def _ret_ignore(retval):
         pass
 
