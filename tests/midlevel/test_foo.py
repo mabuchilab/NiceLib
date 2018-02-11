@@ -1,5 +1,4 @@
-from nicelib import NiceLib, load_lib
-from nicelib.nicelib import Sig, NiceObject, ret_ignore, ret_return
+from nicelib import NiceLib, load_lib, Sig, NiceObject, ret_ignore, ret_return
 
 
 class NiceFoo(NiceLib):
