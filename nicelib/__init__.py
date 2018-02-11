@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Nate Bogdanowicz
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
+
+import sys
+import os.path
 from importlib import import_module
+
 from .__about__ import __version__
 
 
@@ -24,7 +28,7 @@ class LibInfo(object):
         return getattr(self._ffilib, name)
 
 
-def load_lib(name, pkg, builder=None, kwargs={}):
+def load_lib(name, pkg=None, dir=None, builder=None, kwargs={}):
     """Load a low-level lib module, building it if required
 
     If `name` is `foo`, tries to import a module named `_foolib`. If the module can't be located,
@@ -37,6 +41,9 @@ def load_lib(name, pkg, builder=None, kwargs={}):
     """
     prefix = '.' if pkg else ''
     lib_name = prefix + '_{}lib'.format(name)
+    if dir:
+        sys.path.insert(0, os.path.dirname(dir))
+
     try:
         lib_module = import_module(lib_name, pkg)
     except ImportError:
