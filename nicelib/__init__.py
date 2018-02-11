@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016 Nate Bogdanowicz
+# Copyright 2016-2018 Nate Bogdanowicz
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 
 import sys
@@ -56,8 +56,9 @@ def load_lib(name, pkg=None, dir=None, builder=None, kwargs={}):
     return LibInfo(lib_module)
 
 
-from .nicelib import NiceLib, NiceObjectDef
+from .nicelib import NiceLib, NiceObjectDef, NiceObject, Sig, ret_return, ret_ignore
 from .build import build_lib
 from .process import generate_bindings
 
-__all__ = ['NiceLib', 'NiceObjectDef', 'build_lib', 'load_lib', 'generate_bindings']
+__all__ = ['NiceLib', 'NiceObjectDef', 'build_lib', 'load_lib', 'generate_bindings', 'NiceObject',
+           'Sig', 'ret_return', 'ret_ignore', '__version__']
