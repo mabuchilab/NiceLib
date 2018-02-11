@@ -504,8 +504,8 @@ class NiceObjectMeta(type):
                 libfunc = parent_lib._create_libfunction(attr_name, sig)
 
                 if not libfunc:
-                    log.warn("Function '%s' could not be found using prefixes %r",
-                             attr_name, sig.flags['prefix'])
+                    log.warning("Function '%s' could not be found using prefixes %r",
+                                attr_name, sig.flags['prefix'])
                 setattr(cls, attr_name, libfunc)
 
     @classmethod
@@ -838,6 +838,8 @@ class LibMeta(type):
         try:
             c_func, c_func_name = cls._find_c_func(shortname, prefixes)
         except ValueError:
+            log.warning("No lib function found with a name ending in '{}' with any of these "
+                        "prefixes: {}".format(shortname, prefixes))
             return None
 
         c_functype = cls._ffi.typeof(c_func)
