@@ -9,6 +9,9 @@ python:
 install:
   - pip install .
 
+before_script:
+  - make -C tests sharedlibs
+
 script:
   - py.test
 
