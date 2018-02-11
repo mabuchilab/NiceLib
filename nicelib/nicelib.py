@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 
 __all__ = ['NiceLib', 'NiceObjectDef']
 FLAGS = ('prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf')
+UNDER_FLAGS = tuple('_{}_'.format(f) for f in FLAGS)
 ARG_HANDLERS = []
 
 
@@ -439,30 +440,51 @@ class BufOutArgHandler(ArgHandler):
 class NiceObjectMeta(type):
     def __new__(metacls, clsname, bases, classdict):
         if bases == (object,):
-            return type(clsname, bases, classdict)  # Base class
+            return type.__new__(metacls, clsname, bases, classdict)  # Base class
+
+        flags = {f.strip('_'):classdict.pop(f) for f in UNDER_FLAGS if f in classdict}
+        metacls._handle_flags(flags)
+        classdict['_flags'] = flags
+        classdict.setdefault('_n_handles', classdict.pop('_n_handles_', 1))
+
+        return type.__new__(metacls, clsname, bases, classdict)
+
+    @classmethod
+    def _handle_flags(metacls, flags):
+        with suppress(KeyError):
+            flags['prefix'] = to_tuple(flags['prefix'])
+
+    def _patch(cls, parent_lib):
+        if hasattr(cls, '_init_'):
+            init = cls._init_
+            if isinstance(init, basestring):
+                init = getattr(parent_lib, init)
+            cls._init_func = staticmethod(init)
+
+        for attr_name, attr_value in list(cls.__dict__.items()):
+            if isinstance(attr_value, Sig):
+                sig = attr_value
+                sig.set_default_flags((cls._flags, parent_lib._base_flags))
+                libfunc = parent_lib._create_libfunction(attr_name, sig)
+
+                if not libfunc:
+                    log.warn("Function '%s' could not be found using prefixes %r",
+                             attr_name, sig.flags['prefix'])
+                setattr(cls, attr_name, libfunc)
 
     @classmethod
     def from_niceobjectdef(metacls, cls_name, niceobjdef, parent_lib):
-        try:
-            init_func = parent_lib._libfuncs[niceobjdef.init] if niceobjdef.init else None
-        except KeyError:
-            raise ValueError("Could not find function '{}'".format(niceobjdef.init))
-
-        niceobj_dict = {
-            '_init_func': init_func,
-            '_n_handles': niceobjdef.n_handles,
-            '__doc__': niceobjdef.doc
+        classdict = {
+            '_init_': niceobjdef.init,
+            '_n_handles_': niceobjdef.n_handles,
+            '__doc__': niceobjdef.doc,
         }
-        for attr_name, attr_value in niceobjdef.attrs.items():
-            sig = (attr_value if isinstance(attr_value, Sig) else
-                   Sig.from_tuple(attr_value))
-            sig.set_default_flags((niceobjdef.flags, parent_lib._base_flags))
-            libfunc = parent_lib._create_libfunction(attr_name, sig)
-            if not libfunc:
-                log.warn("Function '%s' could not be found using prefixes %r",
-                         attr_name, sig.flags['prefix'])
-            niceobj_dict[attr_name] = libfunc
-        return type(cls_name, (NiceObject,), niceobj_dict)
+        classdict.update({('_'+f+'_'):v for f,v in niceobjdef.flags.items()})
+        classdict.update(niceobjdef.attrs)
+
+        cls = NiceObjectMeta(cls_name, (NiceObject,), classdict)
+        cls._patch(parent_lib)
+        return cls
 
 
 class NiceObject(with_metaclass(NiceObjectMeta, object)):
@@ -583,6 +605,7 @@ class NiceObjectDef(object):
 
         if attrs is not None:
             self.names = set(attrs.keys())
+            attrs = {n:(v if isinstance(v, Sig) else Sig.from_tuple(v)) for n,v in attrs.items()}
 
         if 'ret_wrap' in flags:
             warnings.warn("The 'ret_wrap' flag has been renamed to 'ret', please update your code:",
@@ -781,7 +804,8 @@ class LibMeta(type):
             setattr(cls, niceobj_cls_name, niceobj_cls)
 
         for niceobj_cls_name, niceclass in cls._niceclasses.items():
-            pass
+            niceclass._patch(cls)
+            setattr(cls, niceobj_cls_name, niceclass)
 
     def _add_enum_constant_defs(cls):
         prefixes = cls._base_flags['prefix']
