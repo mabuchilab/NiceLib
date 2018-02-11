@@ -2,6 +2,9 @@
 *.pyc
 *.pyo
 *.swp
+*.o
+*.so
+_*lib.py
 
 /bin/
 /build/
@@ -13,3 +16,4 @@
 
 Release/
 .cache/
+.pytest_cache/
