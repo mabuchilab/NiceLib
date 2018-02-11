@@ -71,6 +71,11 @@ class Sig(object):
     def __repr__(self):
         return "<Sig({})>".format(', '.join(repr(s) for s in self.arg_strs))
 
+    def __call__(self, func):
+        """Signature decorator for hybrid functions"""
+        func.sig = self
+        return func
+
     def args_c_str(self):
         return ', '.join(h.arg_c_str for h in self.handlers)
 
@@ -696,6 +701,7 @@ class LibMeta(type):
         niceclasses = {}
         sigs = {}
         rethandlers = {}
+        hybrid_funcs = {}
 
         for name, value in orig_classdict.items():
             log.info("Processing attr '{}'...".format(name))
@@ -715,12 +721,12 @@ class LibMeta(type):
 
             elif isfunction(value):
                 if hasattr(value, 'sig'):
+                    hybrid_funcs[name] = value
                     sigs[name] = value.sig
                 elif name.startswith('_ret_') and name != '_ret_':
                     # For backwards compatibility
                     rethandlers[name] = RetHandler(func=value, name=name[5:])
                 else:
-                    # Ordinary function (includes ret-handlers)
                     classdict[name] = staticmethod(value)
 
             elif isinstance(value, Sig):
@@ -738,7 +744,7 @@ class LibMeta(type):
 
         # Add these last to prevent user overwriting them
         classdict.update(_niceobjectdefs=niceobjectdefs, _niceclasses=niceclasses, _sigs=sigs,
-                         _rethandlers=rethandlers, _base_flags=flags)
+                         _rethandlers=rethandlers, _base_flags=flags, _hybrid_funcs=hybrid_funcs)
         log.info('classdict: %r', classdict)
         return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
@@ -818,8 +824,13 @@ class LibMeta(type):
             sig.set_default_flags([cls._base_flags])
             libfunc = cls._create_libfunction(shortname, sig)
             if libfunc:
-                setattr(cls, shortname, libfunc)
                 cls._libfuncs[shortname] = libfunc
+                try:
+                    hybrid_func = cls._hybrid_funcs[shortname]
+                    hybrid_func.libfunc = libfunc
+                    setattr(cls, shortname, hybrid_func)
+                except KeyError:
+                    setattr(cls, shortname, libfunc)
 
     def _create_libfunction(cls, shortname, sig):
         # Designed to be called by NiceLib and NiceObjectMeta
