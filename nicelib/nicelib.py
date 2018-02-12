@@ -469,15 +469,32 @@ def ret_ignore(retval):
 
 
 class NiceObjectMeta(type):
-    def __new__(metacls, clsname, bases, classdict):
+    def __new__(metacls, clsname, bases, orig_classdict):
+        log.info('Creating class %s...', clsname)
         if bases == (object,):
-            return type.__new__(metacls, clsname, bases, classdict)  # Base class
+            return type.__new__(metacls, clsname, bases, orig_classdict)  # Base class
 
-        flags = {f.strip('_'):classdict.pop(f) for f in UNDER_FLAGS if f in classdict}
+        classdict = {'_n_handles': 1}
+        sigs = {}
+        flags = {}
+        for name, value in orig_classdict.items():
+            if name == '_sigs_':
+                sigs.update((n, (v if isinstance(v, Sig) else Sig.from_tuple(v)))
+                            for n,v in value.items())
+            elif isinstance(value, Sig):
+                sigs[name] = value
+            elif name == '_n_handles_':
+                classdict['_n_handles'] = value
+            elif name in COMBINED_FLAGS:
+                flags[name.strip('_')] = value
+            else:
+                classdict[name] = value
+
         metacls._handle_flags(flags)
-        classdict['_flags'] = flags
-        classdict.setdefault('_n_handles', classdict.pop('_n_handles_', 1))
 
+        # Add these last to prevent user overwriting them
+        classdict.update(_sigs=sigs, _flags=flags)
+        log.info('classdict: %r', classdict)
         return type.__new__(metacls, clsname, bases, classdict)
 
     @classmethod
@@ -486,22 +503,21 @@ class NiceObjectMeta(type):
             flags['prefix'] = to_tuple(flags['prefix'])
 
     def _patch(cls, parent_lib):
+        log.info("Patching NiceObject subclass '%s'...", cls.__name__)
         if hasattr(cls, '_init_'):
             init = cls._init_
             if isinstance(init, basestring):
                 init = getattr(parent_lib, init)
             cls._init_func = staticmethod(init)
 
-        for attr_name, attr_value in list(cls.__dict__.items()):
-            if isinstance(attr_value, Sig):
-                sig = attr_value
-                sig.set_default_flags((cls._flags, parent_lib._base_flags))
-                libfunc = parent_lib._create_libfunction(attr_name, sig)
+        for name, sig in cls._sigs.items():
+            sig.set_default_flags((cls._flags, parent_lib._base_flags))
+            libfunc = parent_lib._create_libfunction(name, sig)
 
-                if not libfunc:
-                    log.warn("Function '%s' could not be found using prefixes %r",
-                             attr_name, sig.flags['prefix'])
-                setattr(cls, attr_name, libfunc)
+            if not libfunc:
+                log.warn("Function '%s' could not be found using prefixes %r",
+                         name, sig.flags['prefix'])
+            setattr(cls, name, libfunc)
 
     @classmethod
     def from_niceobjectdef(metacls, cls_name, niceobjdef, parent_lib):
