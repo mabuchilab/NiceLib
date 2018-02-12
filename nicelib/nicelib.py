@@ -722,7 +722,10 @@ class LibMeta(type):
 
         for name, value in orig_classdict.items():
             log.info("Processing attr '{}'...".format(name))
-            if name in COMBINED_FLAGS:
+            if name == '_info_':
+                classdict['_info'] = value
+
+            elif name in COMBINED_FLAGS:
                 flags[name.strip('_')] = value
 
             elif isinstance(value, NiceObjectDef):
