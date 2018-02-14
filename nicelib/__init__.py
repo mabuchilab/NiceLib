@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016 Nate Bogdanowicz
+# Copyright 2016-2018 Nate Bogdanowicz
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 
 import sys
@@ -62,4 +62,4 @@ from .build import build_lib
 from .process import generate_bindings
 
 __all__ = ['NiceLib', 'NiceObjectDef', 'build_lib', 'load_lib', 'generate_bindings', 'NiceObject',
-           'RetHandler', 'ret_return', 'ret_ignore', 'Sig', 'sig_pattern']
+           'RetHandler', 'ret_return', 'ret_ignore', 'Sig', 'sig_pattern', '__version__']
