@@ -56,9 +56,10 @@ def load_lib(name, pkg=None, dir=None, builder=None, kwargs={}):
     return LibInfo(lib_module)
 
 
-from .nicelib import NiceLib, NiceObjectDef, NiceObject, Sig, ret_return, ret_ignore
+from .nicelib import (NiceLib, NiceObjectDef, NiceObject, RetHandler, ret_return, ret_ignore,
+                      Sig, sig_pattern)
 from .build import build_lib
 from .process import generate_bindings
 
 __all__ = ['NiceLib', 'NiceObjectDef', 'build_lib', 'load_lib', 'generate_bindings', 'NiceObject',
-           'Sig', 'ret_return', 'ret_ignore', '__version__']
+           'RetHandler', 'ret_return', 'ret_ignore', 'Sig', 'sig_pattern', '__version__']
