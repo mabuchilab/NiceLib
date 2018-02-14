@@ -47,6 +47,21 @@ def c_to_numpy_array(ffi, c_arr, size):
     return np.frombuffer(ffi.buffer(c_arr), dtype=dtype)
 
 
+def sig_pattern(sig_patterns, names):
+    """Create a dict of Sigs by expanding a set of patterns.
+
+    Parameters
+    ----------
+    sig_patterns : sequence of pairs (`pattern`, `sig`)
+        Each `sig` is an ordinary sig, and `pattern` is a string pattern which will be completed
+        with each of the names given, using `str.format()`
+    names : sequence of strings
+    """
+    return {pattern.format(name): sig
+            for name in names
+            for pattern, sig in sig_patterns}
+
+
 class Sig(object):
     @classmethod
     def from_tuple(cls, sig_tup):
@@ -718,6 +733,9 @@ class LibMeta(type):
             log.info("Processing attr '{}'...".format(name))
             if name == '_info_':
                 classdict['_info'] = value
+
+            elif name == '_sigs_':
+                sigs.update(value)
 
             elif name in COMBINED_FLAGS:
                 flags[name.strip('_')] = value
