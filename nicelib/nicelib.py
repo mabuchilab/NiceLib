@@ -867,7 +867,7 @@ class LibMeta(type):
                 try:
                     hybrid_func = cls._hybrid_funcs[shortname]
                     hybrid_func.libfunc = libfunc
-                    setattr(cls, shortname, hybrid_func)
+                    setattr(cls, shortname, staticmethod(hybrid_func))
                 except KeyError:
                     setattr(cls, shortname, libfunc)
 
