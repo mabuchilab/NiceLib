@@ -746,6 +746,16 @@ class LibMeta(type):
                 log.info('...as the _sigs_ special attribute')
                 sigs.update(value)
 
+            elif name in ('_ret', '_ret_'):
+                # Have to handle separately, for backwards compat
+                if isinstance(value, basestring):
+                    log.info('...as a stringy ret flag')
+                    raise ValueError("Can't use string as _ret_ flag")
+                elif isfunction(value):
+                    log.info('...as a functiony ret flag')
+                    value = RetHandler(value, name)
+                flags['ret'] = value
+
             elif name in COMBINED_FLAGS:
                 log.info('...as a flag')
                 flags[name.strip('_')] = value
