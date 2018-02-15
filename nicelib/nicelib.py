@@ -732,7 +732,7 @@ class LibMeta(type):
         niceobjectdefs = {}  # name: NiceObjectDef
         niceclasses = {}
         sigs = {}
-        rethandlers = {}
+        rethandlers = {'return': ret_return, 'ignore': ret_ignore}
         hybrid_funcs = {}
 
         for name, value in orig_classdict.items():
@@ -770,8 +770,9 @@ class LibMeta(type):
                     sigs[name] = value.sig
                 elif name.startswith('_ret_') and name != '_ret_':
                     # For backwards compatibility
-                    rethandlers[name] = RetHandler(func=value, name=name[5:])
                     log.info('...as an old-style return-handler')
+                    shortname = name[5:]
+                    rethandlers[shortname] = RetHandler(func=value, name=shortname)
                 else:
                     log.info('...as an ordinary function')
                     classdict[name] = staticmethod(value)
@@ -795,8 +796,7 @@ class LibMeta(type):
 
         # Add these last to prevent user overwriting them
         classdict.update(_niceobjectdefs=niceobjectdefs, _niceclasses=niceclasses, _sigs=sigs,
-                         _rethandlers=rethandlers, _base_flags=flags, _hybrid_funcs=hybrid_funcs)
-        log.info('classdict: %r', classdict)
+                         _ret_handlers=rethandlers, _base_flags=flags, _hybrid_funcs=hybrid_funcs)
         return super(LibMeta, metacls).__new__(metacls, clsname, bases, classdict)
 
     def __init__(cls, clsname, bases, classdict):
@@ -815,7 +815,6 @@ class LibMeta(type):
 
         cls._handle_base_flags()
         cls._add_dir_ffilib()
-        cls._add_ret_handlers()
         cls._create_libfunctions()
         cls._create_niceobject_classes()
         cls._add_enum_constant_defs()
@@ -833,16 +832,6 @@ class LibMeta(type):
             del cls._ret_wrap
             warnings.warn("Your class defines _ret_wrap, which has been renamed to _ret, "
                           "please update your code:", stacklevel=2)
-
-    def _add_ret_handlers(cls):
-        log.info('Adding return handlers...')
-        ret_handlers = {}
-        all_attrs = list(ChainMap(*(c.__dict__ for c in cls.mro())).items())
-        for name, value in all_attrs:
-            if isinstance(value, RetHandler):
-                ret_handlers[name[5:]] = value
-        cls._ret_handlers = ret_handlers  # Assign only after finding all _ret_-prefixed names
-        log.info('ret_handlers: %s', cls._ret_handlers)
 
     def _handle_base_flags(cls):
         ret = cls._base_flags.get('ret')
