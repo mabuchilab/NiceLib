@@ -672,7 +672,7 @@ class NiceObjectDef(object):
 
         if attrs is not None:
             self.names = set(attrs.keys())
-            self.attrs = {n:(v if isinstance(v, Sig) else Sig.from_tuple(v))
+            self.attrs = {n:(v if (isinstance(v, Sig) or callable(v)) else Sig.from_tuple(v))
                           for n,v in attrs.items()}
 
         if 'ret_wrap' in flags:
