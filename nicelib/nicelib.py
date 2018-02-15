@@ -474,7 +474,7 @@ class RetHandler(object):
             kwargs = {arg:available_kwargs[arg] for arg in self.kwargs}
         except KeyError as e:
             raise KeyError("Unknown arg '{}' in arglist of ret-handling function "
-                           "'{}'".format(e.args[0], self.ret_handler.__name__))
+                           "'{}'".format(e.args[0], self.__name__))
         return self._func(retval, **kwargs)
 
 
