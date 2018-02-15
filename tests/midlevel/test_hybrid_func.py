@@ -7,8 +7,8 @@ class NiceFoo(NiceLib):
     _ret = ret_return
 
     @Sig('in', 'in')
-    def add(a, b):
-        return NiceFoo.add.libfunc(a, b)
+    def add(cls, a, b):
+        return cls._autofunc_add(a, b)
 
     create_item = Sig()
 

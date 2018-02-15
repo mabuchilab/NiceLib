@@ -497,12 +497,17 @@ class NiceObjectMeta(type):
         classdict = {'_n_handles': 1}
         sigs = {}
         flags = {}
+        hybrid_funcs = {}
         for name, value in orig_classdict.items():
             if name == '_sigs_':
                 sigs.update((n, (v if isinstance(v, Sig) else Sig.from_tuple(v)))
                             for n,v in value.items())
             elif isinstance(value, Sig):
                 sigs[name] = value
+            elif isfunction(value) and hasattr(value, 'sig'):
+                hybrid_funcs[name] = value
+                sigs[name] = (value.sig if isinstance(value.sig, Sig) else
+                              Sig.from_tuple(value.sig))
             elif name == '_n_handles_':
                 classdict['_n_handles'] = value
             elif name in COMBINED_FLAGS:
@@ -513,7 +518,7 @@ class NiceObjectMeta(type):
         metacls._handle_flags(flags)
 
         # Add these last to prevent user overwriting them
-        classdict.update(_sigs=sigs, _flags=flags)
+        classdict.update(_sigs=sigs, _flags=flags, _hybrid_funcs=hybrid_funcs)
         log.info('classdict: %r', classdict)
         return type.__new__(metacls, clsname, bases, classdict)
 
@@ -537,7 +542,13 @@ class NiceObjectMeta(type):
             if not libfunc:
                 log.warning("Function '%s' could not be found using prefixes %r",
                             name, sig.flags['prefix'])
-            setattr(cls, name, libfunc)
+            else:
+                try:
+                    hybrid_func = cls._hybrid_funcs[name]
+                    setattr(cls, '_autofunc_'+name, libfunc)
+                    setattr(cls, name, hybrid_func)
+                except KeyError:
+                    setattr(cls, name, libfunc)
 
     @classmethod
     def from_niceobjectdef(metacls, cls_name, niceobjdef, parent_lib):
@@ -879,8 +890,8 @@ class LibMeta(type):
                 cls._libfuncs[shortname] = libfunc
                 try:
                     hybrid_func = cls._hybrid_funcs[shortname]
-                    hybrid_func.libfunc = libfunc
-                    setattr(cls, shortname, staticmethod(hybrid_func))
+                    setattr(cls, '_autofunc_'+shortname, libfunc)
+                    setattr(cls, shortname, classmethod(hybrid_func))
                 except KeyError:
                     setattr(cls, shortname, libfunc)
 
