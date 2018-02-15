@@ -903,9 +903,10 @@ class LibMeta(type):
         if isinstance(ret_handler, basestring):
             ret_handler = cls._ret_handlers[ret_handler]
 
-        if hasattr(cls, '_info'):
+        try:
             arg_names = cls._info._argnames.get(c_func_name)
-        else:
+        except AttributeError:
+            # _info or _argnames is missing
             arg_names = None
 
         sig.bind_argtypes(cls._ffi, shortname, c_argtypes, ret_handler, arg_names)

@@ -16,13 +16,13 @@ class LibInfo(object):
             self._ffilib = lib_module.lib
             self._defs = lib_module.defs
             self.__dict__.update(self._defs)
-            self._argnames = getattr(lib_module, 'argnames', None)
+            self._argnames = getattr(lib_module, 'argnames', {})
             self._build_version = lib_module.build_version
         else:
             self._ffi = None
             self._ffilib = None
             self._defs = None
-            self._argnames = None
+            self._argnames = {}
 
     def __getattr__(self, name):
         return getattr(self._ffilib, name)
