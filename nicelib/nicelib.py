@@ -280,7 +280,7 @@ class InOutArgHandler(ArgHandler):
             return cls(sig, arg_str)
 
     def make_c_arg(self, ffi, arg_value):
-        inarg_type = (ffi.typeof(arg_value) if isinstance(arg_value, ffi.cdata) else
+        inarg_type = (ffi.typeof(arg_value) if isinstance(arg_value, ffi.CData) else
                       type(arg_value))
 
         if inarg_type == self.c_argtype:
