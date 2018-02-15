@@ -1027,13 +1027,14 @@ class LibFunction(object):
             raise TypeError("{}() takes {} arguments ({} given)"
                             "".format(self.name, self.sig.num_inargs, len(args)))
 
+        c_args = self.sig.make_c_args(args)
+        retval = self.c_func(*c_args)
+
         ret_handler_args = {
             'niceobj': kwds.pop('niceobj', None),
             'funcname': self.name,
+            'funcargs': c_args,
         }
-
-        c_args = self.sig.make_c_args(args)
-        retval = self.c_func(*c_args)
         return self.sig.extract_outputs(c_args, retval, ret_handler_args)
 
 
