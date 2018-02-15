@@ -778,7 +778,8 @@ class LibMeta(type):
                 if hasattr(value, 'sig'):
                     log.info('...as a hybrid function')
                     hybrid_funcs[name] = value
-                    sigs[name] = value.sig
+                    sigs[name] = (value.sig if isinstance(value.sig, Sig) else
+                                  Sig.from_tuple(value.sig))
                 elif name.startswith('_ret_') and name != '_ret_':
                     # For backwards compatibility
                     log.info('...as an old-style return-handler')
