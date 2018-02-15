@@ -736,49 +736,62 @@ class LibMeta(type):
         hybrid_funcs = {}
 
         for name, value in orig_classdict.items():
-            log.info("Processing attr '{}'...".format(name))
+            log.info("Processing attr '%s' (%s)...", name, type(value))
             if name == '_info_':
+                log.info('...as the _info_ special attribute')
                 classdict['_info'] = value
 
             elif name == '_sigs_':
+                log.info('...as the _sigs_ special attribute')
                 sigs.update(value)
 
             elif name in COMBINED_FLAGS:
+                log.info('...as a flag')
                 flags[name.strip('_')] = value
 
             elif isinstance(value, NiceObjectDef):
+                log.info('...as a NiceObjectDef')
                 if value.attrs is None:
                     value.names.remove(name)  # Remove self (context manager syntax)
                 niceobjectdefs[name] = value
 
             elif isinstance(value, type) and issubclass(value, NiceObject):
+                log.info('...as a NiceObject classdef')
                 niceclasses[name] = value
 
             elif isinstance(value, RetHandler):
+                log.info('...as a RetHandler')
                 rethandlers[name] = value
 
             elif isfunction(value):
                 if hasattr(value, 'sig'):
+                    log.info('...as a hybrid function')
                     hybrid_funcs[name] = value
                     sigs[name] = value.sig
                 elif name.startswith('_ret_') and name != '_ret_':
                     # For backwards compatibility
                     rethandlers[name] = RetHandler(func=value, name=name[5:])
+                    log.info('...as an old-style return-handler')
                 else:
+                    log.info('...as an ordinary function')
                     classdict[name] = staticmethod(value)
 
             elif isinstance(value, Sig):
+                log.info('...as a Sig')
                 sigs[name] = value
 
             elif not name.startswith('_'):
+                log.info('...as an old-style sig tuple')
                 sigs[name] = Sig.from_tuple(value)
 
             else:
+                log.info('...as an ordinary class attribute')
                 classdict[name] = value
 
         log.info('Found NiceObjectDefs: %r', niceobjectdefs)
         log.info('Found NiceObject subclasses: %s', niceclasses)
         log.info('Found root sigs: %s', sigs)
+        log.info('Found return-handlers: %s', rethandlers)
 
         # Add these last to prevent user overwriting them
         classdict.update(_niceobjectdefs=niceobjectdefs, _niceclasses=niceclasses, _sigs=sigs,
@@ -859,6 +872,7 @@ class LibMeta(type):
     def _create_libfunctions(cls):
         cls._libfuncs = {}
         for shortname, sig in cls._sigs.items():
+            log.info('Creating libfunc for %s', sig)
             sig.set_default_flags([cls._base_flags])
             libfunc = cls._create_libfunction(shortname, sig)
             if libfunc:
