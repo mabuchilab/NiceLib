@@ -36,9 +36,13 @@ These are the major NiceLib classes and functions of which you should know:
 
 * :ref:`wrapper-API`
 
-  * `NiceLib`
-  * `NiceObjectDef`
   * `load_lib()`
+  * `NiceLib`
+  * `Sig`
+  * `NiceObject`
+  * `RetHandler`
+  * `ret_return()`
+  * `ret_ignore()`
   * `generate_bindings()`
 
 
@@ -99,14 +103,20 @@ AST Hook Helpers
 
 Mid-Level Binding API
 ---------------------
+.. autofunction:: nicelib.load_lib
+
 .. autoclass:: nicelib.nicelib.NiceLib
     :members:
     :undoc-members:
 
-.. autoclass:: nicelib.nicelib.NiceObjectDef
+.. autoclass:: nicelib.nicelib.Sig
+    :members:
+
+.. autoclass:: nicelib.nicelib.NiceObject
     :members:
     :undoc-members:
 
-.. autofunction:: nicelib.load_lib
+.. autofunction:: nicelib.nicelib.ret_return
+.. autofunction:: nicelib.nicelib.ret_ignore
 
 .. autofunction:: nicelib.generate_bindings
