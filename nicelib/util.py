@@ -63,7 +63,7 @@ def handle_header_path(path, basedir):
     """
     if isinstance(path, basestring):
         if os.path.exists(path):
-            return path
+            return path, None
         else:
             raise ValueError("Cannot find library header")
 

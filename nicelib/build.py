@@ -7,7 +7,7 @@ import os.path
 import logging
 import cffi
 from .util import handle_header_path, handle_lib_name
-from .process import process_headers
+from .process import process_headers, process_source
 from .__about__ import __version__
 
 
@@ -27,10 +27,12 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
 
     Parameters
     ----------
-    header_info : str or dict
-        Path to header file. Paths can use ``os.environ``, as described below. Info is provided in
-        the form of a dict which must contain a 'header' key whose value is either a str containing
-        a single header name, or a tuple of such strings.
+    header_info : str, dict, or None
+        Path to header file. If None, uses only the header source given by ``preamble``.
+
+        Paths can use ``os.environ``, as described below. Info is provided in the form of a dict
+        which must contain a 'header' key whose value is either a str containing a single header
+        name, or a tuple of such strings.
 
         There are also some other optional entries:
 
@@ -105,27 +107,44 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         filedir, _ = os.path.split(filedir)
     filedir = os.path.realpath(filedir)
 
-    lib_name = handle_lib_name(lib_name, filedir)
-
-    logbuf.write("Searching for headers...\n")
-    header_paths, predef_path = handle_header_path(header_info, filedir)
-    logbuf.write("Found {}\n".format(header_paths))
-
     if not (module_name.startswith('_') and module_name.endswith('lib')):
         raise TypeError("Module name must use the format '_*lib'")
 
-    logbuf.write("Parsing and cleaning headers...\n")
-    retval = process_headers(header_paths, predef_path,
-                             update_cb=update_cb,
-                             ignored_headers=ignored_headers,
-                             ignore_system_headers=ignore_system_headers,
-                             preamble=preamble,
-                             token_hooks=token_hooks,
-                             ast_hooks=ast_hooks,
-                             hook_groups=hook_groups,
-                             debug_file=debug_file,
-                             load_dump_file=load_dump_file,
-                             save_dump_file=save_dump_file)
+    lib_name = handle_lib_name(lib_name, filedir)
+
+    if header_info:
+        logbuf.write("Searching for headers...\n")
+        header_paths, predef_path = handle_header_path(header_info, filedir)
+        logbuf.write("Found {}\n".format(header_paths))
+
+        logbuf.write("Parsing and cleaning headers...\n")
+        retval = process_headers(header_paths, predef_path,
+                                 update_cb=update_cb,
+                                 ignored_headers=ignored_headers,
+                                 ignore_system_headers=ignore_system_headers,
+                                 preamble=preamble,
+                                 token_hooks=token_hooks,
+                                 ast_hooks=ast_hooks,
+                                 hook_groups=hook_groups,
+                                 debug_file=debug_file,
+                                 load_dump_file=load_dump_file,
+                                 save_dump_file=save_dump_file)
+    else:
+        if not preamble:
+            raise ValueError('No header provided. Must give header_info and/or preamble')
+        logbuf.write("Parsing and cleaning headers...\n")
+        retval = process_source('', predef_path,
+                                update_cb=update_cb,
+                                ignored_headers=ignored_headers,
+                                ignore_system_headers=ignore_system_headers,
+                                preamble=preamble,
+                                token_hooks=token_hooks,
+                                ast_hooks=ast_hooks,
+                                hook_groups=hook_groups,
+                                debug_file=debug_file,
+                                load_dump_file=load_dump_file,
+                                save_dump_file=save_dump_file)
+
     clean_header_str, macro_code, argnames = retval
 
     logbuf.write("Compiling cffi module...\n")
