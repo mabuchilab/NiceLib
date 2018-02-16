@@ -29,15 +29,29 @@ class LibInfo(object):
 
 
 def load_lib(name, pkg=None, dir=None, builder=None, kwargs={}):
-    """Load a low-level lib module, building it if required
+    """Load a low-level lib module, building it first if required.
 
-    If `name` is `foo`, tries to import a module named `_foolib`. If the module can't be located,
+    If ``name`` is ``'foo'``, tries to import a module named ``_foolib``. If the module can't be located,
     `load_lib` tries to build it.
 
-    `builder` is the name of the module whose `build()` function is used to generate `_foolib.py`.
-    By default, it is assumed to be `_build_foo` (where 'foo' is the value of `name`).
+    Parameters
+    ----------
+    name : str
+        The name of the library. A name of ``'foo'`` would try to import the module ``_foolib``.
+    pkg : str
+        The package within which to look for the module. If None, looks for a top-level module.
+    dir : str
+        A directory within which to search for the module, before checking the system path. Useful
+        when working with local modules not within a package.
+    builder : str, optional
+        The name of the module whose ``build()`` function is used to generate ``_foolib.py`` By
+        default, it is assumed to be ``_build_foo`` (where 'foo' is the value of ``name``).
+    kwargs : dict, optional
+        Keyword args to be passed to ``build()``.
 
-    `kwargs`, if given, is a dict of keyword args that is passed to `build()`.
+    Returns
+    -------
+    lib : LibInfo
     """
     prefix = '.' if pkg else ''
     lib_name = prefix + '_{}lib'.format(name)

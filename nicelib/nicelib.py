@@ -78,6 +78,16 @@ class Sig(object):
         return cls(*sig_tup, **sig_flags)
 
     def __init__(self, *arg_strs, **flags):
+        """Create a signature specification.
+
+        Parameters
+        ----------
+        arg_strs : strings
+            Strings defining the input-output signature of the underlying C function being wrapped.
+            There is a one-to-one correspondence between arg strings and the C function's args.
+        flags
+            Flags(settings) to be applied to this function.
+        """
         self.arg_strs = arg_strs
         self.sig_flags = flags
         self._num_default_args = 0
@@ -460,6 +470,7 @@ class RetHandler(object):
 
     def __call__(self, func):
         self._func = func
+        self.__doc__ = func.__doc__
         if hasattr(func, '__name__') and not self.__name__:
             self.__name__ = func.__name__
 
@@ -480,11 +491,13 @@ class RetHandler(object):
 
 @RetHandler(num_retvals=1)
 def ret_return(retval):
+    """Append the return value to the wrapped function's return values."""
     return retval
 
 
 @RetHandler(num_retvals=0)
 def ret_ignore(retval):
+    """Ignore the return value."""
     pass
 
 
@@ -566,6 +579,34 @@ class NiceObjectMeta(type):
 
 
 class NiceObject(with_metaclass(NiceObjectMeta, object)):
+    """Base class for object-like mid-level library wrappers
+
+    Attributes
+    ----------
+    _prefix_ : str or sequence of strs, optional
+        Prefix(es) to strip from the library "method" names. E.g. If the library has functions
+        named like ``SDK_Obj_Func()``, you can set `_prefix_` to ``'SDK_Obj_'``, and access them as
+        ``Func()``. If more than one prefix is given, they are tried in order for each signature
+        until the appropraite function is found.
+    _ret_ : function or str, optional
+        ``RetHandler`` to handle the return values of each C function. By default, the return value
+        will be appended to the end of the Python return values. The return handler function takes
+        the C function's return value (often an error/success code) as its only argument. If the
+        wrapper returns a non-None value, it will be appended to the wrapped function's return
+        values.
+
+        NiceLib defines the simple handlers ``ret_return()`` and ``ret_ignore()`` for convenience.
+    _struct_maker_ : function, optional
+        Function that is called to create an FFI struct of the given type. Mainly useful for
+        odd libraries that require you to always fill out some field of the struct, like its size
+        in bytes
+    _buflen_ : int, optional
+        The default length for buffers. This can be overridden on a per-argument basis in the
+        argument's spec string, e.g `'len=64'` will make a 64-byte buffer.
+    _use_numpy_ : bool, optional
+        If true, convert output args marked as 'arr' to ``numpy`` arrays. Obviously requires
+        ``numpy`` to be installed.
+    """
     _init_func = None
     _n_handles = None
 
@@ -1074,47 +1115,41 @@ class NiceLib(with_metaclass(LibMeta, object)):
     """Base class for mid-level library wrappers
 
     Provides a nice interface for quickly defining mid-level library wrappers. You define a
-    subclass for each specific library (DLL).
+    subclass for each specific library (.dll/.so file).
 
     Attributes
     ----------
-    _info
+    _info_
         A `LibInfo` object that contains access to the underlying library and macros. Required
-        (unless you are using the old-style `_ffi`, `_ffilib`, and `_defs` attributes)
-    _ffi
-        FFI instance variable. Required if not using `_info`
-    _ffilib
-        FFI library opened with `dlopen()`. Required if not using `_info`.
-    _defs
+        (unless you are using the old-style ``_ffi_``, ``_ffilib_``, and ``_defs_`` attributes)
+    _ffi_
+        FFI instance variable. Required if not using ``_info_``
+    _ffilib_
+        FFI library opened with ``dlopen()``. Required if not using ``_info_``.
+    _defs_
         ``dict`` containing the Python-equivalent macros defined in the header file(s). Optional and
-        only used if not using `_info`.
-    _prefix : str or sequence of strs, optional
-        Prefix(es) to strip from the library function names. E.g. If the library has functions
-        named like ``SDK_Func()``, you can set `_prefix` to ``'SDK_'``, and access them as
-        `Func()`. If more than one prefix is given, they are tried in order for each signature
-        until the appropraite function is found.
-    _ret : function or str, optional
-        Wrapper function to handle the return values of each library function. By default, the
-        return value will be appended to the end of the Python return values. The wrapper function
-        takes the C function's return value (often an error/success code) as its only argument. If
-        the wrapper returns a non-``None`` value, it will be appended to the wrapped function's
-        return values.
+        only used if not using ``_info_``.
+    _prefix_ : str or sequence of strs, optional
+        Prefix(es) to strip from the library function names. E.g. If the library has functions named
+        like ``SDK_Func()``, you can set ``_prefix_`` to ``'SDK_'``, and access them as ``Func()``.
+        If more than one prefix is given, they are tried in order for each signature until the
+        appropraite function is found.
+    _ret_ : function or str, optional
+        ``RetHandler`` to handle the return values of each C function. By default, the return value
+        will be appended to the end of the Python return values. The return handler function takes
+        the C function's return value (often an error/success code) as its only argument. If the
+        wrapper returns a non-None value, it will be appended to the wrapped function's return
+        values.
 
-        You may also use a ``str`` instead. If you define function ``_ret_foo()`` in your
-        subclass, you may refer to it by using the ``str`` ``'foo'``.
-
-        There are two wrappers that ``NiceLib`` defines for convenience (and may also be referenced
-        as strings). ``_ret_return()`` is the default, which simply appends the return value to the
-        wrapped function's return values, and ``_ret_ignore()``, which ignores the value entirely
-        and does not return it.
-    _struct_maker : function, optional
+        NiceLib defines the simple handlers ``ret_return()`` and ``ret_ignore()`` for convenience.
+    _struct_maker_ : function, optional
         Function that is called to create an FFI struct of the given type. Mainly useful for
         odd libraries that require you to always fill out some field of the struct, like its size
         in bytes
-    _buflen : int, optional
+    _buflen_ : int, optional
         The default length for buffers. This can be overridden on a per-argument basis in the
         argument's spec string, e.g `'len=64'` will make a 64-byte buffer.
-    _use_numpy : bool, optional
+    _use_numpy_ : bool, optional
         If true, convert output args marked as 'arr' to ``numpy`` arrays. Obviously requires
         ``numpy`` to be installed.
     """
