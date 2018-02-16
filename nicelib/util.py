@@ -74,18 +74,16 @@ def handle_header_path(path, basedir):
 
         header_names = to_tuple(header_dict['header'])
         include_dirs = to_tuple(header_dict.get('path', ('.',)))
-        include_dirs = tuple(d if os.path.isabs(d) else os.path.join(basedir, d)
-                             for d in include_dirs)
         log.info('Looking for {} in {}'.format(header_names, include_dirs))
 
         try:
-            headers = [find_header(h, include_dirs) for h in header_names]
+            headers = [find_header(h, include_dirs, basedir) for h in header_names]
         except:
             continue
 
         if 'predef' in header_dict:
             try:
-                predef_header = find_header(header_dict['predef'], include_dirs)
+                predef_header = find_header(header_dict['predef'], include_dirs, basedir)
             except:
                 continue
         else:
@@ -95,7 +93,7 @@ def handle_header_path(path, basedir):
     raise ValueError("Could not find library header")
 
 
-def find_header(header_name, include_dirs):
+def find_header(header_name, include_dirs, basedir):
     """Resolve the path of a header_name
 
     Supports inclusion of environment variables in header and dir names. If `header_name` is a
@@ -119,7 +117,7 @@ def find_header(header_name, include_dirs):
                 warnings.warn("os.environ does not provide key '{}'".format(e.args[0]))
 
             if not os.path.isabs(include_dir):
-                raise Exception("Header include paths must be absolute")
+                include_dir = os.path.join(basedir, include_dir)
 
             path = os.path.join(include_dir, header_name)
             if os.path.exists(path):
