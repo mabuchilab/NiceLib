@@ -354,10 +354,6 @@ class ArrayLenArgHandler(ArgHandler):
         m = cls.RE_LEN.match(arg_str)
         if m:
             len_handler = cls(sig, arg_str)
-            arr_handler = ArrayArgHandler.unmatched_arrays.pop(0)
-            len_handler.arr_handler = arr_handler
-            arr_handler.len_handler = len_handler
-
             len_param = m.group(2)
 
             len_handler.get_len = False
@@ -367,6 +363,7 @@ class ArrayLenArgHandler(ArgHandler):
             elif len_param is not None:
                 len_handler.fixed_len = int(len_param)
 
+            ArrayArgHandler._add_new_len_handler(len_handler)
             return len_handler
         else:
             return None
@@ -392,14 +389,33 @@ class ArrayArgHandler(ArgHandler):
     @classmethod
     def start_sig_definition(cls):
         cls.unmatched_arrays = []
-        # NOTE: Could also define unmatched_lens if we want to allow lens before arrs
+        cls.unmatched_lens = []
 
     @classmethod
     def end_sig_definition(cls):
-        if cls.unmatched_arrays:
+        if cls.unmatched_arrays or cls.unmatched_lens:
             raise ValueError("Number of paired buf/arr sig elements does not match number of "
                              "len sig elements")
         cls.unmatched_arrays = None
+        cls.unmatched_lens = None
+
+    @classmethod
+    def _add_new_len_handler(cls, len_handler):
+        try:
+            arr_handler = cls.unmatched_arrays.pop(0)
+            len_handler.arr_handler = arr_handler
+            arr_handler.len_handler = len_handler
+        except IndexError:
+            cls.unmatched_lens.append(len_handler)
+
+    @classmethod
+    def _add_new_arr_handler(cls, arr_handler):
+        try:
+            len_handler = cls.unmatched_lens.pop(0)
+            len_handler.arr_handler = arr_handler
+            arr_handler.len_handler = len_handler
+        except IndexError:
+            cls.unmatched_arrays.append(arr_handler)
 
     @classmethod
     def create(cls, sig, arg_str):
@@ -409,7 +425,7 @@ class ArrayArgHandler(ArgHandler):
             len_num = None if m.group(3) is None else int(m.group(3))
             handler = cls(sig, arg_str, is_buf, len_num)
             if len_num is None:
-                cls.unmatched_arrays.append(handler)
+                cls._add_new_arr_handler(handler)
             return handler
         return None
 
