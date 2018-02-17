@@ -22,6 +22,12 @@ FLAGS = {'prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf'}
 UNDER_FLAGS = {'_{}_'.format(f) for f in FLAGS}
 USINGLE_FLAGS = {'_'+f for f in FLAGS}
 COMBINED_FLAGS = UNDER_FLAGS | USINGLE_FLAGS
+
+NL_ATTRS = {'info', 'ffi', 'ffilib', 'defs'}
+UNDER_NL_ATTRS = {'_{}_'.format(a) for a in NL_ATTRS}
+USINGLE_NL_ATTRS = {'_'+a for a in NL_ATTRS}
+COMBINED_NL_ATTRS = UNDER_NL_ATTRS | USINGLE_NL_ATTRS
+
 ARG_HANDLERS = []
 
 
@@ -811,6 +817,10 @@ class LibMeta(type):
                 log.info('...as a flag')
                 flags[name.strip('_')] = value
 
+            elif name in COMBINED_NL_ATTRS:
+                log.info('...as a special NiceLib attribute')
+                classdict[name.rstrip('_')] = value
+
             elif isinstance(value, NiceObjectDef):
                 log.info('...as a NiceObjectDef')
                 if value.attrs is None:
@@ -872,7 +882,7 @@ class LibMeta(type):
             cls._ffi = cls._info._ffi
             cls._ffilib = cls._info._ffilib
             cls._defs = cls._info._defs
-        else:
+        elif '_lib' in cls.__dict__:
             cls._ffilib = cls._lib
             del cls._lib
 
@@ -1155,7 +1165,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
     """
     _ffi = None  # MUST be filled in by subclass
     _ffilib = None  # MUST be filled in by subclass
-    _defs = None
+    _defs = {}
 
     @RetHandler(num_retvals=1)
     def _ret_return(retval):
