@@ -475,7 +475,7 @@ class RetHandler(object):
             self(func)
 
     def __call__(self, func):
-        self._func = func
+        self.__func__ = func
         self.__doc__ = func.__doc__
         if hasattr(func, '__name__') and not self.__name__:
             self.__name__ = func.__name__
@@ -492,7 +492,7 @@ class RetHandler(object):
         except KeyError as e:
             raise KeyError("Unknown arg '{}' in arglist of ret-handling function "
                            "'{}'".format(e.args[0], self.__name__))
-        return self._func(retval, **kwargs)
+        return self.__func__(retval, **kwargs)
 
 
 @RetHandler(num_retvals=1)
