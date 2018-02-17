@@ -565,9 +565,9 @@ class NiceObjectMeta(type):
                 try:
                     hybrid_func = cls._hybrid_funcs[name]
                     setattr(cls, '_autofunc_'+name, libfunc)
-                    setattr(cls, name, hybrid_func)
+                    setattr(cls, name, hybrid_func)  # Set hybrid func as instancemethod
                 except KeyError:
-                    setattr(cls, name, libfunc)
+                    setattr(cls, name, libfunc)  # Set func as instancemethod
 
     @classmethod
     def from_niceobjectdef(metacls, cls_name, niceobjdef, parent_lib):
