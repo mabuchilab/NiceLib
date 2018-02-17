@@ -341,7 +341,7 @@ class IgnoreArgHandler(ArgHandler):
 
 @register_arg_handler
 class ArrayLenArgHandler(ArgHandler):
-    RE_LEN = re.compile(r'len(=([0-9]+|in))?')
+    RE_LEN = re.compile(r'len(=([0-9]+|in))?(:([a-zA-Z_][0-9a-zA-Z_]*))?$')
 
     @property
     def takes_input(self):
@@ -354,14 +354,16 @@ class ArrayLenArgHandler(ArgHandler):
         m = cls.RE_LEN.match(arg_str)
         if m:
             len_handler = cls(sig, arg_str)
-            len_param = m.group(2)
 
+            len_param = m.group(2)
             len_handler.get_len = False
             len_handler.fixed_len = None
             if len_param == 'in':
                 len_handler.get_len = True
             elif len_param is not None:
                 len_handler.fixed_len = int(len_param)
+
+            len_handler.size_type = m.group(4)
 
             ArrayArgHandler._add_new_len_handler(len_handler)
             return len_handler
@@ -376,7 +378,15 @@ class ArrayLenArgHandler(ArgHandler):
             self.len = self.fixed_len
         else:
             self.len = self.sig.flags['buflen']
-        return self.len
+
+        # self.len is number of array elements
+        # We return # of elements scaled by the given measurement size
+        if self.size_type:
+            meas_size = (1 if self.size_type == 'byte' else ffi.sizeof(self.size_type))
+            item_size = ffi.sizeof(self.arr_handler.c_argtype)
+            return self.len * item_size // meas_size
+        else:
+            return self.len
 
 
 @register_arg_handler
