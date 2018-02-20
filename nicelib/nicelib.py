@@ -924,13 +924,13 @@ class LibMeta(type):
             cls._base_flags['ret'] = cls._err_wrap
             del cls._err_wrap
             warnings.warn("Your class defines _err_wrap, which has been renamed to _ret, "
-                          "please update your code:", stacklevel=2)
+                          "please update your code:", stacklevel=3)
 
         if '_ret_wrap' in cls.__dict__:
             cls._base_flags['ret'] = cls._ret_wrap
             del cls._ret_wrap
             warnings.warn("Your class defines _ret_wrap, which has been renamed to _ret, "
-                          "please update your code:", stacklevel=2)
+                          "please update your code:", stacklevel=3)
 
     def _handle_base_flags(cls):
         ret = cls._base_flags.get('ret')
