@@ -139,7 +139,11 @@ def handle_lib_name(lib_name, basedir):
 
     # First try local directory
     for try_name in lib_names:
-        path = os.path.join(basedir, try_name)
+        if os.path.isabs(try_name):
+            path = try_name
+        else:
+            path = os.path.join(basedir, try_name)
+
         if os.path.exists(path):
             return path
 

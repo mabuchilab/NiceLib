@@ -110,7 +110,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     if not (module_name.startswith('_') and module_name.endswith('lib')):
         raise TypeError("Module name must use the format '_*lib'")
 
-    lib_name = handle_lib_name(lib_name, filedir)
+    lib_path = handle_lib_name(lib_name, filedir)
 
     if header_info:
         logbuf.write("Searching for headers...\n")
@@ -157,8 +157,12 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
 
     module_path = os.path.join(filedir, module_name + '.py')
     with open(module_path, 'a') as f:
+        f.write("import os, os.path\n")
         f.write("build_version = '{}'\n".format(__version__))
-        f.write("lib = ffi.dlopen({!r})\n".format(lib_name))
+        f.write("_old_curdir = os.path.abspath(os.curdir)\n")
+        f.write("os.chdir({!r})\n #  In case of dependent libs".format(os.path.dirname(lib_path)))
+        f.write("lib = ffi.dlopen({!r})\n".format(os.path.basename(lib_path)))
+        f.write("os.chdir(_old_curdir)\n")
         f.write(macro_code)
         f.write('argnames = {!r}\n'.format(argnames))
 
