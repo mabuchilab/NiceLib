@@ -4,9 +4,12 @@ from __future__ import division, absolute_import, with_statement, print_function
 
 import sys
 import os.path
+import logging
 from importlib import import_module
 
 from .__about__ import __version__
+
+log = logging.getLogger(__name__)
 
 
 class LibInfo(object):
@@ -53,16 +56,19 @@ def load_lib(name, pkg=None, dir=None, builder=None, kwargs={}):
     -------
     lib : LibInfo
     """
+    log.info('Loading lib %s...', name)
     prefix = '.' if pkg else ''
     lib_name = prefix + '_{}lib'.format(name)
     if dir:
         sys.path.insert(0, os.path.dirname(dir))
 
     try:
+        log.info('Loading %s from %s...', lib_name, pkg)
         lib_module = import_module(lib_name, pkg)
     except ImportError:
         if builder is None:
             builder = prefix + '_build_{}'.format(name)
+        log.info('Loading build module %s from %s...', builder, pkg)
         build_module = import_module(builder, pkg)
         build_module.build(**kwargs)
         lib_module = import_module(lib_name, pkg)
