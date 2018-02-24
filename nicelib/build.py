@@ -160,7 +160,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         f.write("import os, os.path\n")
         f.write("build_version = '{}'\n".format(__version__))
         f.write("_old_curdir = os.path.abspath(os.curdir)\n")
-        f.write("os.chdir({!r})\n #  In case of dependent libs".format(os.path.dirname(lib_path)))
+        f.write("os.chdir({!r}) #  In case of dependent libs\n".format(os.path.dirname(lib_path)))
         f.write("lib = ffi.dlopen({!r})\n".format(os.path.basename(lib_path)))
         f.write("os.chdir(_old_curdir)\n")
         f.write(macro_code)
