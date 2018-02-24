@@ -108,7 +108,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     filedir = os.path.realpath(filedir)
 
     if not (module_name.startswith('_') and module_name.endswith('lib')):
-        raise TypeError("Module name must use the format '_*lib'")
+        raise TypeError("Module name must use the format '_*lib', got '{}'".format(module_name))
 
     lib_path = handle_lib_name(lib_name, filedir)
 
