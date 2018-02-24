@@ -133,6 +133,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         if not preamble:
             raise ValueError('No header provided. Must give header_info and/or preamble')
         logbuf.write("Parsing and cleaning headers...\n")
+        predef_path = None
         retval = process_source('', predef_path,
                                 update_cb=update_cb,
                                 ignored_headers=ignored_headers,
