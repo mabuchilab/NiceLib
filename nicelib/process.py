@@ -2096,8 +2096,23 @@ def extern_c_hook(tokens):
 
 def enum_type_hook(tokens):
     """Removes enum type, e.g. `enum myEnum : short {...};` becomes `enum myEnum {...};`"""
-    return modify_pattern(tokens, [('k', 'enum'), ('k', Token.IDENTIFIER), ('d', ':'),
-                                   ('d', Token.IDENTIFIER)])
+    ph = ParseHelper(tokens)
+    while True:
+        for token in ph.read_to('enum'):
+            yield token
+
+        next_token = ph.peek_true_token()
+        if not next_token or next_token.type is not Token.IDENTIFIER:
+            continue
+        for token in ph.read_to(next_token):
+            yield token
+
+        next_token = ph.peek_true_token()
+        if next_token != ':':
+            continue
+
+        for token in ph.read_until(('{', ';')):
+            pass  # ignore enum type
 
 
 class ParseHelper(object):
