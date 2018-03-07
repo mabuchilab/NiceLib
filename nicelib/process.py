@@ -1041,7 +1041,7 @@ class FFICleaner(TreeModifier):
         log.debug(src)
         try:
             self.ffi.cdef(src, override=True)
-        except cffi.api.FFIError as e:
+        except Exception as e:  # Use generic error b/c cffi keeps changing
             log.error(str(e))  # Ignore bad or unsupported types
         return node
 
