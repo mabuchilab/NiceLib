@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016-2017 Nate Bogdanowicz
+# Copyright 2016-2018 Nate Bogdanowicz
 from __future__ import unicode_literals, division, print_function
 from future import standard_library
 standard_library.install_aliases()
@@ -18,7 +18,8 @@ from enum import Enum
 from collections import OrderedDict, namedtuple, defaultdict, Sequence, deque
 import ast
 from io import StringIO
-from pycparser import c_parser, c_generator, c_ast, plyparser
+from .parser import cpp_parser, cpp_generator
+from pycparser import c_ast, plyparser
 import cffi
 import cffi.commontypes
 from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
@@ -29,7 +30,7 @@ if PY2:
     range = xrange
 
 log = logging.getLogger(__name__)
-cparser = c_parser.CParser()
+cparser = cpp_parser.CPPParser()
 
 TokenType = Enum('TokenType', 'DEFINED IDENTIFIER NUMBER STRING_CONST CHAR_CONST HEADER_NAME '
                  'PUNCTUATOR NEWLINE WHITESPACE LINE_COMMENT BLOCK_COMMENT')
@@ -1023,7 +1024,7 @@ class FFICleaner(TreeModifier):
     """
     def __init__(self, ffi):
         self.ffi = ffi
-        self.generator = c_generator.CGenerator()
+        self.generator = cpp_generator.CPPGenerator()
         self.defined_tags = set()
         self.cur_typedef_name = None
         self.id_vals = {}  # Ordinary C identifiers (use just for enum values)
@@ -1376,7 +1377,7 @@ class Generator(object):
         argnames = argname_grabber.argnames
 
         # Generate cleaned C source
-        generator = c_generator.CGenerator()
+        generator = cpp_generator.CPPGenerator()
         header_src = generator.visit(self.tree)
 
         # Convert macros
@@ -2094,25 +2095,11 @@ def extern_c_hook(tokens):
     return modify_pattern(tokens, [('d', 'extern'), ('d', '"C"'), ('d', '{'), ('kd', '~~}~~')])
 
 
+# Enum types are now automatically parsed stripped by the CPPParser
+# Leave this function temporarily for backwards compatibility
 def enum_type_hook(tokens):
-    """Removes enum type, e.g. `enum myEnum : short {...};` becomes `enum myEnum {...};`"""
-    ph = ParseHelper(tokens)
-    while True:
-        for token in ph.read_to('enum'):
-            yield token
-
-        next_token = ph.peek_true_token()
-        if not next_token or next_token.type is not Token.IDENTIFIER:
-            continue
-        for token in ph.read_to(next_token):
-            yield token
-
-        next_token = ph.peek_true_token()
-        if next_token != ':':
-            continue
-
-        for token in ph.read_until(('{', ';')):
-            pass  # ignore enum type
+    for token in tokens:
+        yield token
 
 
 class ParseHelper(object):
