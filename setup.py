@@ -2,7 +2,10 @@
 # Copyright 2016-2018 Nate Bogdanowicz
 import os
 import os.path
+import sys
 from setuptools import setup, find_packages
+from setuptools.command.install import install as _install
+from setuptools.command.sdist import sdist as _sdist
 
 description = ('A package for rapidly developing "nice" Python bindings to C libraries, '
                'using `cffi`')
@@ -30,6 +33,26 @@ install_requires = [
     'enum34>=1.0.4;python_version<"3.4"',
 ]
 
+
+# Pre-generate tables within the package, just as pycparser does
+def _run_build_tables(dir):
+    from subprocess import call
+    call([sys.executable, '_build_tables.py'],
+         cwd=os.path.join(dir, 'nicelib', 'parser'))
+
+
+class install(_install):
+    def run(self):
+        _install.run(self)
+        self.execute(_run_build_tables, (self.install_lib,), msg="Build the lexing/parsing tables")
+
+
+class sdist(_sdist):
+    def make_release_tree(self, basedir, files):
+        self.execute(_run_build_tables, (basedir,), msg="Build the lexing/parsing tables")
+        _sdist.make_release_tree(self, basedir, files)
+
+
 if __name__ == '__main__':
     setup(
         name = about['__distname__'],
@@ -42,5 +65,6 @@ if __name__ == '__main__':
         url = about['__url__'],
         license = about['__license__'],
         classifiers = classifiers,
-        install_requires = install_requires
+        install_requires = install_requires,
+        cmdclass={'install': install, 'sdist': sdist},
     )

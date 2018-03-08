@@ -7,9 +7,14 @@ from __future__ import division
 from pycparser.c_parser import CParser
 from pycparser import c_ast
 
+from .cpp_lexer import CPPLexer
+
 
 class CPPParser(CParser):
     def __init__(self, **kwds):
+        kwds['lexer'] = CPPLexer
+        kwds['lextab'] = 'nicelib.parser.lextab'
+        kwds['yacctab'] = 'nicelib.parser.yacctab'
         CParser.__init__(self, **kwds)
 
     # Parse pass-by-ref args as pointers
