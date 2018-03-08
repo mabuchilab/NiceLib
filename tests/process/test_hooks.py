@@ -54,23 +54,6 @@ def test_extern_c_hook():
 
 
 #
-# enum_type
-#
-ENUM_TYPE_SRC = """
-enum e : short {
-    A,
-    B = 2
-};
-"""
-
-def test_enum_type_hook():
-    src = use_hook(enum_type_hook, ENUM_TYPE_SRC)
-    assert 'short' not in src
-    assert ':' not in src
-    assert 'enum' in src
-
-
-#
 # struct_func
 #
 STRUCT_FUNC_SRC = """
