@@ -158,13 +158,29 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
 
     module_path = os.path.join(filedir, module_name + '.py')
     with open(module_path, 'a') as f:
-        f.write("import os, os.path\n")
-        f.write("build_version = '{}'\n".format(__version__))
-        f.write("_old_curdir = os.path.abspath(os.curdir)\n")
-        f.write("os.chdir({!r})  # In case of dependent libs\n".format(os.path.dirname(lib_path)))
-        f.write("lib = ffi.dlopen({!r})\n".format(lib_path))
-        f.write("os.chdir(_old_curdir)\n")
-        f.write(macro_code)
-        f.write('argnames = {!r}\n'.format(argnames))
+        f.write(MODULE_TEMPLATE.format(
+            build_version=__version__,
+            lib_dir=os.path.dirname(lib_path),
+            lib_path=lib_path,
+            macro_code=macro_code,
+            argnames=argnames
+        ))
 
     logbuf.write("Done building {}\n".format(module_name))
+
+
+MODULE_TEMPLATE = """
+import os
+import os.path
+build_version = {build_version!r}
+
+# Change directory in case of dependent libs not on PATH
+_old_curdir = os.path.abspath(os.curdir)
+os.chdir({lib_dir!r})
+lib = ffi.dlopen({lib_path!r})
+os.chdir(_old_curdir)
+
+{macro_code}
+
+argnames = {argnames!r}
+"""
