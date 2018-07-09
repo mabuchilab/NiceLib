@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016-2017 Nate Bogdanowicz
+# Copyright 2016-2018 Nate Bogdanowicz
 import datetime
 
 __distname__ = "NiceLib"
-__version__ = "0.5"
+__version__ = "0.5.1"
 __author__ = "Nate Bogdanowicz"
 __email__ = "natezb@gmail.com"
 __url__ = 'https://github.com/mabuchilab/NiceLib'

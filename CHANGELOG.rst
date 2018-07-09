@@ -1,6 +1,14 @@
 Change Log
 ==========
 
+(0.5.1) 2018-7-9
+----------------
+
+Changed
+"""""""
+- Fixed `free_buf`-related bug caused by typo (thanks @Gene2002)
+
+
 (0.5) 2018-2-20
 ---------------
 
