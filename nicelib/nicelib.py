@@ -487,7 +487,7 @@ class BufOutArgHandler(ArgHandler):
             return None
         string = ffi.string(c_arg[0])
 
-        free_buf = self.sig.args['free_buf']
+        free_buf = self.sig.flags['free_buf']
         if free_buf:
             free_buf(c_arg[0])
         return string
