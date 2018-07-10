@@ -23,4 +23,5 @@ deploy:
   distributions: "sdist bdist_wheel"
   on:
     tags: true
+    python: "3.6"
     branch: "0.5-hotfix"
