@@ -2012,7 +2012,7 @@ def modify_pattern(tokens, pattern):
             for keep_tok, buf_tok in match_buf:
                 if keep_tok == 'k':
                     yield buf_tok
-            raise StopIteration
+            return  # End of token stream
 
 
 def remove_pattern(tokens, pattern):
@@ -2244,22 +2244,25 @@ def asm_hook(tokens):
     """Remove `_asm` and `__asm` and their blocks"""
     ph = ParseHelper(tokens)
 
-    while True:
-        for token in ph.read_until(('_asm', '__asm')):
-            yield token
-        ph.pop()  # Get rid of '__asm'
+    try:
+        while True:
+            for token in ph.read_until(('_asm', '__asm')):
+                yield token
+            ph.pop()  # Get rid of '__asm'
 
-        if ph.peek_true_token() == '{':
-            ph.read_to('{', discard=True)
-            ph.read_to_depth(ph.depth-1, discard=True)
-        else:
-            ph.read_to('\n', discard=True)
+            if ph.peek_true_token() == '{':
+                ph.read_to('{', discard=True)
+                ph.read_to_depth(ph.depth-1, discard=True)
+            else:
+                ph.read_to('\n', discard=True)
 
-        next_true_token = ph.peek_true_token()
-        if next_true_token in (';', '_asm', '__asm'):
-            ph.read_until(next_true_token, discard=True)
-        else:
-            yield Token(Token.PUNCTUATOR, ';')
+            next_true_token = ph.peek_true_token()
+            if next_true_token in (';', '_asm', '__asm'):
+                ph.read_until(next_true_token, discard=True)
+            else:
+                yield Token(Token.PUNCTUATOR, ';')
+    except StopIteration:
+        return
 
 
 def stdcall_hook(tokens):
@@ -2271,33 +2274,39 @@ def stdcall_hook(tokens):
     """
     ph = ParseHelper(tokens)
 
-    while True:
-        token = ph.pop()
-        if token == '(':
-            if ph.peek_true_token() in ('__stdcall', 'WINAPI'):
-                ph.read_to(('__stdcall', 'WINAPI'))  # Discard
-                for t in lexer.lex(' volatile volatile const ('):
+    try:
+        while True:
+            token = ph.pop()
+            if token == '(':
+                if ph.peek_true_token() in ('__stdcall', 'WINAPI'):
+                    ph.read_to(('__stdcall', 'WINAPI'))  # Discard
+                    for t in lexer.lex(' volatile volatile const ('):
+                        yield t
+                else:
+                    yield token
+            elif token in ('__stdcall', 'WINAPI'):
+                for t in lexer.lex(' volatile volatile const '):
                     yield t
             else:
                 yield token
-        elif token in ('__stdcall', 'WINAPI'):
-            for t in lexer.lex(' volatile volatile const '):
-                yield t
-        else:
-            yield token
+    except StopIteration:
+        return
 
 
 def vc_pragma_hook(tokens):
     """Remove `__pragma(...)`"""
     ph = ParseHelper(tokens)
 
-    while True:
-        for token in ph.read_until('__pragma'):
-            yield token
+    try:
+        while True:
+            for token in ph.read_until('__pragma'):
+                yield token
 
-        # Throw away pragmas
-        ph.read_to('(', discard=True)
-        ph.read_to_depth(ph.depth-1, discard=True)
+            # Throw away pragmas
+            ph.read_to('(', discard=True)
+            ph.read_to_depth(ph.depth-1, discard=True)
+    except StopIteration:
+        return
 
 
 def struct_func_hook(tokens):
@@ -2315,69 +2324,72 @@ def struct_func_hook(tokens):
     """
     ph = ParseHelper(tokens)
 
-    while True:
-        for token in ph.read_to('struct'):
-            yield token
-        if token != 'struct':
-            raise StopIteration
-
-        # Yield until opening of struct def (or end of statement)
-        start_depth = ph.depth
-        maybe_a_def = True
-        in_struct_def = False
-        done = False
-        while not done:
-            token = ph.pop()
-            yield token
-
-            if ph.depth == start_depth and token == ';':
-                done = True
-            elif ph.depth == start_depth and token == '=':
-                maybe_a_def = False
-            elif maybe_a_def and token == '{':
-                done = True
-                in_struct_def = True
-
-        if not in_struct_def:
-            continue
-
-        struct_def_done = False
-        while not struct_def_done:
-            # Process each member
-            buf = []
-            member_depth = ph.depth
-            member_done = False
-            sue_proximity = 99
-            while not member_done:
-                token = ph.pop()
-                buf.append(token)
-
-                if token not in NON_TOKENS:
-                    sue_proximity += 1
-
-                if token in ('struct', 'union', 'enum'):
-                    sue_proximity = 0
-
-                if sue_proximity > 2 and token == '{':
-                    # In a funcdef, ignore these tokens
-                    buf = []
-                    ph.read_to_depth(ph.depth - 1, discard=True)
-
-                    # Discard optional semicolon
-                    if ph.peek() == ';':
-                        ph.pop()
-                    member_done = True
-
-                elif ph.depth == member_depth and token == ';':
-                    # End of ordinary member declaration
-                    member_done = True
-
-                elif ph.depth == member_depth - 1:
-                    member_done = True
-                    struct_def_done = True
-
-            for token in buf:
+    try:
+        while True:
+            for token in ph.read_to('struct'):
                 yield token
+            if token != 'struct':
+                return  # End of token stream
+
+            # Yield until opening of struct def (or end of statement)
+            start_depth = ph.depth
+            maybe_a_def = True
+            in_struct_def = False
+            done = False
+            while not done:
+                token = ph.pop()
+                yield token
+
+                if ph.depth == start_depth and token == ';':
+                    done = True
+                elif ph.depth == start_depth and token == '=':
+                    maybe_a_def = False
+                elif maybe_a_def and token == '{':
+                    done = True
+                    in_struct_def = True
+
+            if not in_struct_def:
+                continue
+
+            struct_def_done = False
+            while not struct_def_done:
+                # Process each member
+                buf = []
+                member_depth = ph.depth
+                member_done = False
+                sue_proximity = 99
+                while not member_done:
+                    token = ph.pop()
+                    buf.append(token)
+
+                    if token not in NON_TOKENS:
+                        sue_proximity += 1
+
+                    if token in ('struct', 'union', 'enum'):
+                        sue_proximity = 0
+
+                    if sue_proximity > 2 and token == '{':
+                        # In a funcdef, ignore these tokens
+                        buf = []
+                        ph.read_to_depth(ph.depth - 1, discard=True)
+
+                        # Discard optional semicolon
+                        if ph.peek() == ';':
+                            ph.pop()
+                        member_done = True
+
+                    elif ph.depth == member_depth and token == ';':
+                        # End of ordinary member declaration
+                        member_done = True
+
+                    elif ph.depth == member_depth - 1:
+                        member_done = True
+                        struct_def_done = True
+
+                for token in buf:
+                    yield token
+    except StopIteration:
+        return
 
 
 #
