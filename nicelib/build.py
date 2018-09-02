@@ -176,7 +176,8 @@ build_version = {build_version!r}
 
 # Change directory in case of dependent libs not on PATH
 _old_curdir = os.path.abspath(os.curdir)
-os.chdir({lib_dir!r})
+if {lib_dir!r}:
+    os.chdir({lib_dir!r})
 lib = ffi.dlopen({lib_path!r})
 os.chdir(_old_curdir)
 
