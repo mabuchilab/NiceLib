@@ -96,8 +96,14 @@ class Sig(object):
         """
         self.arg_strs = arg_strs
         self.sig_flags = flags
+        self._handle_flags(self.sig_flags)
         self._num_default_args = 0
         self._make_arg_handlers()
+
+    @staticmethod
+    def _handle_flags(flags):
+        with suppress(KeyError):
+            flags['prefix'] = to_tuple(flags['prefix'])
 
     def __repr__(self):
         return "<Sig({})>".format(', '.join(repr(s) for s in self.arg_strs))
@@ -768,6 +774,11 @@ class NiceObjectDef(object):
         if bad_kwds:
             raise ValueError("Unknown flags {}".format(bad_kwds))
         self.flags = flags
+
+        # Add default empty prefix
+        flags['prefix'] = to_tuple(flags['prefix'])
+        if '' not in flags['prefix']:
+            flags['prefix'] += ('',)
 
     def set_signatures(self, sigs={}, **kwds):
         self.attrs = sigs
