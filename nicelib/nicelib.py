@@ -17,7 +17,7 @@ from .util import to_tuple, ChainMap, suppress
 
 log = logging.getLogger(__name__)
 
-__all__ = ['NiceLib', 'NiceObjectDef']
+__all__ = ['NiceLib', 'NiceObject', 'Sig']
 FLAGS = {'prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf'}
 UNDER_FLAGS = {'_{}_'.format(f) for f in FLAGS}
 USINGLE_FLAGS = {'_'+f for f in FLAGS}
@@ -71,6 +71,9 @@ def sig_pattern(sig_patterns, names):
 class Sig(object):
     @classmethod
     def from_tuple(cls, sig_tup):
+        warnings.warn("Using tuples to define signatures has been deprecated in favor of using Sig."
+                      " See the documentation for more information.",
+                      FutureWarning, stacklevel=3)
         # Allow non-tuple, e.g. ('in') or ({'ret':'ignore'})
         if not isinstance(sig_tup, tuple):
             sig_tup = (sig_tup,)
@@ -751,6 +754,9 @@ def _wrap_inarg(ffi, argtype, arg):
 # WARNING uses some stack frame hackery; should probably make use of this syntax optional
 class NiceObjectDef(object):
     def __init__(self, attrs=None, n_handles=1, init=None, doc=None, **flags):
+        warnings.warn("The use of NiceObjectDef has been deprecated in favor of defining a "
+                      "subclass of NiceObject. See the documentation for more information.",
+                      FutureWarning, stacklevel=2)
         self.doc = doc
         self.attrs = attrs
         self.n_handles = n_handles
