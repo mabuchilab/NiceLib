@@ -191,7 +191,7 @@ class Sig(object):
         py_args = deque(args)
         c_args = []
         for handler in self.handlers:
-            log.info("Making C arg for %s", handler)
+            log.debug("Making C arg for %s", handler)
             py_arg = py_args.popleft() if handler.takes_input else None
             try:
                 c_args.append(handler.make_c_arg(self.ffi, py_arg))
@@ -1140,6 +1140,9 @@ class LibFunction(object):
                             "".format(self.name, self.sig.num_inargs, len(args)))
 
         c_args = self.sig.make_c_args(args)
+        # TODO: Add a custom object for logging these messages, to allow both filtering
+        # and to avoid this text formatting unless it's needed
+        log.info('Calling {}({})'.format(self.name, ', '.join(repr(arg) for arg in args)))
         retval = self.c_func(*c_args)
 
         ret_handler_args = {
