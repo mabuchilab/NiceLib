@@ -193,7 +193,14 @@ class Sig(object):
         for handler in self.handlers:
             log.info("Making C arg for %s", handler)
             py_arg = py_args.popleft() if handler.takes_input else None
-            c_args.append(handler.make_c_arg(self.ffi, py_arg))
+            try:
+                c_args.append(handler.make_c_arg(self.ffi, py_arg))
+            except TypeError as e:
+                msg = ("Invalid input for argument '{}' of {}. Could not make valid cffi arg from "
+                       "{!r}".format(handler.c_argname, self.func_name, py_arg))
+                old_msg = str(e)
+                msg = msg + '\n\n' + old_msg if old_msg else msg
+                raise TypeError(msg)
 
         # Do second pass to clean up callables; beware that cdata can be callable though
         return [a() if (not isinstance(a, self.ffi.CData) and callable(a)) else a for a in c_args]
@@ -727,7 +734,7 @@ def _wrap_inarg(ffi, argtype, arg):
         dtype = np.dtype(prefix + str(ffi.sizeof(argtype.item)))
 
         if arg.dtype != dtype:
-            raise TypeError
+            raise TypeError("Got ndarray with dtype {}, but expected {}".format(arg.dtype, dtype))
 
         return ffi.cast(argtype, arg.ctypes.data)
 
