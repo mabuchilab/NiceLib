@@ -21,8 +21,10 @@ classifiers = [
 
 # Load metadata from __about__.py
 base_dir = os.path.dirname(__file__)
+readme_path = os.path.join(base_dir, 'README.rst')
+about_path = os.path.join(base_dir, 'nicelib', '__about__.py')
 about = {}
-with open(os.path.join(base_dir, 'nicelib', '__about__.py')) as f:
+with open(about_path) as f:
     exec(f.read(), about)
 
 install_requires = [
@@ -61,7 +63,7 @@ if __name__ == '__main__':
         author = about['__author__'],
         author_email = about['__email__'],
         description = description,
-        long_description = '\n'.join(open("README.rst").read().splitlines()[2:]),
+        long_description = '\n'.join(open(readme_path).read().splitlines()[2:]),
         url = about['__url__'],
         license = about['__license__'],
         classifiers = classifiers,
