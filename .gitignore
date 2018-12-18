@@ -6,6 +6,9 @@
 *.so
 _*lib.py
 
+lextab.py
+yacctab.py
+
 /bin/
 /build/
 /dist/
