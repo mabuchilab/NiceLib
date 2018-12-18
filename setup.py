@@ -6,6 +6,7 @@ import sys
 from setuptools import setup, find_packages
 from setuptools.command.install import install as _install
 from setuptools.command.sdist import sdist as _sdist
+from setuptools.command.develop import develop as _develop
 
 description = ('A package for rapidly developing "nice" Python bindings to C libraries, '
                'using `cffi`')
@@ -55,6 +56,12 @@ class sdist(_sdist):
         self.execute(_run_build_tables, (basedir,), msg="Build the lexing/parsing tables")
 
 
+class develop(_develop):
+    def run(self):
+        _develop.run(self)
+        self.execute(_run_build_tables, (self.setup_path,), msg="Build the lexing/parsing tables")
+
+
 if __name__ == '__main__':
     setup(
         name = about['__distname__'],
@@ -68,5 +75,5 @@ if __name__ == '__main__':
         license = about['__license__'],
         classifiers = classifiers,
         install_requires = install_requires,
-        cmdclass={'install': install, 'sdist': sdist},
+        cmdclass={'install': install, 'sdist': sdist, 'develop': develop},
     )
