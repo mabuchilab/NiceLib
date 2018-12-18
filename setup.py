@@ -51,8 +51,8 @@ class install(_install):
 
 class sdist(_sdist):
     def make_release_tree(self, basedir, files):
-        self.execute(_run_build_tables, (basedir,), msg="Build the lexing/parsing tables")
         _sdist.make_release_tree(self, basedir, files)
+        self.execute(_run_build_tables, (basedir,), msg="Build the lexing/parsing tables")
 
 
 if __name__ == '__main__':
