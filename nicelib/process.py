@@ -1065,11 +1065,11 @@ class FFICleaner(TreeModifier):
         if not node.name and self.cur_typedef_name:
             node.name = '__autotag_' + self.cur_typedef_name
 
-        if node.decls:  # Is a definition
+        if node.decls is not None:  # Is a definition
             if node.name is None:
                 self.generic_visit(node)
             elif node.name in self.defined_tags:
-                node = node_class(node.name, ())
+                node = node_class(node.name, None)
             else:
                 self.defined_tags.add(node.name)
                 self.generic_visit(node)
