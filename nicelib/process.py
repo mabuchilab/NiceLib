@@ -1618,6 +1618,9 @@ def to_py_src(node):
             py_src = [node.value.rstrip('FfLl')]
         elif node.type == 'string':
             py_src = [node.value]
+        elif node.type == 'char':
+            char_literal = node.value.strip('uUL')
+            py_src = ['ord({})'.format(char_literal)]
         else:
             raise ConvertError("Unsupported constant type '{}'".format(node.type))
 
