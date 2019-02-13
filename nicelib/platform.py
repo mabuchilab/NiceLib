@@ -26,7 +26,10 @@ if fnmatch(sys.platform, 'linux*'):
         #define __gnu_linux__ 1
         #define __STDC__ 1
     """
-    INCLUDE_DIRS = ['/usr/include', '/usr/local/include', '/usr/lib/gcc/*/*/include']
+    INCLUDE_DIRS = ['/usr/include',
+                    '/usr/lib/gcc/*/*/include-fixed',
+                    '/usr/local/include',
+                    '/usr/lib/gcc/*/*/include']
     COMPILER = 'GCC'
 
 elif fnmatch(sys.platform, 'darwin*'):
