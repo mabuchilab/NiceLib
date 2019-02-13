@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016-2018 Nate Bogdanowicz
+# Copyright 2016-2019 Nate Bogdanowicz
 from __future__ import unicode_literals, division, print_function
 from future import standard_library
 standard_library.install_aliases()
@@ -232,16 +232,16 @@ class Lexer(object):
 def _token_matcher_factory(match_strings, ignore_types=()):
     def matcher(tokens):
         match_iter = reversed(match_strings)
-        test_string = next(match_iter)
+        test_strings = next(match_iter)
         for token in reversed(tokens):
             if token.type in ignore_types:
                 continue
 
-            if token.string != test_string:
+            if token.string not in test_strings:
                 return False
 
             try:
-                test_string = next(match_iter)
+                test_strings = next(match_iter)
             except StopIteration:
                 return True  # Matched all of match_strings
 
@@ -252,7 +252,7 @@ def _token_matcher_factory(match_strings, ignore_types=()):
 def build_c_lexer():
     # Only lex angle brackets as part of a header name immediately after `#include`
     include_matcher = _token_matcher_factory(
-        ("#", "include"),
+        (["#"], ["include", "include_next"]),
         ignore_types=(Token.NEWLINE, Token.WHITESPACE, Token.LINE_COMMENT, Token.BLOCK_COMMENT)
     )
 
@@ -348,6 +348,7 @@ class Parser(object):
             'undef': self.parse_undef,
             'pragma': self.parse_pragma,
             'include': self.parse_include,
+            'include_next': lambda: self.parse_include(include_next=True),
             'error': self.parse_error,
             'warning': self.parse_warning,
         }
@@ -906,7 +907,7 @@ class Parser(object):
             warnings.warn(PreprocessorWarning(tokens[0], message))
         return False
 
-    def parse_include(self):
+    def parse_include(self, include_next=False):
         tokens = self.pop_until_newline()  # Ignore includes
         if self.skipping:
             return False
@@ -928,7 +929,14 @@ class Parser(object):
                 else:
                     return None
 
-            for try_dir in dirs:
+            iter_dirs = iter(dirs)
+            if include_next:
+                # Drop all paths before and including the current header's path (base_dir)
+                for try_dir in iter_dirs:
+                    if try_dir == base_dir:
+                        break
+
+            for try_dir in iter_dirs:
                 try_path = os.path.join(try_dir, relpath)
                 if os.path.exists(try_path):
                     return try_path
@@ -941,7 +949,10 @@ class Parser(object):
 
             log.debug("System header {}".format(hpath))
             # We include the local path too, which is not standard
-            dirs = self.include_dirs + [base_dir]
+            if include_next:
+                dirs = self.include_dirs
+            else:
+                dirs = self.include_dirs + [base_dir]
             path = search_for_file(dirs, hpath)
             is_sys_header = True
 
@@ -949,7 +960,10 @@ class Parser(object):
                 raise PreprocessorError(token, 'System header "{}" not found'.format(hpath))
         else:
             log.debug("Local header {}".format(hpath))
-            dirs = [base_dir] + self.include_dirs
+            if include_next:
+                dirs = self.include_dirs
+            else:
+                dirs = [base_dir] + self.include_dirs
             path = search_for_file(dirs, hpath)
             is_sys_header = False
 
