@@ -976,7 +976,7 @@ class Parser(object):
             return False
 
         log.debug("Including header {!r}".format(path))
-        with open(path, 'rU') as f:
+        with open(path, 'r', newline=None) as f:
             tokens = lexer.lex(f.read(), path, is_sys_header=is_sys_header)
             tokens.append(Token(Token.NEWLINE, '\n'))
 
