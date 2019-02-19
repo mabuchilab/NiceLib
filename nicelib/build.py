@@ -118,23 +118,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         logbuf.write("Found {}\n".format(header_paths))
 
         logbuf.write("Parsing and cleaning headers...\n")
-        retval = process_headers(header_paths, predef_path,
-                                 update_cb=update_cb,
-                                 ignored_headers=ignored_headers,
-                                 ignore_system_headers=ignore_system_headers,
-                                 preamble=preamble,
-                                 token_hooks=token_hooks,
-                                 ast_hooks=ast_hooks,
-                                 hook_groups=hook_groups,
-                                 debug_file=debug_file,
-                                 load_dump_file=load_dump_file,
-                                 save_dump_file=save_dump_file)
-    else:
-        if not preamble:
-            raise ValueError('No header provided. Must give header_info and/or preamble')
-        logbuf.write("Parsing and cleaning headers...\n")
-        predef_path = None
-        retval = process_source('', predef_path,
+        hinfo = process_headers(header_paths, predef_path,
                                 update_cb=update_cb,
                                 ignored_headers=ignored_headers,
                                 ignore_system_headers=ignore_system_headers,
@@ -145,12 +129,26 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
                                 debug_file=debug_file,
                                 load_dump_file=load_dump_file,
                                 save_dump_file=save_dump_file)
-
-    clean_header_str, macro_code, argnames = retval
+    else:
+        if not preamble:
+            raise ValueError('No header provided. Must give header_info and/or preamble')
+        logbuf.write("Parsing and cleaning headers...\n")
+        predef_path = None
+        hinfo = process_source('', predef_path,
+                               update_cb=update_cb,
+                               ignored_headers=ignored_headers,
+                               ignore_system_headers=ignore_system_headers,
+                               preamble=preamble,
+                               token_hooks=token_hooks,
+                               ast_hooks=ast_hooks,
+                               hook_groups=hook_groups,
+                               debug_file=debug_file,
+                               load_dump_file=load_dump_file,
+                               save_dump_file=save_dump_file)
 
     logbuf.write("Compiling cffi module...\n")
     ffi = cffi.FFI()
-    ffi.cdef(clean_header_str)
+    ffi.cdef(hinfo.header_src)
     ffi.set_source('.' + module_name, None)
     ffi.compile(tmpdir=filedir)
 
@@ -162,8 +160,8 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
             build_version=__version__,
             lib_dir=os.path.dirname(lib_path),
             lib_path=lib_path,
-            macro_code=macro_code,
-            argnames=argnames
+            macro_code=hinfo.macro_src,
+            argnames=hinfo.argnames
         ))
 
     logbuf.write("Done building {}\n".format(module_name))

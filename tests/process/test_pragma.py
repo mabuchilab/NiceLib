@@ -3,5 +3,5 @@ from nicelib.process import process_headers
 
 
 def test_pragma_once():
-    header_src, _, _ = process_headers(local_fpath(__file__, 'pragma/once-a.h'))
-    assert header_src.count('123') == 1
+    hinfo = process_headers(local_fpath(__file__, 'pragma/once-a.h'))
+    assert hinfo.header_src.count('123') == 1

@@ -1417,7 +1417,7 @@ class Generator(object):
                 else:
                     macro_src.write("defs['{}'] = {}\n".format(macro.name, py_src))
 
-        return header_src, macro_src.getvalue(), self.tree, argnames
+        return HeaderInfo(header_src, macro_src.getvalue(), self.tree, argnames)
 
     def gen_py_src(self, macro):
         if isinstance(macro, FuncMacro):
@@ -1792,12 +1792,16 @@ def process_source(source, predef_path=None, update_cb=None, ignored_headers=(),
                     token_hooks=token_hooks,
                     ast_hooks=ast_hooks,
                     debug_file=debug_file)
-    header_src, macro_src, tree, argnames = gen.generate()
+    return gen.generate()
 
-    if return_ast:
-        return header_src, macro_src, tree, argnames
-    else:
-        return header_src, macro_src, argnames
+
+class HeaderInfo(object):
+    def __init__(self, header_src, macro_src, ast, argnames):
+        self.header_src = header_src
+        self.macro_src = macro_src
+        self.ast = ast
+        self.argnames = argnames
+        self.enums = None
 
 
 def generate_bindings(header_info, outfile, prefix=(), add_ret_ignore=False, niceobj_prefix={},
@@ -1835,12 +1839,12 @@ def generate_bindings(header_info, outfile, prefix=(), add_ret_ignore=False, nic
     header_paths, predef_path = handle_header_path(header_info)
     print("Found {}".format(header_paths))
 
-    _, _, tree = process_headers(header_paths, return_ast=True, **kwds)
+    hinfo = process_headers(header_paths, return_ast=True, **kwds)
     toplevel_sigs = []
     niceobj_sigs = defaultdict(list)
     prefixes = (prefix, '') if isinstance(prefix, basestring) else prefix + ('',)
 
-    for ext in tree.ext:
+    for ext in hinfo.ast.ext:
         if isinstance(ext, c_ast.Decl) and isinstance(ext.type, c_ast.FuncDecl):
             funcdecl = ext.type
             func_name = funcdecl.type.declname

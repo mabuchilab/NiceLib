@@ -3,24 +3,24 @@ from nicelib.process import process_headers
 
 
 def test_exclude_sys_funcdefs():
-    header_src, _, _ = process_headers(local_fpath(__file__, 'general/sys-funcdef-a.h'))
-    assert 'program_func' in header_src
-    assert 'created_func' in header_src
-    assert 'sys_func' not in header_src
+    hinfo = process_headers(local_fpath(__file__, 'general/sys-funcdef-a.h'))
+    assert 'program_func' in hinfo.header_src
+    assert 'created_func' in hinfo.header_src
+    assert 'sys_func' not in hinfo.header_src
 
 
 def test_argnames():
-    _, _, argnames = process_headers(local_fpath(__file__, 'general/argnames.h'))
-    assert argnames['f'] is None
-    assert argnames['f_void'] == []
-    assert argnames['f_int'] == [None]
-    assert argnames['f_int_int'] == [None, None]
+    hinfo = process_headers(local_fpath(__file__, 'general/argnames.h'))
+    assert hinfo.argnames['f'] is None
+    assert hinfo.argnames['f_void'] == []
+    assert hinfo.argnames['f_int'] == [None]
+    assert hinfo.argnames['f_int_int'] == [None, None]
 
-    assert argnames['f_inta'] == ['a']
-    assert argnames['f_inta_intb'] == ['a', 'b']
+    assert hinfo.argnames['f_inta'] == ['a']
+    assert hinfo.argnames['f_inta_intb'] == ['a', 'b']
 
-    assert argnames['f_ptra'] == ['a']
-    assert argnames['f_arra'] == ['a']
+    assert hinfo.argnames['f_ptra'] == ['a']
+    assert hinfo.argnames['f_arra'] == ['a']
 
-    assert argnames['f_structa'] == ['a']
-    assert argnames['f_structptra'] == ['a']
+    assert hinfo.argnames['f_structa'] == ['a']
+    assert hinfo.argnames['f_structptra'] == ['a']
