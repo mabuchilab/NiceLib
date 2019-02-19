@@ -1687,7 +1687,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
     header_paths : str or sequence of strs
         Paths of the headers
     ignored_headers : sequence of strs
-        Names of headers to ignore; `#include`\s containing these will be skipped.
+        Names of headers to ignore; `#include`\\s containing these will be skipped.
     ignore_system_headers : bool
         If True, skip inclusion of headers specified with angle brackets, e.g. `#include
         <stdarg.h>` Header files specified with double quotes are processed as ususal. Default is
@@ -1700,7 +1700,7 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
         typedefs that would otherwise be hard to reach due to an end user missing headers.
     token_hooks : sequence of functions
         Hook functions to be run on the already preprocessed token stream. Each function should
-        accept and return a sequence of `Token`\s. These are applied after any builtin token hooks.
+        accept and return a sequence of `Token`\\s. These are applied after any builtin token hooks.
     ast_hooks : sequence of functions
         Hook functions to be run on chunks of the header's C AST. After preprocessing and running
         the token hooks, the tokens are grouped and joined to form a sequence of chunks called
