@@ -1428,7 +1428,7 @@ class Generator(object):
             args = ()
 
         log.debug("Generating body of macro {} "
-                 "[{}:{}:{}]".format(macro.name, macro.fpath, macro.line, macro.col))
+                  "[{}:{}:{}]".format(macro.name, macro.fpath, macro.line, macro.col))
         log.debug("  body tokens are {}".format(macro.body))
 
         py_src = None
