@@ -1069,7 +1069,7 @@ class FFICleaner(TreeModifier):
             if node.name is None:
                 self.generic_visit(node)
             elif node.name in self.defined_tags:
-                node = c_ast.Enum(node.name, ())
+                node = c_ast.Enum(node.name, None)
             else:
                 self.defined_tags.add(node.name)
                 self.generic_visit(node)
