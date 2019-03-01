@@ -5,3 +5,4 @@ extern Item* create_item();
 extern int item_get_id(Item*);
 extern float item_get_value(Item*);
 extern void item_set_value(Item*, float);
+extern int item_static_value(void);

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2018 Nate Bogdanowicz
+# Copyright 2015-2019 Nate Bogdanowicz
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 
 from builtins import str, zip
@@ -18,7 +18,7 @@ from .util import to_tuple, ChainMap, suppress
 log = logging.getLogger(__name__)
 
 __all__ = ['NiceLib', 'NiceObject', 'Sig']
-FLAGS = {'prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf'}
+FLAGS = {'prefix', 'ret', 'struct_maker', 'buflen', 'use_numpy', 'free_buf', 'use_handle'}
 UNDER_FLAGS = {'_{}_'.format(f) for f in FLAGS}
 USINGLE_FLAGS = {'_'+f for f in FLAGS}
 COMBINED_FLAGS = UNDER_FLAGS | USINGLE_FLAGS
@@ -690,7 +690,9 @@ class LibMethod(object):
         self.__signature__ = Signature(params)
 
     def __call__(self, *args):
-        return self._libfunc(*(self._niceobj._handles + args), niceobj=self._niceobj)
+        if self._libfunc.sig.flags.get('use_handle', True):
+            args = self._niceobj._handles + args
+        return self._libfunc(*args, niceobj=self._niceobj)
 
 
 def _wrap_inarg(ffi, argtype, arg):

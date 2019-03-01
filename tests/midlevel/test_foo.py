@@ -16,7 +16,13 @@ class NiceFoo(NiceLib):
         get_id = Sig('in')
         get_value = Sig('in', ret=ret_ignore)
         set_value = Sig('in', 'in')
+        static_value = Sig(use_handle=False)
 
 
 def test_add():
     assert NiceFoo.add(2, 2) == 4
+
+
+def test_static_method():
+    item = NiceFoo.Item()
+    assert item.static_value() == 5

@@ -29,3 +29,7 @@ float item_get_value(Item *pitem) {
 void item_set_value(Item *pitem, float value) {
     pitem->value = value;
 }
+
+int item_static_value(void) {
+    return 5;
+}
