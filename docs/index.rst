@@ -22,7 +22,7 @@ just by defining a signature like this ::
 
     class MyLib(NiceLib):
         ...
-        my_c_function = ('in', 'in', 'arr', 'len', 'ignore')
+        my_c_function = Sig('in', 'in', 'arr', 'len', 'ignore')
 
 while giving you easy error handling and more.
 

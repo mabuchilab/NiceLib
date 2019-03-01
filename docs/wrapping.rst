@@ -247,7 +247,7 @@ But if we use ``_init_``::
 
     class MyNiceLib(NiceLib):
         [...]
-        GetHandle = ('out')
+        GetHandle = Sig('out')
 
         class MyObject(NiceObject):
             _init_ = 'GetHandle'
