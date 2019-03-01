@@ -3,7 +3,7 @@
 import datetime
 
 __distname__ = "NiceLib"
-__version__ = "0.6"
+__version__ = "0.7.dev0"
 __author__ = "Nate Bogdanowicz"
 __email__ = "natezb@gmail.com"
 __url__ = 'https://github.com/mabuchilab/NiceLib'
