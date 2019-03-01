@@ -114,6 +114,9 @@ use_numpy
 struct_maker
     A function that is called to create an FFI struct of the given type. Mainly useful for odd libraries that require you to always fill out some field of the struct, like its size in bytes.
 
+use_handle
+    Useful for creating "static methods" within a ``NiceObject``\—if False, the ``NiceObject``\'s handle(s) will not be passed into the C function. True by default. It only makes sense to specify this at the per-function level within a ``NiceObject``.
+
 
 ``NiceLib`` Class Attributes
 ----------------------------
@@ -235,7 +238,7 @@ NiceObjects
 -----------
 Often a C library exposes a distinctly object-like interface like the one in our example. Essentially, you have a handle or ID of some resource (a motor in the example), which gets passed as the first argument to a subset of the library's functions. It makes sense to treat these functions as the *methods* of some type of object. NiceLib allows you to define these types of objects by subclassing `NiceObject`.
 
-`NiceObject` class definitions are nested inside your `NiceLib` class definition, and consist of method ``Sig``\s and object-specific settings. When you instantiate a `NiceObject`, the args are passed to the `NiceObject`\'s *initializer*, which returns a handle. This handle is passed as the first parameter to all of the `NiceObject`\'s "methods". This initializer is specified using the `NiceObject`\'s ``_init_`` class attribute, which can be either a function or the name of one of the mid-level functions (as with ``'OpenMotor'`` in the example above). If ``_init_`` is not defined, the args passed to the `NiceObject`\'s constructor are used directly as the handle.
+`NiceObject` class definitions are nested inside your `NiceLib` class definition, and consist of method ``Sig``\s and object-specific settings. When you instantiate a `NiceObject`, the args are passed to the `NiceObject`\'s *initializer*, which returns a handle. This handle is passed as the first parameter to all of the `NiceObject`\'s "methods" (unless the method has ``use_handle=False``). This initializer is specified using the `NiceObject`\'s ``_init_`` class attribute, which can be either a function or the name of one of the mid-level functions (as with ``'OpenMotor'`` in the example above). If ``_init_`` is not defined, the args passed to the `NiceObject`\'s constructor are used directly as the handle.
 
 Without using ``_init_``, object construction would look like this::
 
