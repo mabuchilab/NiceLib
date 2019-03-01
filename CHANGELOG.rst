@@ -1,8 +1,34 @@
 Change Log
 ==========
 
-Unreleased
-----------
+(0.6) 2019-2-28
+---------------
+
+Added
+"""""
+- Better support for libs with absolute paths
+- ``pycparser`` extension for parsing C++isms
+- Warnings against using using ``NiceObjectDef`` and tuple-based Sigs
+- Support for ``#include_next`` directive
+- Lexing support for u/U/L-prefixed char literals
+- Python source generation of char literals
+- Include "include-fixed" directory in INCLUDE_DIRS
+
+
+Changed
+"""""""
+- Fixed error on fileless header parsing
+- Fixed StopIteration issue caused by PEP 479
+- Improved error message for invalid ``LibFunction`` input args
+- Fixed duplicate struct issue exposed by pycparser 2.19
+
+
+(0.5.2) 2018-7-9
+----------------
+
+Changed
+"""""""
+- Fixed `free_buf`-related bug caused by typo (thanks @Gene2002)
 
 
 (0.5) 2018-2-20
