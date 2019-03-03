@@ -1146,7 +1146,7 @@ class LibFunction(object):
         if sys.version_info >= (3,3):
             bound_args = self.__signature__.bind(*args, **kwds)
             args = bound_args.args
-        else:
+        elif kwds:
             raise TypeError('Keyword args in LibFunctions are not supported for Python versions '
                             'before 3.3')
 
