@@ -1,6 +1,7 @@
 typedef struct Item Item;
 
-extern int add(int, int);
+extern int add(int a, int b);
+extern int subtract(int a, int b);
 extern Item* create_item();
 extern int item_get_id(Item*);
 extern float item_get_value(Item*);
