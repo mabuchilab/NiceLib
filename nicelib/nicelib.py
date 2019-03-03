@@ -4,16 +4,21 @@ from __future__ import division, absolute_import, with_statement, print_function
 
 from builtins import str, zip
 from past.builtins import basestring
-from future.utils import with_metaclass
+from future.utils import PY2, with_metaclass
 
 import re
 import sys
 import warnings
 import logging
-from inspect import isfunction, getargspec
+from inspect import isfunction
 from collections import deque
 
 from .util import to_tuple, ChainMap, suppress
+
+if PY2:
+    from inspect import getargspec
+else:
+    from inspect import getfullargspec as getargspec
 
 log = logging.getLogger(__name__)
 
