@@ -163,13 +163,23 @@ The available signature values are:
 'inout'
     The argument is used as both input and output. The mid-level function takes it as an argument and also returns it with the return values. You can pass in either a value or a pointer to the value. For example, if the underlying C argument is an ``int *``, you can pass in a ``cffi`` ``int`` pointer, which will be used directly, or (more typically) you can pass in a Python int, which will be used as the initial value of a newly-created ``cffi`` int pointer.
 
+'arr'
+    The argument is an array used only for *output*. The C argument is a pointer or array, into which the C-function writes. The result is added to the return values.
+
+    This is used for the common case of a C function which takes both an array (or pointer to a block of memory) and its length as inputs, to ensure that it doesn't overrun the array. As such, each ``'arr'`` requires a corresponding ``'len'`` entry. The first ``'arr'``/``'buf'`` in a ``Sig`` is matched with the first ``'len'`` and so forth. If the array is fixed-length and you don't need to pass in a length parameter to the C-function, use ``'arr[n]'`` as described below. If you need to pass in the array (and not auto-create it), use ``'in'``.
+
+    NiceLib will automatically create the buffer and pass it and the length parameter to the C-function. You simply receive the resulting array.
+
+'arr[n]'
+    The same as ``'arr[n]'``, but does not have a matching ``'len'``. Because of this, the array length is specified directly as an int. For example, a 20-char buffer would be ``'arr[20]'``.
+
 'bufout'
     The argument is a pointer to a string buffer (a ``char**``). This is used for when the C library creates a string buffer and returns it to the user. NiceLib will automatically convert the output to a Python ``bytes``, or None if a null pointer was returned.
 
     If the memory should be cleaned up by the user (as is usually the case), you may use the ``free_buf`` setting to specify the cleanup function.
 
 'buf'
-    The argument is a string buffer used for output. The C argument is a ``char`` pointer or array, into which the C-function writes a null-terminated string. This string is decoded using ``ffi.string()``, and added to the return values.
+    The same as ``'arr'``, but decodes the output string using ``ffi.string()`` before adding it to the return values.
 
     This is used for the common case of a C function which takes both a string buffer and its length as inputs, so that it doesn't overrun the buffer. As such, ``'buf'`` requires a corresponding ``'len'`` entry. The first ``'buf'``/``'arr'`` is matched with the first ``'len'`` and so forth. If you don't need to pass in a length parameter to the C-function, use ``'buf[n]'`` as described below.
 
@@ -178,17 +188,12 @@ The available signature values are:
 'buf[n]'
     The same as ``'buf'``, but does not have a matching ``'len'``. Because of this, the buffer length is specified directly as an int. For example, a 20-char buffer would be ``'buf[20]'``.
 
-'arr'
-    The same as ``'buf'``, but does not call ``ffi.string()`` on the returned value. Used e.g. for ``int`` arrays.
-
-'arr[n]'
-    The same as ``'buf[n]'``, but does not call ``ffi.string()`` on the returned value. Used e.g. for ``int`` arrays.
 
 'len'
-    The length of the buffer being passed to the C-function. See ``'buf'`` for more info. This will use the length given by the innermost ``buflen`` setting.
+    The length of the buffer being passed to the C-function. See ``'arr'`` and ``'buf'`` for more info. This will use the length given by the innermost ``buflen`` flag/setting.
     
 'len=n'
-    The same as ``'len'``, but with an overridden length. For example, ``'len=32'`` would allocate a buffer or array of length 32, regardless of what ``buflen`` is.
+    The same as ``'len'``, but with a directly specified length. For example, ``'len=32'`` allocates a buffer or array of length 32, regardless of the value of ``buflen``.
 
 'len=in'
     Similar to ``'len=n'``, except the mid-level function takes an input argument which is an ``int`` specifying the size of buffer that should be allocated for that invocation.
