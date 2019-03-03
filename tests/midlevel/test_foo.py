@@ -14,7 +14,7 @@ class NiceFoo(NiceLib):
         _prefix_ = 'item_'
 
         get_id = Sig('in')
-        get_value = Sig('in', ret=ret_ignore)
+        get_value = Sig('in')
         set_value = Sig('in', 'in')
         static_value = Sig(use_handle=False)
 
