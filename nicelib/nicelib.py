@@ -1138,6 +1138,13 @@ class LibFunction(object):
         return self._call(args, kwds)
 
     def _call(self, args, kwds, niceobj=None):
+        if sys.version_info >= (3,3):
+            bound_args = self.__signature__.bind(*args, **kwds)
+            args = bound_args.args
+        else:
+            raise TypeError('Keyword args in LibFunctions are not supported for Python versions '
+                            'before 3.3')
+
         check_num_args(self.name, len(args), self.sig.num_inargs, self.sig.variadic)
 
         if len(args) != self.sig.num_inargs:
