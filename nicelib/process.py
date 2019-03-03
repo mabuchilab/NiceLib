@@ -8,6 +8,7 @@ from past.builtins import basestring
 from future.utils import PY2
 
 import re
+import sys
 import os.path
 from io import open  # Needed for opening as unicode, might be slow on Python 2
 import copy
@@ -15,7 +16,7 @@ import warnings
 import logging
 import pickle as pkl
 from enum import Enum
-from collections import OrderedDict, namedtuple, defaultdict, Sequence, deque
+from collections import OrderedDict, namedtuple, defaultdict, deque
 import ast
 from io import StringIO
 from .parser import cpp_parser, cpp_generator
@@ -24,6 +25,11 @@ import cffi
 import cffi.commontypes
 from .platform import PREDEF_MACRO_STR, REPLACEMENT_MAP, INCLUDE_DIRS
 from .util import handle_header_path
+
+if sys.version_info < (3,3):
+    from collections import Sequence
+else:
+    from collections.abc import Sequence
 
 # Faster than using future's range function, speeds up lexer significantly
 if PY2:
