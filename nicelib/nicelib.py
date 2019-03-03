@@ -689,10 +689,10 @@ class LibMethod(object):
                   for h in self._libfunc.sig.in_handlers[self._niceobj._n_handles:]]
         self.__signature__ = Signature(params)
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kwds):
         if self._libfunc.sig.flags.get('use_handle', True):
             args = self._niceobj._handles + args
-        return self._libfunc(*args, niceobj=self._niceobj)
+        return self._libfunc._call(args, kwds, niceobj=self._niceobj)
 
 
 def _wrap_inarg(ffi, argtype, arg):
@@ -1135,6 +1135,9 @@ class LibFunction(object):
             return LibMethod(instance, self)
 
     def __call__(self, *args, **kwds):
+        return self._call(args, kwds)
+
+    def _call(self, args, kwds, niceobj=None):
         check_num_args(self.name, len(args), self.sig.num_inargs, self.sig.variadic)
 
         if len(args) != self.sig.num_inargs:
@@ -1148,7 +1151,7 @@ class LibFunction(object):
         retval = self.c_func(*c_args)
 
         ret_handler_args = {
-            'niceobj': kwds.pop('niceobj', None),
+            'niceobj': niceobj,
             'funcname': self.name,
             'funcargs': c_args,
         }
