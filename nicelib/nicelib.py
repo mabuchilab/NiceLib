@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2018 Nate Bogdanowicz
+# Copyright 2015-2019 Nate Bogdanowicz
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 
 from builtins import str, zip
@@ -66,6 +66,12 @@ def sig_pattern(sig_patterns, names):
     return {pattern.format(name): sig
             for name in names
             for pattern, sig in sig_patterns}
+
+
+class Enums(object):
+    def __init__(self, enum_dict):
+        for name, value in enum_dict.items():
+            setattr(self, name, value)
 
 
 class Sig(object):
@@ -941,6 +947,7 @@ class LibMeta(type):
         cls._create_libfunctions()
         cls._create_niceobject_classes()
         cls._add_enum_constant_defs()
+        cls._add_enums()
         cls._add_macro_defs()
 
     def _handle_deprecated_attributes(cls):
@@ -1059,6 +1066,12 @@ class LibMeta(type):
                     warnings.warn("Conflicting name {}, ignoring".format(shortname))
                 else:
                     setattr(cls, shortname, attr)
+
+    def _add_enums(cls):
+        try:
+            cls.enums = Enums(cls._info._module.enums)
+        except AttributeError:
+            pass
 
     def _add_macro_defs(cls):
         prefixes = cls._base_flags['prefix']

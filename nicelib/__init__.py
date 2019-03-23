@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016-2018 Nate Bogdanowicz
+# Copyright 2016-2019 Nate Bogdanowicz
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 
 import sys
@@ -15,6 +15,7 @@ log = logging.getLogger(__name__)
 class LibInfo(object):
     def __init__(self, lib_module=None, prefix=None):
         if lib_module:
+            self._module = lib_module
             self._ffi = lib_module.ffi
             self._ffilib = lib_module.lib
             self._defs = lib_module.defs
@@ -22,6 +23,7 @@ class LibInfo(object):
             self._argnames = getattr(lib_module, 'argnames', {})
             self._build_version = lib_module.build_version
         else:
+            self._module = None
             self._ffi = None
             self._ffilib = None
             self._defs = None
