@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016-2018 Nate Bogdanowicz
+# Copyright 2016-2019 Nate Bogdanowicz
 from __future__ import print_function
 
 import os
@@ -161,15 +161,44 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
             lib_dir=os.path.dirname(lib_path),
             lib_path=lib_path,
             macro_code=hinfo.macro_src,
-            argnames=hinfo.argnames
+            argnames=hinfo.argnames,
+            enum_code=gen_all_enum_code(hinfo.enums),
         ))
 
     logbuf.write("Done building {}\n".format(module_name))
 
 
+def gen_all_enum_code(einfo_list):
+    code_list = []
+    names = []
+    for einfo in einfo_list:
+        name, code = gen_enum_code(einfo)
+        if code:
+            code_list.append(code)
+            names.append(name)
+
+    code_list.append(
+        'enums = {\n    '
+        + ',\n    '.join("'{name}': {name}".format(name=name) for name in names)
+        + '\n}'
+    )
+    return '\n\n'.join(code_list)
+
+
+def gen_enum_code(einfo):
+    if not einfo.tag_name:
+        return None, None
+    class_name = einfo.tag_name
+    src = ["class {}(enum.Enum):".format(class_name)]
+    for name in einfo.value_names:
+        src.append("    {name} = lib.{name}".format(name=name))
+    return class_name, '\n'.join(src)
+
+
 MODULE_TEMPLATE = """
 import os
 import os.path
+import enum
 build_version = {build_version!r}
 
 # Change directory in case of dependent libs not on PATH
@@ -182,4 +211,6 @@ os.chdir(_old_curdir)
 {macro_code}
 
 argnames = {argnames!r}
+
+{enum_code}
 """
