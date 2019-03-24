@@ -1,4 +1,4 @@
-sharedlibs: libfoo
+sharedlibs: libfoo libenum
 
 libfoo:
 	$(CC) -c -Wall -Werror -fpic foo.c
