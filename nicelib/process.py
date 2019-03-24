@@ -1242,7 +1242,7 @@ class ArgNameGrabber(c_ast.NodeVisitor):
 
 class EnumGrabber(c_ast.NodeVisitor):
     def __init__(self):
-        self.enum_map = {}
+        self.enum_map = OrderedDict()
         self.outer_typedef = None
 
     def run(self, root):
