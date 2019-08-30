@@ -54,7 +54,8 @@ elif fnmatch(sys.platform, 'win*'):
                     r'{PROGRAMFILES(X86)}\Windows Kits\*\Include\*\*\*',
                     r'{PROGRAMFILES(X86)}\Microsoft Visual Studio *\VC\include',
                     r'{PROGRAMFILES(X86)}\Microsoft Visual Studio *\VC\include\*',
-                    r'{PROGRAMFILES(X86)}\Microsoft Visual Studio *\VC\include\*\*']
+                    r'{PROGRAMFILES(X86)}\Microsoft Visual Studio *\VC\include\*\*',
+                    r'{PROGRAMFILES(X86)}\Microsoft Visual Studio\*\Community\VC\Tools\MSVC\*\include']
 
     if is_64bit:
         PREDEF_MACRO_STR += """
