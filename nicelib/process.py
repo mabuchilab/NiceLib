@@ -1609,7 +1609,8 @@ def to_py_src(node):
             raise ConvertError("Unsupported binary operator '{}'".format(node.op))
 
     elif isinstance(node, c_ast.Constant):
-        if node.type == 'int':
+        # Match int, unsigned int, long int, etc.
+        if 'int' in node.type.split():
             int_str = node.value.lower().rstrip('ul')
             if int_str.startswith('0x'):
                 base = 16
