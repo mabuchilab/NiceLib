@@ -58,6 +58,9 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         If True, skip inclusion of headers specified with angle brackets, e.g. `#include
         <stdarg.h>` Header files specified with double quotes are processed as ususal. Default is
         False.
+    preamble : str
+        C source to insert before the headers specified by `header_info`. Useful for including
+        typedefs that would otherwise be hard to reach due to an end user missing headers.
     token_hooks : sequence of functions
         Token hook functions. See `process_headers()` for more info.
     ast_hooks : sequence of functions
