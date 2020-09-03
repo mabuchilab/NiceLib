@@ -1621,7 +1621,7 @@ def to_py_src(node):
             else:
                 base = 10
             py_src = [str(int(int_str, base))]
-        elif node.type == 'float':
+        elif node.type in ('float', 'double'):
             py_src = [node.value.rstrip('FfLl')]
         elif node.type == 'string':
             py_src = [node.value]
