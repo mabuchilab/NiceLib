@@ -1457,8 +1457,7 @@ class Generator(object):
                     warnings.warn(str(e))
 
             except (plyparser.ParseError, AttributeError) as e:
-                warnings.warn("Un-pythonable macro {}".format(macro.name))
-                warnings.warn(str(e))
+                warnings.warn("Un-pythonable macro {}: {}".format(macro.name, str(e)))
 
         log.debug("  generated to {}".format(py_src))
         return py_src
