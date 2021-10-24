@@ -40,8 +40,10 @@ install_requires = [
 # Pre-generate tables within the package, just as pycparser does
 def _run_build_tables(dir):
     from subprocess import call
+    path = os.path.join(dir, 'nicelib', 'parser')
+    print('Running _build_tables.py on path "{}"'.format(path))
     call([sys.executable, '_build_tables.py'],
-         cwd=os.path.join(dir, 'nicelib', 'parser'))
+         cwd=path)
 
 
 class install(_install):
