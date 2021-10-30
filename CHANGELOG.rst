@@ -1,8 +1,19 @@
 Change Log
 ==========
 
-Unreleased
-----------
+(0.7) 2021-10-27
+----------------
+
+Added
+"""""
+- ``use_handle`` flag for defining static midlevel methods
+- LibFunction kwarg support for Python 3.3 and later
+- Path for community edition of Visual Studio (thanks @DerekK88)
+
+ Changed
+ """""""
+ - Fixed ``to_py_src`` to handle unsigned int, long int, and double constants
+ - Consolidated warnings for un-pythonable macros
 
 
 (0.6) 2019-2-28
