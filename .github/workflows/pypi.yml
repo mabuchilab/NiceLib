@@ -22,7 +22,7 @@ jobs:
       - name: Build distributions via setup.py
         run: >-
           python setup.py
-          sdist
+          sdist --formats=zip
           bdist_wheel
 
       - name: Publish to TestPyPI
