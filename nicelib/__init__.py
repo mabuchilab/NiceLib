@@ -13,6 +13,8 @@ log = logging.getLogger(__name__)
 
 
 class LibInfo(object):
+    """Opaque object containing library information"""
+
     def __init__(self, lib_module=None, prefix=None):
         if lib_module:
             self._ffi = lib_module.ffi
@@ -54,7 +56,7 @@ def load_lib(name, pkg=None, dir=None, builder=None, kwargs={}):
 
     Returns
     -------
-    lib : LibInfo
+    lib : `LibInfo`
     """
     log.info('Loading lib %s...', name)
     prefix = '.' if pkg else ''

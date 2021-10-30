@@ -37,6 +37,7 @@ These are the major NiceLib classes and functions of which you should know:
 * :ref:`wrapper-API`
 
   * `load_lib()`
+  * `LibInfo`
   * `NiceLib`
   * `Sig`
   * `NiceObject`
@@ -58,7 +59,7 @@ Header Processing API
 
 Token Hooks
 ~~~~~~~~~~~
-These functions can all be used in the `token_hooks` passed to `build_lib()` or `process_headers()`
+These functions can all be used in the ``token_hooks`` passed to `build_lib()` or `process_headers()`
 
 .. autofunction:: nicelib.process.cdecl_hook
 .. autofunction:: nicelib.process.stdcall_hook
@@ -76,6 +77,9 @@ These functions can all be used in the `token_hooks` passed to `build_lib()` or 
 Token Hook Helpers
 ~~~~~~~~~~~~~~~~~~
 These functions and classes are useful for writing your own custom token hooks:
+
+.. autoclass:: nicelib.process.TokenType
+    :members:
 
 .. autofunction:: nicelib.process.remove_pattern
 .. autofunction:: nicelib.process.modify_pattern
@@ -105,6 +109,8 @@ Mid-Level Binding API
 ---------------------
 .. autofunction:: nicelib.load_lib
 
+.. autoclass:: nicelib.LibInfo
+
 .. autoclass:: nicelib.nicelib.NiceLib
     :members:
     :undoc-members:
@@ -115,6 +121,9 @@ Mid-Level Binding API
 .. autoclass:: nicelib.nicelib.NiceObject
     :members:
     :undoc-members:
+
+.. autoclass:: nicelib.nicelib.RetHandler
+   :members:
 
 .. autofunction:: nicelib.nicelib.ret_return
 .. autofunction:: nicelib.nicelib.ret_ignore

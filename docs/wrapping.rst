@@ -5,7 +5,7 @@ Creating Mid-Level Bindings
 
 What Are Mid-Level Bindings?
 ----------------------------
-It's worth discussing what we mean by "mid-level" bindings. Mid-level bindings have a one-to-one correspondence between low-level functions and mid-level functions. The difference is that each mid-level function has a more Pythonic interface that lets the user mostly or entirely avoid working with `cffi` directly. In other words, the overall structure of the library stays the same, but each individual function's interface may change.
+It's worth discussing what we mean by "mid-level" bindings. Mid-level bindings have a one-to-one correspondence between low-level functions and mid-level functions. The difference is that each mid-level function has a more Pythonic interface that lets the user mostly or entirely avoid working with ``cffi`` directly. In other words, the overall structure of the library stays the same, but each individual function's interface may change.
 
 These mid-level bindings can then be used to craft high-level bindings that might have a completely different structure than the underlying low-level library.
 
@@ -64,7 +64,7 @@ Then we can use the library like this::
         print("Motor {} is at position {}".format(serial, pos))
         motor.Close()
 
-There are a number of features in use in this example: prefix removal, return value wrapping, array and string buffer output, and `NiceObjectDef`\s with custom initializers. These make use of settings, which you can read more about below.
+There are a number of features in use in this example: prefix removal, return value wrapping, array and string buffer output, and a `NiceObject` with custom initializers. These make use of settings, which you can read more about below.
 
 
 .. _settings:
@@ -123,9 +123,9 @@ use_handle
 ``NiceLib`` subclasses make use of a few underscore-surrounded special class attributes. In addition to the class-wide *settings* described above, they include:
 
 _info_
-    A `LibInfo` object that contains access to the underlying library and macros. Required (unless you are using the old-style ``_ffi_``, ``_ffilib_``, and ``_defs_`` attributes)
+    A :py:class:`LibInfo` object that contains access to the underlying library and macros. Required (unless you are using the old-style ``_ffi_``, ``_ffilib_``, and ``_defs_`` attributes)
 
-Typically you will want to pass the relevant library attributes via a `LibInfo` instance created using :py:func:`~nicelib.load_lib`, as shown in the examples above. However, it is currently possible to specify them directly. This was the original method, but may become deprecated in later versions of `NiceLib`.
+Typically you will want to pass the relevant library attributes via a :py:class:`LibInfo` instance created using :py:func:`~nicelib.load_lib`, as shown in the examples above. However, it is currently possible to specify them directly. This was the original method, but may become deprecated in later versions of `NiceLib`.
 
 _ffi_
     FFI instance variable. Required if not using ``_info_``.
@@ -230,7 +230,7 @@ There are two handlers that nicelib defines for convenience:
 
 Injected Parameters
 ~~~~~~~~~~~~~~~~~~~
-Sometimes it may be useful to give a handler more information about the function that was called, like the C parameters it was passed. If you define your handler to take one or more specially-named args, they will be automatically injected for you. These include::
+Sometimes it may be useful to give a handler more information about the function that was called, like the C parameters it was passed. If you define your handler to take one or more specially-named args, they will be automatically injected for you. These include:
 
 funcargs
     The list of all ``cffi``\-level args (including output args) that were passed to the C function

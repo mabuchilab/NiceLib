@@ -515,6 +515,7 @@ class BufOutArgHandler(ArgHandler):
 
 
 class RetHandler(object):
+    """Decorator class for creating return handlers"""
     def __init__(self, func=None, name=None, num_retvals=None):
         self.__name__ = name
         self.num_retvals = num_retvals
@@ -638,8 +639,8 @@ class NiceObject(with_metaclass(NiceObjectMeta, object)):
     ----------
     _prefix_ : str or sequence of strs, optional
         Prefix(es) to strip from the library "method" names. E.g. If the library has functions
-        named like ``SDK_Obj_Func()``, you can set `_prefix_` to ``'SDK_Obj_'``, and access them as
-        ``Func()``. If more than one prefix is given, they are tried in order for each signature
+        named like ``SDK_Obj_Func()``, you can set ``_prefix_`` to ``'SDK_Obj_'``, and access them
+        as ``Func()``. If more than one prefix is given, they are tried in order for each signature
         until the appropraite function is found.
     _ret_ : function or str, optional
         ``RetHandler`` to handle the return values of each C function. By default, the return value
@@ -655,7 +656,7 @@ class NiceObject(with_metaclass(NiceObjectMeta, object)):
         in bytes
     _buflen_ : int, optional
         The default length for buffers. This can be overridden on a per-argument basis in the
-        argument's spec string, e.g `'len=64'` will make a 64-byte buffer.
+        argument's spec string, e.g ``'len=64'`` will make a 64-byte buffer.
     _use_numpy_ : bool, optional
         If true, convert output args marked as 'arr' to ``numpy`` arrays. Obviously requires
         ``numpy`` to be installed.
@@ -1228,7 +1229,7 @@ class NiceLib(with_metaclass(LibMeta, object)):
         in bytes
     _buflen_ : int, optional
         The default length for buffers. This can be overridden on a per-argument basis in the
-        argument's spec string, e.g `'len=64'` will make a 64-byte buffer.
+        argument's spec string, e.g ``'len=64'`` will make a 64-byte buffer.
     _use_numpy_ : bool, optional
         If true, convert output args marked as 'arr' to ``numpy`` arrays. Obviously requires
         ``numpy`` to be installed.

@@ -15,7 +15,7 @@ import copy
 import warnings
 import logging
 import pickle as pkl
-from enum import Enum
+from enum import Enum, auto
 from collections import OrderedDict, namedtuple, defaultdict, deque
 import ast
 from io import StringIO
@@ -38,8 +38,20 @@ if PY2:
 log = logging.getLogger(__name__)
 cparser = cpp_parser.CPPParser()
 
-TokenType = Enum('TokenType', 'DEFINED IDENTIFIER NUMBER STRING_CONST CHAR_CONST HEADER_NAME '
-                 'PUNCTUATOR NEWLINE WHITESPACE LINE_COMMENT BLOCK_COMMENT')
+class TokenType(Enum):
+    """Enum of token types for C Preprocessor"""
+    DEFINED = auto()  #: 'defined'
+    IDENTIFIER = auto()  #: Identifier
+    NUMBER = auto()  #: Numeric literal
+    STRING_CONST = auto()  #: String literal (e.g. ``"my string"``)
+    CHAR_CONST = auto()  #: Char literal (e.g. ``'c'``)
+    HEADER_NAME = auto()  #: Header name (inside ``<angle brackets>``)
+    PUNCTUATOR = auto()  #: Punctuation token
+    NEWLINE = auto()  #: Newline char
+    WHITESPACE = auto()  #: Non-newline whitespace
+    LINE_COMMENT = auto()  #: Line comment (starts with ``//``)
+    BLOCK_COMMENT = auto()  #: Block comment (inside ``/*`` ``*/``)
+
 Position = namedtuple('Position', ['row', 'col'])
 
 
@@ -994,16 +1006,16 @@ class Parser(object):
 class TreeModifier(c_ast.NodeVisitor):
     """A special type of visitor class that modifies an AST in place
 
-    Subclass this and implement the various `visit_X` methods which transform nodes of each type.
+    Subclass this and implement the various ``visit_X`` methods which transform nodes of each type.
     You can then instantiate the class and use it to implement an AST hook.
 
-    Its `visit_X` methods must return a value, which correspond to the transformed node. If the node
-    is contained in a parent node's list and its `visit_X` method returns None, it will be removed
-    from the list. This modification/removal is implemented via `generic_visit`, so you can override
-    it on a per-nodetype basis.
+    Its ``visit_X`` methods must return a value, which correspond to the transformed node. If the
+    node is contained in a parent node's list and its ``visit_X`` method returns None, it will be
+    removed from the list. This modification/removal is implemented via `generic_visit`, so you can
+    override it on a per-nodetype basis.
 
-    The `X` in `visit_X` is the node type's name, e.g. `visit_Enum`. See ``pycparser.c_ast`` or
-    ``pycparser._c_ast.cfg`` for all the available types of nodes, and
+    The ``X`` in ``visit_X`` is the node type's name, e.g. ``visit_Enum``. See ``pycparser.c_ast``
+    or ``pycparser._c_ast.cfg`` for all the available types of nodes, and
     ``pycparser.c_ast.NodeVisitor`` to see the base visitor class.
     """
     def visit(self, node):
@@ -1693,41 +1705,41 @@ def process_headers(header_paths, predef_path=None, update_cb=None, ignored_head
     header_paths : str or sequence of strs
         Paths of the headers
     ignored_headers : sequence of strs
-        Names of headers to ignore; `#include`\\s containing these will be skipped.
+        Names of headers to ignore; ``#include``\\s containing these will be skipped.
     ignore_system_headers : bool
-        If True, skip inclusion of headers specified with angle brackets, e.g. `#include
-        <stdarg.h>` Header files specified with double quotes are processed as ususal. Default is
+        If True, skip inclusion of headers specified with angle brackets, e.g. ``#include
+        <stdarg.h>`` Header files specified with double quotes are processed as ususal. Default is
         False.
     debug_file : str
-        File to write a partially-processed header to just before it is parsed by `pycparser`.
-        Useful for debugging the preprocessor when `pycparser`'s parser chokes on its output.
+        File to write a partially-processed header to just before it is parsed by ``pycparser``.
+        Useful for debugging the preprocessor when ``pycparser``'s parser chokes on its output.
     preamble : str
-        C source to insert before the headers specified by `header_paths`. Useful for including
+        C source to insert before the headers specified by ``header_paths``. Useful for including
         typedefs that would otherwise be hard to reach due to an end user missing headers.
-    token_hooks : sequence of functions
+        token_hooks : sequence of functions
         Hook functions to be run on the already preprocessed token stream. Each function should
-        accept and return a sequence of `Token`\\s. These are applied after any builtin token hooks.
+        accept and return a sequence of ``Token``\\s. These are applied after any builtin token hooks.
     ast_hooks : sequence of functions
         Hook functions to be run on chunks of the header's C AST. After preprocessing and running
         the token hooks, the tokens are grouped and joined to form a sequence of chunks called
         "external declarations" (declarations, typedefs, and function definitions). Each chunk is
-        parsed by `pycparser`, then passed through the list of AST hook functions to transform it.
+        parsed by ``pycparser``, then passed through the list of AST hook functions to transform it.
         These are applied after any builtin AST hooks.
 
-        AST hook functions take the parsed `FileAST` and the persistent `CParser` instance as
-        arguments, and return a transformed `FileAST`. It is useful to have a reference to the
+        AST hook functions take the parsed ``FileAST`` and the persistent ``CParser`` instance as
+        arguments, and return a transformed ``FileAST``. It is useful to have a reference to the
         parser to add phony typedefs if necessary.
     hook_groups : str or sequence of strs
         Predefined hook groups to use. Each hook group enables certain builtin hooks that are
         commonly used together. The only hook group available for now is 'C++'.
 
         'C++' : (declspec_hook, extern_c_hook, enum_type_hook, CPPTypedefAdder)
-            Hooks for converting C++-only headers into C syntax understandable by `cffi`.
+            Hooks for converting C++-only headers into C syntax understandable by ``cffi``.
     load_dump_file : bool
         Save the list of tokens resulting from preprocessing to 'token_dump.pkl'. See save_dump_file
         for more info.
     save_dump_file : bool
-        Ignore `header_paths` and load the already-preprocessed tokens from 'token_dump.pkl'. This
+        Ignore ``header_paths`` and load the already-preprocessed tokens from 'token_dump.pkl'. This
         can significantly speed up your turnaround time when debugging really large header sets
         when writing and debugging hooks.
 
@@ -2092,12 +2104,12 @@ def add_line_directive_hook(tokens):
 
 
 def declspec_hook(tokens):
-    """Removes all occurences of `__declspec(...)`"""
+    """Removes all occurences of ``__declspec(...)``"""
     return remove_pattern(tokens, ['__declspec', '(', '~~)~~'])
 
 
 def cdecl_hook(tokens):
-    """Removes `cdecl`, `_cdecl`, and `__cdecl`
+    """Removes ``cdecl``, ``_cdecl``, and ``__cdecl``
 
     Enabled by default.
     """
@@ -2107,14 +2119,14 @@ def cdecl_hook(tokens):
 
 
 def inline_hook(tokens):
-    """Removes `_inline`, `__inline`, and `__forceinline`"""
+    """Removes ``_inline``, ``__inline``, and ``__forceinline``"""
     for token in tokens:
         if token not in ('_inline', '__inline', '__forceinline'):
             yield token
 
 
 def extern_c_hook(tokens):
-    """Removes `extern "C" { ... }` while keeping the block's contents"""
+    """Removes ``extern "C" { ... }`` while keeping the block's contents"""
     return modify_pattern(tokens, [('d', 'extern'), ('d', '"C"'), ('d', '{'), ('kd', '~~}~~')])
 
 
@@ -2235,16 +2247,16 @@ class ParseHelper(object):
     def read_to_depth(self, depth, discard=False):
         """Read until the specified nesting depth or the end of the token stream
 
-        If `discard` is False, returns a list of the tokens seen before either reaching the desired
-        depth or end-of-stream.
+        If ``discard`` is False, returns a list of the tokens seen before either reaching the
+        desired depth or end-of-stream.
 
-        If `discard` is True, returns True on reaching the desired depth, and raises StopIteration
+        If ``discard`` is True, returns True on reaching the desired depth, and raises StopIteration
         on end-of-stream.
 
         Always raises StopIteration if we're already at the end of the token stream.
 
-        Seeing a `(`, `{`, or `[` increases the depth, and seeing a `)`, `}`, or `]` decreases it.
-        The current depth is available via the `depth` attribute.
+        Seeing a ``(``, ``{``, or ``[`` increases the depth, and seeing a ``)``, ``}``, or ``]``
+        decreases it. The current depth is available via the ``depth`` attribute.
         """
         buf = []
 
@@ -2264,7 +2276,7 @@ class ParseHelper(object):
 
 
 def asm_hook(tokens):
-    """Remove `_asm` and `__asm` and their blocks"""
+    """Remove ``_asm`` and ``__asm`` and their blocks"""
     ph = ParseHelper(tokens)
 
     try:
@@ -2289,11 +2301,11 @@ def asm_hook(tokens):
 
 
 def stdcall_hook(tokens):
-    """Replace `__stdcall` and `WINAPI` with `volatile volatile const`
+    """Replace ``__stdcall`` and ``WINAPI`` with ``volatile volatile const``
 
     Enabled by default.
 
-    This technique is stolen from `cffi`.
+    This technique is stolen from ``cffi``.
     """
     ph = ParseHelper(tokens)
 
@@ -2317,7 +2329,7 @@ def stdcall_hook(tokens):
 
 
 def vc_pragma_hook(tokens):
-    """Remove `__pragma(...)`"""
+    """Remove ``__pragma(...)``"""
     ph = ParseHelper(tokens)
 
     try:

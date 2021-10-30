@@ -49,17 +49,17 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     module_name : str
         Name of module to create. Must be in the format ``'_*lib'``, e.g. ``'_mylib'``
     filedir : str
-        Path indicating the directory where the generated module will be saved. If `filedir` points
-        to an existing file, that file's directory is used. Usually you would pass the ``__file__``
-        attribute from your build module.
+        Path indicating the directory where the generated module will be saved. If ``filedir``
+        points to an existing file, that file's directory is used. Usually you would pass the
+        ``__file__`` attribute from your build module.
     ignored_headers : sequence of strs
-        Names of headers to ignore; `#include`\s containing these will be skipped.
+        Names of headers to ignore; ``#include``\s containing these will be skipped.
     ignore_system_headers : bool
-        If True, skip inclusion of headers specified with angle brackets, e.g. `#include
-        <stdarg.h>` Header files specified with double quotes are processed as ususal. Default is
-        False.
+        If True, skip inclusion of headers specified with angle brackets, e.g.
+        ``#include <stdarg.h>`` Header files specified with double quotes are processed as ususal.
+        Default is False.
     preamble : str
-        C source to insert before the headers specified by `header_info`. Useful for including
+        C source to insert before the headers specified by ``header_info``. Useful for including
         typedefs that would otherwise be hard to reach due to an end user missing headers.
     token_hooks : sequence of functions
         Token hook functions. See `process_headers()` for more info.
@@ -68,8 +68,8 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
     hook_groups : str or sequence of strs
         Hook groups. See `process_headers()` for more info.
     debug_file : str
-        File to write a partially-processed header to just before it is parsed by `pycparser`.
-        Useful for debugging the preprocessor when `pycparser`'s parser chokes on its output.
+        File to write a partially-processed header to just before it is parsed by ``pycparser``.
+        Useful for debugging the preprocessor when ``pycparser``'s parser chokes on its output.
     logbuf : writeable buffer
         IO buffer to write() common log output to. By default this output will logged using the
         ``logging`` stdlib module, at the ``info`` log level. You can use ``sys.stdout`` to perform
@@ -78,7 +78,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         Save the list of tokens resulting from preprocessing to 'token_dump.pkl'. See save_dump_file
         for more info.
     save_dump_file : bool
-        Ignore `header_paths` and load the already-preprocessed tokens from 'token_dump.pkl'. This
+        Ignore ``header_paths`` and load the already-preprocessed tokens from 'token_dump.pkl'. This
         can significantly speed up your turnaround time when debugging really large header sets
         when writing and debugging hooks.
 
