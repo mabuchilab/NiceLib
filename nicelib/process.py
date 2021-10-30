@@ -15,7 +15,7 @@ import copy
 import warnings
 import logging
 import pickle as pkl
-from enum import Enum, auto
+from enum import Enum
 from collections import OrderedDict, namedtuple, defaultdict, deque
 import ast
 from io import StringIO
@@ -40,17 +40,17 @@ cparser = cpp_parser.CPPParser()
 
 class TokenType(Enum):
     """Enum of token types for C Preprocessor"""
-    DEFINED = auto()  #: 'defined'
-    IDENTIFIER = auto()  #: Identifier
-    NUMBER = auto()  #: Numeric literal
-    STRING_CONST = auto()  #: String literal (e.g. ``"my string"``)
-    CHAR_CONST = auto()  #: Char literal (e.g. ``'c'``)
-    HEADER_NAME = auto()  #: Header name (inside ``<angle brackets>``)
-    PUNCTUATOR = auto()  #: Punctuation token
-    NEWLINE = auto()  #: Newline char
-    WHITESPACE = auto()  #: Non-newline whitespace
-    LINE_COMMENT = auto()  #: Line comment (starts with ``//``)
-    BLOCK_COMMENT = auto()  #: Block comment (inside ``/*`` ``*/``)
+    DEFINED = 1  #: 'defined'
+    IDENTIFIER = 2  #: Identifier
+    NUMBER = 3  #: Numeric literal
+    STRING_CONST = 4  #: String literal (e.g. ``"my string"``)
+    CHAR_CONST = 5  #: Char literal (e.g. ``'c'``)
+    HEADER_NAME = 6  #: Header name (inside ``<angle brackets>``)
+    PUNCTUATOR = 7  #: Punctuation token
+    NEWLINE = 8  #: Newline char
+    WHITESPACE = 9  #: Non-newline whitespace
+    LINE_COMMENT = 10  #: Line comment (starts with ``//``)
+    BLOCK_COMMENT = 11  #: Block comment (inside ``/*`` ``*/``)
 
 Position = namedtuple('Position', ['row', 'col'])
 
