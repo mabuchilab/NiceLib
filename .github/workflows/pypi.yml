@@ -39,5 +39,6 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Debug
-        run: echo "event_name ${{ github.event_name }}"
-        run: echo "event.action ${{ github.event.action }}"
+        run: |
+          echo "event_name ${{ github.event_name }}"
+          echo "event.action ${{ github.event.action }}"
