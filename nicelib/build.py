@@ -157,7 +157,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
 
     logbuf.write("Compiling cffi module...\n")
     ffi = cffi.FFI()
-    ffi.cdef(clean_header_str)
+    ffi.cdef(clean_header_str, pack=pack)
     ffi.set_source('.' + module_name, None)
     ffi.compile(tmpdir=filedir)
 
