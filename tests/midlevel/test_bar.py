@@ -1,6 +1,5 @@
 import sys
 from nicelib import NiceLib, load_lib
-from pathlib import Path
 
 
 class NiceBar(NiceLib):
@@ -11,7 +10,7 @@ class NiceBar(NiceLib):
 class NiceBar2(NiceLib):
     """Bar2 not packed"""
     _info = load_lib('bar2', pkg=None, dir=__file__)
-    
+
 
 def test_packed():
     ffi = NiceBar._ffi
