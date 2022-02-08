@@ -22,7 +22,7 @@ class LogBuffer(object):
 def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
               ignore_system_headers=False, preamble=None, token_hooks=(), ast_hooks=(),
               hook_groups=(), debug_file=None, logbuf=None, load_dump_file=False,
-              save_dump_file=False):
+              save_dump_file=False, pack=None):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -81,7 +81,11 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         Ignore ``header_paths`` and load the already-preprocessed tokens from 'token_dump.pkl'. This
         can significantly speed up your turnaround time when debugging really large header sets
         when writing and debugging hooks.
-
+    pack: int
+        Forwared to ``FFI.cdef``. Controls the packing of structs if necessary.
+        This has to be done manullay since CFFI ignores ``#pragma pack`` and gcc
+        directives. See the CFFI documentation for more information.
+        
     Notes
     -----
     ``header_info`` and ``lib_name`` can each be a dict that maps from a platform to the
