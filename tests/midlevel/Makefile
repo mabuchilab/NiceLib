@@ -9,4 +9,4 @@ libbar:
 	$(CC) -shared -o libbar.so bar.o
 
 clean:
-	rm foo.o libfoo.so _foolib.py libbar.so _barlib.py
+	rm foo.o libfoo.so _foolib.py libbar.so _barlib.py _bar2lib.py
