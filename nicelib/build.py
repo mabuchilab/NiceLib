@@ -22,7 +22,7 @@ class LogBuffer(object):
 def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
               ignore_system_headers=False, preamble=None, token_hooks=(), ast_hooks=(),
               hook_groups=(), debug_file=None, logbuf=None, load_dump_file=False,
-              save_dump_file=False, pack=None):
+              save_dump_file=False, pack=None, override=False):
     """Build a low-level Python wrapper of a C lib
 
     Parameters
@@ -82,10 +82,13 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
         can significantly speed up your turnaround time when debugging really large header sets
         when writing and debugging hooks.
     pack: int
-        Forwared to ``FFI.cdef``. Controls the packing of structs if necessary.
-        This has to be done manullay since CFFI ignores ``#pragma pack`` and gcc
-        directives. See the CFFI documentation for more information.
-        
+        Forwared to ``FFI.cdef``. Controls the packing of structs if necessary. This has to be done
+        manually since CFFI ignores ``#pragma pack`` and gcc directives. See the CFFI documentation
+        for more information.
+    override: bool
+        Forwarded to ``FFI.cdef``. If True, allows repeated declarations; the final declaration will
+        override any others. Otherwise, repeated declarations are treated as an error.
+
     Notes
     -----
     ``header_info`` and ``lib_name`` can each be a dict that maps from a platform to the
@@ -157,7 +160,7 @@ def build_lib(header_info, lib_name, module_name, filedir, ignored_headers=(),
 
     logbuf.write("Compiling cffi module...\n")
     ffi = cffi.FFI()
-    ffi.cdef(clean_header_str, pack=pack)
+    ffi.cdef(clean_header_str, pack=pack, override=override)
     ffi.set_source('.' + module_name, None)
     ffi.compile(tmpdir=filedir)
 
