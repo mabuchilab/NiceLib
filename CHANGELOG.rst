@@ -1,6 +1,15 @@
 Change Log
 ==========
 
+(0.7.1) 2022-5-29
+-----------------
+
+Added
+"""""
+- ``pack`` argument for ``build_lib`` to configure struct packing
+- ``override`` argument for ``build_lib`` to configure whether repeated declarations are supported.
+
+
 (0.7) 2021-10-27
 ----------------
 
@@ -10,8 +19,8 @@ Added
 - LibFunction kwarg support for Python 3.3 and later
 - Path for community edition of Visual Studio (thanks @DerekK88)
 
- Changed
- """""""
+Changed
+"""""""
  - Fixed ``to_py_src`` to handle unsigned int, long int, and double constants
  - Consolidated warnings for un-pythonable macros
 
